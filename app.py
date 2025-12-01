@@ -63,8 +63,8 @@ sheet = service.spreadsheets()
 USERS = {
     "Iván": {
         "Física":   {"est": f"{NOMBRE_HOJA}!C4", "time": f"{NOMBRE_HOJA}!D4"},
-        "Álgebra":  {"est": f"{NOMBRE_HOJA}!C5", "time": f"{NOMBRE_HOJA}!D5"},
-        "Análisis": {"est": f"{NOMBRE_HOJA}!C6", "time": f"{NOMBRE_HOJA}!D6"},
+        "Análisis":  {"est": f"{NOMBRE_HOJA}!C5", "time": f"{NOMBRE_HOJA}!D5"},
+        "Álgebra": {"est": f"{NOMBRE_HOJA}!C6", "time": f"{NOMBRE_HOJA}!D6"},
     },
     "Facundo": {
         "Economía":   {"est": f"{NOMBRE_HOJA}!G4", "time": f"{NOMBRE_HOJA}!H4"},
@@ -325,3 +325,4 @@ with colB:
                 st.markdown("🟢 **Estudiando**")
             else:
                 st.markdown("⚪")
+
