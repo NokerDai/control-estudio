@@ -1,16 +1,23 @@
 import json
 from google.oauth2 import service_account
 import streamlit as st
-from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from datetime import datetime
 
-# Carga las credenciales desde los secretos de Streamlit
-key_dict = json.loads(st.secrets["textkey"])
-creds = service_account.Credentials.from_service_account_info(
-    key_dict,
-    scopes=["https://www.googleapis.com/auth/spreadsheets"]
-)
+# ==============================
+# CONFIGURACIÓN DE CREDENCIALES
+# ==============================
+# Carga las credenciales desde los secretos de Streamlit (st.secrets["textkey"])
+try:
+    key_dict = json.loads(st.secrets["textkey"])
+    creds = service_account.Credentials.from_service_account_info(
+        key_dict,
+        scopes=["https://www.googleapis.com/auth/spreadsheets"]
+    )
+except KeyError:
+    st.error("Error: Falta configurar el secreto 'textkey' en Streamlit Cloud.")
+    st.stop()
+
 
 # -------------------------
 # CONFIGURACIÓN GOOGLE SHEETS
@@ -18,7 +25,10 @@ creds = service_account.Credentials.from_service_account_info(
 SHEET_ID = "1KPdcnRlSjY-4xEUcZO194lwAnlNKx1UaElyDTeczo5Y"
 NOMBRE_HOJA = "Código"
 
-# USUARIO FIJO
+
+# ==============================
+# SELECCIÓN DE USUARIO (USO DE SESSION STATE)
+# ==============================
 if "usuario_seleccionado" not in st.session_state:
     st.title("¿Quién sos?")
     col_u1, col_u2 = st.columns(2)
@@ -33,12 +43,12 @@ if "usuario_seleccionado" not in st.session_state:
             st.session_state["usuario_seleccionado"] = "Iván"
             st.rerun()
             
-    st.stop()  # Detiene la ejecución aquí hasta que alguien elija
+    st.stop()
 
-# Una vez elegido, asignamos la variable que usaba tu código original
+# Asignamos la variable principal
 USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
 
-# Agregamos un botón chiquito en la barra lateral por si le pifiaron al dedo
+# Agregamos un botón para cambiar de usuario
 if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
     del st.session_state["usuario_seleccionado"]
     st.rerun()
@@ -82,6 +92,15 @@ def segundos_a_hms(seg):
     m = (seg % 3600) // 60
     s = seg % 60
     return f"{h:02d}:{m:02d}:{s:02d}"
+
+
+# ==============================
+# FUNCIONES DE CALLBACK PARA EVITAR ERRORES
+# ==============================
+def enable_manual_input(materia_key):
+    """Habilita el input manual para la materia dada usando on_click."""
+    # Establece la clave de session_state asociada al input manual
+    st.session_state[f"manual_{materia_key}"] = True
 
 
 # ==============================
@@ -219,18 +238,29 @@ with colA:
                         st.rerun()
 
             # ======================
-            # TIEMPO MANUAL (✏️)
+            # TIEMPO MANUAL (✏️) - CORREGIDO
             # ======================
             with b2:
-                if st.button("✏️", key=f"manual_{materia}", help="Poner tiempo manual"):
-                    st.session_state[f"manual_{materia}"] = True
+                # Usamos on_click para cambiar el estado de forma segura
+                if st.button(
+                    "✏️", 
+                    key=f"manual_{materia}", 
+                    help="Poner tiempo manual",
+                    on_click=enable_manual_input, # <-- Corrección
+                    args=[materia]
+                ):
+                    pass # La lógica principal está en la función
 
             if st.session_state.get(f"manual_{materia}", False):
                 nuevo = st.text_input(f"Tiempo para {materia} (HH:MM:SS):", key=f"in_{materia}")
+                
+                # Botón de guardar para el input manual
                 if st.button("Guardar", key=f"save_{materia}"):
                     try:
-                        hms_a_segundos(nuevo)
+                        hms_a_segundos(nuevo) # Valida el formato
                         batch_write([(info["time"], nuevo)])
+                        
+                        # Al guardar, desactivamos el input y recargamos
                         st.session_state[f"manual_{materia}"] = False
                         st.rerun()
                     except:
