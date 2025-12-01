@@ -210,22 +210,25 @@ with colA:
                 tiempo_anadido_seg = int((datetime.now() - inicio).total_seconds())
 
             tiempo_acum_seg = hms_a_segundos(tiempo_acum)
-            tiempo_total_proyectado_seg = tiempo_acum_seg + max(0, tiempo_anadido_seg) # Usamos max(0, ...) en la visualización
+            tiempo_total_proyectado_seg = tiempo_acum_seg + max(0, tiempo_anadido_seg)
             tiempo_total_proyectado_hms = segundos_a_hms(tiempo_total_proyectado_seg)
             # --------------------------------------------------------
 
-            # Display: Acumulado
-            st.write(f"🕒 Acumulado: {tiempo_acum}")
+            # Display: Total Proyectado (Acumulado + En proceso) (MODIFICADO)
+            st.write(f"🕒 Total: **{tiempo_total_proyectado_hms}**")
             
-            # Display: Proyectado (solo si está estudiando)
+            # Display: Detalle (solo si está estudiando)
             if est_raw.strip() != "":
                 tiempo_anadido_hms = segundos_a_hms(max(0, tiempo_anadido_seg))
-                st.markdown(f"**⏳ En proceso:** +{tiempo_anadido_hms} (Total: **{tiempo_total_proyectado_hms}**)")
+                st.caption(f"Base: {tiempo_acum} | En proceso: +{tiempo_anadido_hms}")
+                st.markdown("🟢 **Estudiando**")
+            else:
+                st.markdown("⚪")
 
             b1, b2, _ = st.columns([0.2, 0.2, 0.6])
 
             # ======================
-            # DETENER (CORRECCIÓN APLICADA AQUÍ)
+            # DETENER
             # ======================
             if est_raw.strip() != "":
                 with b1:
@@ -233,10 +236,7 @@ with colA:
                         inicio = parse_datetime(est_raw)
                         fin = datetime.now()
                         
-                        # Calcular la diferencia total en segundos
                         diff_total_seconds = (fin - inicio).total_seconds()
-                        
-                        # FIX: Asegurarse de que el tiempo estudiado no sea negativo
                         diff = int(max(0, diff_total_seconds)) 
 
                         total_prev = hms_a_segundos(tiempo_acum)
@@ -311,19 +311,17 @@ with colB:
                 tiempo_anadido_seg = int((datetime.now() - inicio).total_seconds())
 
             tiempo_acum_seg = hms_a_segundos(tiempo)
-            tiempo_total_proyectado_seg = tiempo_acum_seg + max(0, tiempo_anadido_seg) # Usamos max(0, ...) en la visualización
+            tiempo_total_proyectado_seg = tiempo_acum_seg + max(0, tiempo_anadido_seg)
             tiempo_total_proyectado_hms = segundos_a_hms(tiempo_total_proyectado_seg)
             # --------------------------------------------------------
 
-            # Display: Acumulado
-            st.write(f"🕒 Acumulado: {tiempo}")
+            # Display: Total Proyectado (Acumulado + En proceso) (MODIFICADO)
+            st.write(f"🕒 Total: **{tiempo_total_proyectado_hms}**")
             
-            # Display: Proyectado (solo si está estudiando)
+            # Display: Detalle (solo si está estudiando)
             if est_raw.strip() != "":
                 tiempo_anadido_hms = segundos_a_hms(max(0, tiempo_anadido_seg))
-                st.markdown(f"**⏳ En proceso:** +{tiempo_anadido_hms} (Total: **{tiempo_total_proyectado_hms}**)")
-
-            if est_raw.strip() != "":
-                st.markdown("🟢 Estudiando")
+                st.caption(f"Base: {tiempo} | En proceso: +{tiempo_anadido_hms}")
+                st.markdown("🟢 **Estudiando**")
             else:
                 st.markdown("⚪")
