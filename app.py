@@ -30,7 +30,7 @@ NOMBRE_HOJA = "Código"
 # SELECCIÓN DE USUARIO (USO DE SESSION STATE)
 # ==============================
 if "usuario_seleccionado" not in st.session_state:
-    st.title("¿Quién sos?")
+    st.title("¿Quién sos? 👤")
     col_u1, col_u2 = st.columns(2)
     
     with col_u1:
@@ -95,12 +95,12 @@ def segundos_a_hms(seg):
 
 
 # ==============================
-# FUNCIONES DE CALLBACK PARA EVITAR ERRORES
+# FUNCIONES DE CALLBACK PARA EVITAR ERRORES (FIX)
 # ==============================
 def enable_manual_input(materia_key):
-    """Habilita el input manual para la materia dada usando on_click."""
-    # Establece la clave de session_state asociada al input manual
-    st.session_state[f"manual_{materia_key}"] = True
+    """Habilita el input manual. Usa una clave distinta a la del botón."""
+    # Usamos 'show_manual_' para controlar la visibilidad y evitar el error
+    st.session_state[f"show_manual_{materia_key}"] = True
 
 
 # ==============================
@@ -241,17 +241,18 @@ with colA:
             # TIEMPO MANUAL (✏️) - CORREGIDO
             # ======================
             with b2:
-                # Usamos on_click para cambiar el estado de forma segura
+                # El botón usa 'manual_{materia}' como key, y on_click llama a enable_manual_input
                 if st.button(
                     "✏️", 
                     key=f"manual_{materia}", 
                     help="Poner tiempo manual",
-                    on_click=enable_manual_input, # <-- Corrección
+                    on_click=enable_manual_input, 
                     args=[materia]
                 ):
-                    pass # La lógica principal está en la función
+                    pass 
 
-            if st.session_state.get(f"manual_{materia}", False):
+            # Controlamos la visibilidad usando la clave 'show_manual_'
+            if st.session_state.get(f"show_manual_{materia}", False):
                 nuevo = st.text_input(f"Tiempo para {materia} (HH:MM:SS):", key=f"in_{materia}")
                 
                 # Botón de guardar para el input manual
@@ -260,8 +261,8 @@ with colA:
                         hms_a_segundos(nuevo) # Valida el formato
                         batch_write([(info["time"], nuevo)])
                         
-                        # Al guardar, desactivamos el input y recargamos
-                        st.session_state[f"manual_{materia}"] = False
+                        # Al guardar, desactivamos la VISIBILIDAD y recargamos
+                        st.session_state[f"show_manual_{materia}"] = False
                         st.rerun()
                     except:
                         st.error("Formato inválido (usar HH:MM:SS)")
