@@ -84,7 +84,6 @@ def parse_datetime(s):
     return datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
 
 def hms_a_segundos(hms):
-    # Maneja el caso de hms vacío o None, aunque la hoja debería tener 00:00:00
     if not hms or hms.strip() == "":
         return 0
     h, m, s = hms.split(":")
@@ -204,15 +203,14 @@ with colA:
 
             st.markdown(f"**{materia}**")
             
-            # --- Lógica de cálculo de tiempo proyectado (NUEVO) ---
+            # --- Lógica de cálculo de tiempo proyectado ---
             tiempo_anadido_seg = 0
             if est_raw.strip() != "":
                 inicio = parse_datetime(est_raw)
-                # El tiempo añadido es la diferencia entre ahora y la hora de inicio
                 tiempo_anadido_seg = int((datetime.now() - inicio).total_seconds())
 
             tiempo_acum_seg = hms_a_segundos(tiempo_acum)
-            tiempo_total_proyectado_seg = tiempo_acum_seg + tiempo_anadido_seg
+            tiempo_total_proyectado_seg = tiempo_acum_seg + max(0, tiempo_anadido_seg) # Usamos max(0, ...) en la visualización
             tiempo_total_proyectado_hms = segundos_a_hms(tiempo_total_proyectado_seg)
             # --------------------------------------------------------
 
@@ -220,21 +218,26 @@ with colA:
             st.write(f"🕒 Acumulado: {tiempo_acum}")
             
             # Display: Proyectado (solo si está estudiando)
-            if tiempo_anadido_seg > 0:
-                tiempo_anadido_hms = segundos_a_hms(tiempo_anadido_seg)
+            if est_raw.strip() != "":
+                tiempo_anadido_hms = segundos_a_hms(max(0, tiempo_anadido_seg))
                 st.markdown(f"**⏳ En proceso:** +{tiempo_anadido_hms} (Total: **{tiempo_total_proyectado_hms}**)")
 
             b1, b2, _ = st.columns([0.2, 0.2, 0.6])
 
             # ======================
-            # DETENER
+            # DETENER (CORRECCIÓN APLICADA AQUÍ)
             # ======================
             if est_raw.strip() != "":
                 with b1:
                     if st.button("⛔", key=f"det_{materia}", help="Detener estudio"):
                         inicio = parse_datetime(est_raw)
                         fin = datetime.now()
-                        diff = int((fin - inicio).total_seconds())
+                        
+                        # Calcular la diferencia total en segundos
+                        diff_total_seconds = (fin - inicio).total_seconds()
+                        
+                        # FIX: Asegurarse de que el tiempo estudiado no sea negativo
+                        diff = int(max(0, diff_total_seconds)) 
 
                         total_prev = hms_a_segundos(tiempo_acum)
                         nuevo_total = total_prev + diff
@@ -301,15 +304,14 @@ with colB:
         with box:
             st.markdown(f"**{materia}**")
 
-            # --- Lógica de cálculo de tiempo proyectado (NUEVO) ---
+            # --- Lógica de cálculo de tiempo proyectado ---
             tiempo_anadido_seg = 0
             if est_raw.strip() != "":
                 inicio = parse_datetime(est_raw)
-                # El tiempo añadido es la diferencia entre ahora y la hora de inicio
                 tiempo_anadido_seg = int((datetime.now() - inicio).total_seconds())
 
             tiempo_acum_seg = hms_a_segundos(tiempo)
-            tiempo_total_proyectado_seg = tiempo_acum_seg + tiempo_anadido_seg
+            tiempo_total_proyectado_seg = tiempo_acum_seg + max(0, tiempo_anadido_seg) # Usamos max(0, ...) en la visualización
             tiempo_total_proyectado_hms = segundos_a_hms(tiempo_total_proyectado_seg)
             # --------------------------------------------------------
 
@@ -317,8 +319,8 @@ with colB:
             st.write(f"🕒 Acumulado: {tiempo}")
             
             # Display: Proyectado (solo si está estudiando)
-            if tiempo_anadido_seg > 0:
-                tiempo_anadido_hms = segundos_a_hms(tiempo_anadido_seg)
+            if est_raw.strip() != "":
+                tiempo_anadido_hms = segundos_a_hms(max(0, tiempo_anadido_seg))
                 st.markdown(f"**⏳ En proceso:** +{tiempo_anadido_hms} (Total: **{tiempo_total_proyectado_hms}**)")
 
             if est_raw.strip() != "":
