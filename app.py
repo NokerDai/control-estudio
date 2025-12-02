@@ -3,6 +3,11 @@ from google.oauth2 import service_account
 import streamlit as st
 from googleapiclient.discovery import build
 from datetime import datetime
+st.set_page_config(
+    page_title="Control de Estudio",
+    page_icon="⏳",  # podés usar un emoji o una imagen .png
+    layout="centered"
+)
 
 # ==============================
 # CONFIGURACIÓN DE CREDENCIALES
@@ -333,6 +338,7 @@ with colB:
                 st.markdown("🟢 **Estudiando**")
             else:
                 st.markdown("⚪")
+
 
 
 
