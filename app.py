@@ -187,15 +187,22 @@ colA, colB = st.columns(2)
 
 
 # ==============================
-# PANEL USUARIO ACTUAL (editable)
+# PANEL USUARIO ACTUAL
 # ==============================
 with colA:
     st.subheader(f"👤 {USUARIO_ACTUAL}")
     mis_materias = USERS[USUARIO_ACTUAL]
 
+    # Detectar si el usuario está estudiando algo
+    materia_en_curso = None
+    for m, info in mis_materias.items():
+        if datos[USUARIO_ACTUAL]["estado"][m].strip() != "":
+            materia_en_curso = m
+            break
+
     for materia, info in mis_materias.items():
 
-        est_raw = datos[USUARIO_ACTUAL]["estado"][materia]  # hora o ""
+        est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
         tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
 
         box = st.container()
@@ -203,7 +210,6 @@ with colA:
 
             st.markdown(f"**{materia}**")
             
-            # --- Lógica de cálculo de tiempo proyectado ---
             tiempo_anadido_seg = 0
             if est_raw.strip() != "":
                 inicio = parse_datetime(est_raw)
@@ -212,12 +218,9 @@ with colA:
             tiempo_acum_seg = hms_a_segundos(tiempo_acum)
             tiempo_total_proyectado_seg = tiempo_acum_seg + max(0, tiempo_anadido_seg)
             tiempo_total_proyectado_hms = segundos_a_hms(tiempo_total_proyectado_seg)
-            # --------------------------------------------------------
 
-            # Display: Total Proyectado (Acumulado + En proceso) (MODIFICADO)
             st.write(f"🕒 Total: **{tiempo_total_proyectado_hms}**")
-            
-            # Display: Detalle (solo si está estudiando)
+
             if est_raw.strip() != "":
                 tiempo_anadido_hms = segundos_a_hms(max(0, tiempo_anadido_seg))
                 st.caption(f"Base: {tiempo_acum} | En proceso: +{tiempo_anadido_hms}")
@@ -227,17 +230,16 @@ with colA:
 
             b1, b2, _ = st.columns([0.2, 0.2, 0.6])
 
-            # ======================
-            # DETENER
-            # ======================
-            if est_raw.strip() != "":
+            # =====================================================
+            # SI ESTA ES LA MATERIA EN CURSO → SOLO MOSTRAR ⛔
+            # =====================================================
+            if materia_en_curso == materia:
                 with b1:
                     if st.button("⛔", key=f"det_{materia}", help="Detener estudio"):
                         inicio = parse_datetime(est_raw)
                         fin = datetime.now()
-                        
                         diff_total_seconds = (fin - inicio).total_seconds()
-                        diff = int(max(0, diff_total_seconds)) 
+                        diff = int(max(0, diff_total_seconds))
 
                         total_prev = hms_a_segundos(tiempo_acum)
                         nuevo_total = total_prev + diff
@@ -249,47 +251,50 @@ with colA:
 
                         st.rerun()
 
-            # ======================
-            # ESTUDIAR
-            # ======================
-            else:
-                with b1:
-                    if st.button("▶", key=f"est_{materia}", help="Comenzar a estudiar"):
-                        limpiar_estudiando(mis_materias)
-                        batch_write([
-                            (info["est"], ahora_str())
-                        ])
+                # NO mostrar nada más
+                continue
+
+            # =====================================================
+            # SI SE ESTÁ ESTUDIANDO OTRA MATERIA → NO MOSTRAR BOTONES
+            # =====================================================
+            if materia_en_curso is not None:
+                # No mostrar nada de botones ni edición
+                continue
+
+            # =====================================================
+            # SI NO SE ESTÁ ESTUDIANDO NADA → MOSTRAR TODO NORMAL
+            # =====================================================
+
+            # ▶ Estudiar
+            with b1:
+                if st.button("▶", key=f"est_{materia}", help="Comenzar a estudiar"):
+                    limpiar_estudiando(mis_materias)
+                    batch_write([(info["est"], ahora_str())])
+                    st.rerun()
+
+            # ✏️ Editar tiempo
+            with b2:
+                if st.button(
+                    "✏️", 
+                    key=f"manual_{materia}", 
+                    help="Poner tiempo manual",
+                    on_click=enable_manual_input,
+                    args=[materia]
+                ):
+                    pass
+
+            if st.session_state.get(f"show_manual_{materia}", False):
+                nuevo = st.text_input(f"Tiempo para {materia} (HH:MM:SS):", key=f"in_{materia}")
+                
+                if st.button("Guardar", key=f"save_{materia}"):
+                    try:
+                        hms_a_segundos(nuevo)
+                        batch_write([(info["time"], nuevo)])
+                        
+                        st.session_state[f"show_manual_{materia}"] = False
                         st.rerun()
-
-            # ======================
-            # TIEMPO MANUAL (✏️)
-            # Mostrar solo si NO está estudiando
-            # ======================
-            if est_raw.strip() == "":
-                with b2:
-                    if st.button(
-                        "✏️", 
-                        key=f"manual_{materia}", 
-                        help="Poner tiempo manual",
-                        on_click=enable_manual_input, 
-                        args=[materia]
-                    ):
-                        pass 
-            
-                # Mostrar input manual solo si NO está estudiando
-                if st.session_state.get(f"show_manual_{materia}", False):
-                    nuevo = st.text_input(f"Tiempo para {materia} (HH:MM:SS):", key=f"in_{materia}")
-                    
-                    if st.button("Guardar", key=f"save_{materia}"):
-                        try:
-                            hms_a_segundos(nuevo)
-                            batch_write([(info["time"], nuevo)])
-                            
-                            st.session_state[f"show_manual_{materia}"] = False
-                            st.rerun()
-                        except:
-                            st.error("Formato inválido (usar HH:MM:SS)")
-
+                    except:
+                        st.error("Formato inválido (usar HH:MM:SS)")
 
 # ==============================
 # PANEL OTRO USUARIO (solo lectura)
@@ -328,5 +333,6 @@ with colB:
                 st.markdown("🟢 **Estudiando**")
             else:
                 st.markdown("⚪")
+
 
 
