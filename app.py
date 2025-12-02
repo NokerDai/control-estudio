@@ -263,29 +263,32 @@ with colA:
 
             # ======================
             # TIEMPO MANUAL (✏️)
+            # Mostrar solo si NO está estudiando
             # ======================
-            with b2:
-                if st.button(
-                    "✏️", 
-                    key=f"manual_{materia}", 
-                    help="Poner tiempo manual",
-                    on_click=enable_manual_input, 
-                    args=[materia]
-                ):
-                    pass 
-
-            if st.session_state.get(f"show_manual_{materia}", False):
-                nuevo = st.text_input(f"Tiempo para {materia} (HH:MM:SS):", key=f"in_{materia}")
-                
-                if st.button("Guardar", key=f"save_{materia}"):
-                    try:
-                        hms_a_segundos(nuevo)
-                        batch_write([(info["time"], nuevo)])
-                        
-                        st.session_state[f"show_manual_{materia}"] = False
-                        st.rerun()
-                    except:
-                        st.error("Formato inválido (usar HH:MM:SS)")
+            if est_raw.strip() == "":
+                with b2:
+                    if st.button(
+                        "✏️", 
+                        key=f"manual_{materia}", 
+                        help="Poner tiempo manual",
+                        on_click=enable_manual_input, 
+                        args=[materia]
+                    ):
+                        pass 
+            
+                # Mostrar input manual solo si NO está estudiando
+                if st.session_state.get(f"show_manual_{materia}", False):
+                    nuevo = st.text_input(f"Tiempo para {materia} (HH:MM:SS):", key=f"in_{materia}")
+                    
+                    if st.button("Guardar", key=f"save_{materia}"):
+                        try:
+                            hms_a_segundos(nuevo)
+                            batch_write([(info["time"], nuevo)])
+                            
+                            st.session_state[f"show_manual_{materia}"] = False
+                            st.rerun()
+                        except:
+                            st.error("Formato inválido (usar HH:MM:SS)")
 
 
 # ==============================
@@ -325,4 +328,5 @@ with colB:
                 st.markdown("🟢 **Estudiando**")
             else:
                 st.markdown("⚪")
+
 
