@@ -65,7 +65,7 @@ SHEET_MARCAS = "marcas"
 
 DATE_ROW = 170
 TIME_ROW = DATE_ROW
-MARCAS_ROW = 2   # fila pedida para marcas de inicio
+MARCAS_ROW = 2   # fila de marcas de inicio
 
 # -------------------------------------------------------------------
 # MAPEO DE USUARIOS Y MATERIAS
@@ -127,6 +127,7 @@ def enable_manual_input(materia_key):
 # LECTURA MASIVA DESDE GOOGLE SHEETS
 # -------------------------------------------------------------------
 def cargar_todo():
+    sheet_id = st.secrets["sheet_id"]
     ranges = []
     for user, materias in USERS.items():
         for m, info in materias.items():
@@ -134,7 +135,7 @@ def cargar_todo():
             ranges.append(info["time"])
 
     res = sheet.values().batchGet(
-        spreadsheetId=st.secrets["sheet_id"],
+        spreadsheetId=sheet_id,
         ranges=ranges,
         valueRenderOption="FORMATTED_VALUE"
     ).execute()
@@ -166,12 +167,13 @@ def cargar_todo():
 # ESCRITURA MASIVA
 # -------------------------------------------------------------------
 def batch_write(updates):
+    sheet_id = st.secrets["sheet_id"]
     body = {
         "valueInputOption": "RAW",
         "data": [{"range": r, "values": [[v]]} for r, v in updates]
     }
     sheet.values().batchUpdate(
-        spreadsheetId=st.secrets["sheet_id"],
+        spreadsheetId=sheet_id,
         body=body
     ).execute()
 
@@ -211,7 +213,6 @@ if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
 st.title("⏳ Control de Estudio")
 
 # Cargar todo
-st.secrets["sheet_id"] = st.secrets["sheet_id"]  # aseguro alias interno
 datos = cargar_todo()
 
 if st.button("🔄 Actualizar tiempos"):
