@@ -211,7 +211,7 @@ if st.session_state[FECHA_KEY] < hoy:
     for usuario in USERS.keys():
         pasar_dia_usuario(usuario, datos[usuario])
     st.session_state[FECHA_KEY] = hoy
-    st.experimental_rerun()
+    st.rerun()
 
 # -----------------------------
 # Mostrar materias y tiempos
@@ -237,7 +237,7 @@ for materia, info in mis_materias.items():
         if st.button("▶", key=f"est_{materia}"):
             # iniciar estudio
             batch_write([(info["est"], ahora_str())])
-            st.experimental_rerun()
+            st.rerun()
     with b2:
         if st.button("⛔", key=f"det_{materia}"):
             # detener estudio y acumular minutos
@@ -246,7 +246,7 @@ for materia, info in mis_materias.items():
                 diff = int((datetime.now(TZ) - inicio).total_seconds())
                 tiempo_total = tiempo_seg + diff
                 batch_write([(info["time"], segundos_a_hms(tiempo_total)), (info["est"], "")])
-                st.experimental_rerun()
+                st.rerun()
 
 # -----------------------------
 # Mostrar pesos acumulados
@@ -256,3 +256,4 @@ for usuario in USERS.keys():
     precio = st.session_state.get(f"{usuario}_precio", PRECIO_PUNTOS_INICIAL)
     pesos = st.session_state.get(f"{usuario}_pesos", 0)
     st.write(f"{usuario}: ${pesos} acumulados | Precio puntos: {precio} minutos/$500")
+
