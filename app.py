@@ -40,19 +40,14 @@ def ahora_str():
     return datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S")
 
 def parse_datetime(s):
-    """Acepta timestamps con o sin zona y devuelve un datetime TZ-aware."""
     if not s or str(s).strip() == "":
         raise ValueError("Marca vacía")
     s = str(s).strip()
-
-    # Intentar con offset
     try:
         dt = datetime.strptime(s, "%Y-%m-%d %H:%M:%S%z")
         return dt.astimezone(TZ)
     except:
         pass
-
-    # Sin offset → asumir TZ local
     dt = datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
     return dt.replace(tzinfo=TZ)
 
@@ -65,7 +60,7 @@ SHEET_MARCAS = "marcas"
 
 DATE_ROW = 170
 TIME_ROW = DATE_ROW
-MARCAS_ROW = 2   # fila de marcas de inicio
+MARCAS_ROW = 2
 
 # -------------------------------------------------------------------
 # MAPEO DE USUARIOS Y MATERIAS
@@ -108,14 +103,18 @@ USERS = {
 def hms_a_segundos(hms):
     if not hms or hms.strip() == "":
         return 0
-    h, m, s = hms.split(":")
-    return int(h)*3600 + int(m)*60 + int(s)
+    h, m, s = map(int, hms.split(":"))
+    return h*3600 + m*60 + s
 
 def segundos_a_hms(seg):
     h = seg // 3600
     m = (seg % 3600) // 60
     s = seg % 60
     return f"{h:02d}:{m:02d}:{s:02d}"
+
+def hms_a_fraction(hms):
+    """Convierte 'HH:MM:SS' a fracción de día para Google Sheets."""
+    return hms_a_segundos(hms) / 86400
 
 # -------------------------------------------------------------------
 # UTILS PARA UI Y ESTADO
@@ -124,7 +123,7 @@ def enable_manual_input(materia_key):
     st.session_state[f"show_manual_{materia_key}"] = True
 
 # -------------------------------------------------------------------
-# LECTURA MASIVA DESDE GOOGLE SHEETS
+# LECTURA MASIVA
 # -------------------------------------------------------------------
 def cargar_todo():
     sheet_id = st.secrets["sheet_id"]
@@ -148,16 +147,12 @@ def cargar_todo():
     for user, materias in USERS.items():
         for materia, info in materias.items():
 
-            # estado (marca de inicio)
             est_val = values[idx].get("values", [[]])
             est_val = est_val[0][0] if est_val and est_val[0] else ""
-            est_val = est_val.lstrip("'")  # ❌ Limpiar comilla inicial
             idx += 1
 
-            # tiempo acumulado
             time_val = values[idx].get("values", [[]])
             time_val = time_val[0][0] if time_val and time_val[0] else "00:00:00"
-            time_val = time_val.lstrip("'")  # ❌ Limpiar comilla inicial
             idx += 1
 
             data[user]["estado"][materia] = est_val
@@ -171,7 +166,7 @@ def cargar_todo():
 def batch_write(updates):
     sheet_id = st.secrets["sheet_id"]
     body = {
-        "valueInputOption": "RAW",
+        "valueInputOption": "USER_ENTERED",  # permite que Sheets interprete como duración
         "data": [{"range": r, "values": [[v]]} for r, v in updates]
     }
     sheet.values().batchUpdate(
@@ -184,7 +179,7 @@ def limpiar_estudiando(materias):
     batch_write(updates)
 
 # -------------------------------------------------------------------
-# UI: SELECCIÓN DE USUARIO
+# SELECCIÓN DE USUARIO
 # -------------------------------------------------------------------
 if "usuario_seleccionado" not in st.session_state:
     st.title("¿Quién sos? 👤")
@@ -204,7 +199,6 @@ if "usuario_seleccionado" not in st.session_state:
 
 USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
 
-# Cerrar sesión
 if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
     del st.session_state["usuario_seleccionado"]
     st.rerun()
@@ -213,15 +207,12 @@ if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
 # INTERFAZ PRINCIPAL
 # -------------------------------------------------------------------
 st.title("⏳ Control de Estudio")
-
-# Cargar todo
 datos = cargar_todo()
 
 if st.button("🔄 Actualizar tiempos"):
     st.rerun()
 
 otro = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
-
 colA, colB = st.columns(2)
 
 # -------------------------------------------------------------------
@@ -244,7 +235,6 @@ with colA:
 
         box = st.container()
         with box:
-
             st.markdown(f"**{materia}**")
 
             tiempo_anadido_seg = 0
@@ -258,7 +248,6 @@ with colA:
 
             st.write(f"🕒 Total: **{tiempo_total_hms}**")
 
-            # Estado
             if est_raw.strip() != "":
                 st.caption(f"Base: {tiempo_acum} | En proceso: +{segundos_a_hms(tiempo_anadido_seg)}")
                 st.markdown("🟢 **Estudiando**")
@@ -267,35 +256,27 @@ with colA:
 
             b1, b2, _ = st.columns([0.2, 0.2, 0.6])
 
-            # Si esta materia está en curso
             if materia_en_curso == materia:
                 with b1:
                     if st.button("⛔", key=f"det_{materia}"):
-                        inicio = parse_datetime(est_raw)
-                        diff = int((datetime.now(TZ) - inicio).total_seconds())
-
+                        diff = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
                         nuevo_total = tiempo_acum_seg + max(0, diff)
-
                         batch_write([
-                            (info["time"], segundos_a_hms(nuevo_total)),
+                            (info["time"], hms_a_fraction(segundos_a_hms(nuevo_total))),
                             (info["est"], "")
                         ])
-
                         st.rerun()
                 continue
 
-            # Si otra materia está en curso → no mostrar botones
             if materia_en_curso is not None:
                 continue
 
-            # ▶ Empezar
             with b1:
                 if st.button("▶", key=f"est_{materia}"):
                     limpiar_estudiando(mis_materias)
                     batch_write([(info["est"], ahora_str())])
                     st.rerun()
 
-            # ✏️ Editar manual
             with b2:
                 if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia]):
                     pass
@@ -304,8 +285,7 @@ with colA:
                 nuevo = st.text_input(f"Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
                 if st.button("Guardar", key=f"save_{materia}"):
                     try:
-                        hms_a_segundos(nuevo)
-                        batch_write([(info["time"], nuevo)])
+                        batch_write([(info["time"], hms_a_fraction(nuevo))])
                         st.session_state[f"show_manual_{materia}"] = False
                         st.rerun()
                     except:
@@ -324,18 +304,14 @@ with colB:
 
         box = st.container()
         with box:
-
             st.markdown(f"**{materia}**")
 
             tiempo_anadido = 0
             if est_raw.strip() != "":
-                inicio = parse_datetime(est_raw)
-                tiempo_anadido = int((datetime.now(TZ) - inicio).total_seconds())
+                tiempo_anadido = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
 
             total = hms_a_segundos(tiempo) + max(0, tiempo_anadido)
-            total_hms = segundos_a_hms(total)
-
-            st.write(f"🕒 Total: **{total_hms}**")
+            st.write(f"🕒 Total: **{segundos_a_hms(total)}**")
 
             if est_raw.strip() != "":
                 st.caption(f"Base: {tiempo} | En proceso: +{segundos_a_hms(tiempo_anadido)}")
