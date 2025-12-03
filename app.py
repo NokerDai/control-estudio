@@ -151,11 +151,13 @@ def cargar_todo():
             # estado (marca de inicio)
             est_val = values[idx].get("values", [[]])
             est_val = est_val[0][0] if est_val and est_val[0] else ""
+            est_val = est_val.lstrip("'")  # ❌ Limpiar comilla inicial
             idx += 1
 
             # tiempo acumulado
             time_val = values[idx].get("values", [[]])
             time_val = time_val[0][0] if time_val and time_val[0] else "00:00:00"
+            time_val = time_val.lstrip("'")  # ❌ Limpiar comilla inicial
             idx += 1
 
             data[user]["estado"][materia] = est_val
