@@ -2,7 +2,7 @@ import json
 from google.oauth2 import service_account
 import streamlit as st
 from googleapiclient.discovery import build
-from datetime import datetime
+from datetime import datetime, date
 from zoneinfo import ZoneInfo
 
 # -------------------------------------------------------------------
@@ -52,15 +52,25 @@ def parse_datetime(s):
     return dt.replace(tzinfo=TZ)
 
 # -------------------------------------------------------------------
-# HOJAS Y FILAS
+# FILA DINÁMICA SEGÚN LA FECHA
+# -------------------------------------------------------------------
+FILA_BASE = 170
+FECHA_BASE = date(2025, 12, 2)  # fila 170 = 2/12/2025
+
+def fila_para_fecha(fecha_actual):
+    delta = (fecha_actual - FECHA_BASE).days
+    return FILA_BASE + delta
+
+hoy = date.today()
+TIME_ROW = fila_para_fecha(hoy)
+MARCAS_ROW = 2  # sigue fija para las marcas de inicio
+
+# -------------------------------------------------------------------
+# HOJAS
 # -------------------------------------------------------------------
 SHEET_FACUNDO = "F. Economía"
 SHEET_IVAN = "I. Física"
 SHEET_MARCAS = "marcas"
-
-DATE_ROW = 170
-TIME_ROW = DATE_ROW
-MARCAS_ROW = 2
 
 # -------------------------------------------------------------------
 # MAPEO DE USUARIOS Y MATERIAS
@@ -98,7 +108,7 @@ USERS = {
 }
 
 # -------------------------------------------------------------------
-# FUNCIONES PARA TIEMPO
+# FUNCIONES DE TIEMPO
 # -------------------------------------------------------------------
 def hms_a_segundos(hms):
     if not hms or hms.strip() == "":
@@ -140,24 +150,18 @@ def cargar_todo():
     ).execute()
 
     values = res.get("valueRanges", [])
-
     data = {u: {"estado": {}, "tiempos": {}} for u in USERS}
-
     idx = 0
     for user, materias in USERS.items():
         for materia, info in materias.items():
-
             est_val = values[idx].get("values", [[]])
             est_val = est_val[0][0] if est_val and est_val[0] else ""
             idx += 1
-
             time_val = values[idx].get("values", [[]])
             time_val = time_val[0][0] if time_val and time_val[0] else "00:00:00"
             idx += 1
-
             data[user]["estado"][materia] = est_val
             data[user]["tiempos"][materia] = time_val
-
     return data
 
 # -------------------------------------------------------------------
@@ -166,7 +170,7 @@ def cargar_todo():
 def batch_write(updates):
     sheet_id = st.secrets["sheet_id"]
     body = {
-        "valueInputOption": "USER_ENTERED",  # permite que Sheets interprete como duración
+        "valueInputOption": "USER_ENTERED",  # permite interpretar duración
         "data": [{"range": r, "values": [[v]]} for r, v in updates]
     }
     sheet.values().batchUpdate(
@@ -229,7 +233,6 @@ with colA:
             break
 
     for materia, info in mis_materias.items():
-
         est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
         tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
 
@@ -298,7 +301,6 @@ with colB:
     st.subheader(f"👤 {otro}")
 
     for materia, info in USERS[otro].items():
-
         est_raw = datos[otro]["estado"][materia]
         tiempo = datos[otro]["tiempos"][materia]
 
