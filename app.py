@@ -63,7 +63,7 @@ def fila_para_fecha(fecha_actual):
 
 hoy = date.today()
 TIME_ROW = fila_para_fecha(hoy)
-MARCAS_ROW = 2  # sigue fija para las marcas de inicio
+MARCAS_ROW = 2  # fila fija para marcas
 
 # -------------------------------------------------------------------
 # HOJAS
@@ -126,6 +126,10 @@ def hms_a_fraction(hms):
     """Convierte 'HH:MM:SS' a fracción de día para Google Sheets."""
     return hms_a_segundos(hms) / 86400
 
+def hms_a_minutos(hms):
+    """Convierte HH:MM:SS a minutos."""
+    return hms_a_segundos(hms) / 60
+
 # -------------------------------------------------------------------
 # UTILS PARA UI Y ESTADO
 # -------------------------------------------------------------------
@@ -170,7 +174,7 @@ def cargar_todo():
 def batch_write(updates):
     sheet_id = st.secrets["sheet_id"]
     body = {
-        "valueInputOption": "USER_ENTERED",  # permite interpretar duración
+        "valueInputOption": "USER_ENTERED",  # permite interpretar duración y números
         "data": [{"range": r, "values": [[v]]} for r, v in updates]
     }
     sheet.values().batchUpdate(
@@ -181,6 +185,24 @@ def batch_write(updates):
 def limpiar_estudiando(materias):
     updates = [(datos["est"], "") for materia, datos in materias.items()]
     batch_write(updates)
+
+# -------------------------------------------------------------------
+# FUNCION PARA ACUMULAR MINUTOS EN MARCAS
+# -------------------------------------------------------------------
+def acumular_tiempo(usuario, materia, minutos_sumar):
+    """Suma los minutos a la celda correspondiente en marcas."""
+    info = USERS[usuario][materia]
+    res = sheet.values().get(
+        spreadsheetId=st.secrets["sheet_id"],
+        range=info["est"]
+    ).execute()
+    valor_prev = res.get("values", [[0]])[0][0] or 0
+    try:
+        valor_prev = float(valor_prev)
+    except:
+        valor_prev = 0
+    nuevo_total = valor_prev + minutos_sumar
+    batch_write([(info["est"], nuevo_total)])
 
 # -------------------------------------------------------------------
 # SELECCIÓN DE USUARIO
@@ -259,11 +281,16 @@ with colA:
 
             b1, b2, _ = st.columns([0.2, 0.2, 0.6])
 
+            # DETENER ESTUDIO ⛔
             if materia_en_curso == materia:
                 with b1:
                     if st.button("⛔", key=f"det_{materia}"):
-                        diff = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
-                        nuevo_total = tiempo_acum_seg + max(0, diff)
+                        diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
+                        diff_min = diff_seg / 60
+                        # Acumular en marcas
+                        acumular_tiempo(USUARIO_ACTUAL, materia, diff_min)
+                        # Actualizar duración en hoja de materias
+                        nuevo_total = tiempo_acum_seg + diff_seg
                         batch_write([
                             (info["time"], hms_a_fraction(segundos_a_hms(nuevo_total))),
                             (info["est"], "")
@@ -274,12 +301,14 @@ with colA:
             if materia_en_curso is not None:
                 continue
 
+            # COMENZAR ESTUDIO ▶
             with b1:
                 if st.button("▶", key=f"est_{materia}"):
                     limpiar_estudiando(mis_materias)
                     batch_write([(info["est"], ahora_str())])
                     st.rerun()
 
+            # EDITAR TIEMPO ✏️
             with b2:
                 if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia]):
                     pass
