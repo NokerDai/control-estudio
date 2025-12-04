@@ -276,21 +276,21 @@ def show_md_popup(flag_key, title, md_text, close_key):
                 st.markdown(md_text)
                 if st.button("Cerrar", key=close_key):
                     st.session_state[flag_key] = False
-                    st.experimental_rerun()
+                    st.rerun()
         except Exception:
             # por seguridad usar fallback si algo falla
             with st.expander(title, expanded=True):
                 st.markdown(md_text)
                 if st.button("Cerrar", key=close_key+"_fb"):
                     st.session_state[flag_key] = False
-                    st.experimental_rerun()
+                    st.rerun()
     else:
         # Fallback: expander (funciona en todas las versiones)
         with st.expander(title, expanded=True):
             st.markdown(md_text)
             if st.button("Cerrar", key=close_key+"_fb2"):
                 st.session_state[flag_key] = False
-                st.experimental_rerun()
+                st.rerun()
 
 # -------------------------------------------------------------------
 # LOGIN: intento automático vía Streamlit Cloud, fallback a selector
@@ -321,11 +321,11 @@ def detectar_usuario():
         with col_u1:
             if st.button("Soy Facundo", use_container_width=True):
                 st.session_state["usuario_seleccionado"] = "Facundo"
-                st.experimental_rerun()
+                st.rerun()
         with col_u2:
             if st.button("Soy Iván", use_container_width=True):
                 st.session_state["usuario_seleccionado"] = "Iván"
-                st.experimental_rerun()
+                st.rerun()
         st.stop()
     return st.session_state["usuario_seleccionado"]
 
@@ -338,7 +338,7 @@ if "usuario_seleccionado" in st.session_state and hasattr(st, "context") and get
 if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
     # Si estamos en modo local, permite cambiar usuario
     st.session_state.pop("usuario_seleccionado", None)
-    st.experimental_rerun()
+    st.rerun()
 
 # -------------------------------------------------------------------
 # INTERFAZ PRINCIPAL
@@ -353,7 +353,7 @@ col_btn1, col_btn2 = st.columns([0.8, 0.2])
 
 with col_btn1:
     if st.button("🔄 Actualizar tiempos"):
-        st.experimental_rerun()
+        st.rerun()
 
 with col_btn2:
     # Mostrar fecha/hora local
@@ -440,7 +440,7 @@ with colA:
                             (info["time"], fraccion),
                             (info["est"], "")
                         ])
-                        st.experimental_rerun()
+                        st.rerun()
                 continue
 
             if materia_en_curso is not None:
@@ -450,7 +450,7 @@ with colA:
                 if st.button("▶", key=f"est_{materia}"):
                     limpiar_estudiando(mis_materias)
                     batch_write([(info["est"], ahora_str())])
-                    st.experimental_rerun()
+                    st.rerun()
 
             with b2:
                 if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia]):
@@ -462,7 +462,7 @@ with colA:
                     try:
                         batch_write([(info["time"], hms_a_fraction(nuevo))])
                         st.session_state[f"show_manual_{materia}"] = False
-                        st.experimental_rerun()
+                        st.rerun()
                     except:
                         st.error("Formato inválido (usar HH:MM:SS)")
 
@@ -509,3 +509,4 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
