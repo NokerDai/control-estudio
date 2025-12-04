@@ -301,17 +301,19 @@ otro = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
 colA, colB = st.columns(2)
 
 # -------------------------------------------------------------------
-# PANEL USUARIO ACTUAL
+# PANEL USUARIO ACTUAL - VERSIÓN COMPACTA
 # -------------------------------------------------------------------
 with colA:
     st.subheader(f"👤 {USUARIO_ACTUAL}")
 
+    # Expander de información / fe
     with st.expander(f"ℹ️ Fe", expanded=False):
         if USUARIO_ACTUAL == "Facundo":
             st.markdown(MD_FACUNDO)
         else:
             st.markdown(MD_IVAN)
 
+    # Resumen por minuto / total
     try:
         per_min = resumen_marcas[USUARIO_ACTUAL]["per_min"]
         total = resumen_marcas[USUARIO_ACTUAL]["total"]
@@ -319,18 +321,22 @@ with colA:
     except:
         st.markdown("**— | —**")
 
+    # Materias del usuario
     mis_materias = USERS[USUARIO_ACTUAL]
 
+    # Determinar si hay alguna materia en curso
     materia_en_curso = None
     for m, info in mis_materias.items():
         if str(datos[USUARIO_ACTUAL]["estado"][m]).strip() != "":
             materia_en_curso = m
             break
 
+    # Mostrar cada materia en una fila compacta
     for materia, info in mis_materias.items():
         est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
         tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
-    
+
+        # Calcular tiempo total
         tiempo_anadido_seg = 0
         if str(est_raw).strip() != "":
             try:
@@ -338,61 +344,56 @@ with colA:
                 tiempo_anadido_seg = int((datetime.now(TZ) - inicio).total_seconds())
             except:
                 tiempo_anadido_seg = 0
-    
-        tiempo_acum_seg = hms_a_segundos(tiempo_acum)
-        tiempo_total = tiempo_acum_seg + max(0, tiempo_anadido_seg)
+
+        tiempo_total = hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido_seg)
         tiempo_total_hms = segundos_a_hms(tiempo_total)
-    
-        # --- Layout compacto: nombre y botones en la misma línea ---
-        cols = st.columns([0.7, 0.15, 0.15])
-        with cols[0]:
-            st.markdown(f"**{materia}** 🕒 {tiempo_total_hms}")
-            if str(est_raw).strip() != "":
-                st.caption(f"Base: {tiempo_acum} | En proceso: +{segundos_a_hms(tiempo_anadido_seg)}")
-                st.markdown("🟢 Estudiando")
-            else:
-                st.markdown("⚪")
-    
-        # Botón iniciar inicial
-        with cols[1]:
-            if materia_en_curso is None:
-                if st.button("inicial", key=f"est_{materia}", use_container_width=True):
-                    limpiar_estudiando(mis_materias)
-                    batch_write([(info["est"], ahora_str())])
-                    st.rerun()
-            elif materia_en_curso == materia:
-                if st.button("detener", key=f"det_{materia}", use_container_width=True):
+
+        # --- UI compacto: una fila por materia ---
+        col_materia, col_tiempo, col_accion = st.columns([0.6, 0.2, 0.2], gap="small")
+
+        # Nombre de materia
+        with col_materia:
+            st.markdown(f"**{materia}**")
+
+        # Tiempo total
+        with col_tiempo:
+            st.markdown(f"{tiempo_total_hms}")
+
+        # Botón iniciar / detener / editar
+        with col_accion:
+            if materia_en_curso == materia:
+                if st.button("⛔", key=f"det_{materia}", use_container_width=False):
                     try:
                         diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
                     except:
                         diff_seg = 0
                     diff_min = diff_seg / 60
                     acumular_tiempo(USUARIO_ACTUAL, materia, diff_min)
-                    nuevo_total = tiempo_acum_seg + diff_seg
-                    fraccion = hms_a_fraction(segundos_a_hms(nuevo_total))
                     batch_write([
-                        (info["time"], fraccion),
+                        (info["time"], hms_a_fraction(segundos_a_hms(diff_seg + hms_a_segundos(tiempo_acum)))),
                         (info["est"], "")
                     ])
                     st.rerun()
-    
-        # Botón editar ✏️
-        with cols[2]:
-            if materia_en_curso is None:
-                if st.button("editar", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia], use_container_width=True):
-                    pass
-    
-        # Input manual debajo del nombre
-        if st.session_state.get(f"show_manual_{materia}", False):
-            with cols[0]:
-                nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
-                if st.button("Guardar", key=f"save_{materia}"):
-                    try:
-                        batch_write([(info["time"], hms_a_fraction(nuevo))])
-                        st.session_state[f"show_manual_{materia}"] = False
+            else:
+                if materia_en_curso is None:
+                    if st.button("▶", key=f"est_{materia}", use_container_width=False):
+                        limpiar_estudiando(mis_materias)
+                        batch_write([(info["est"], ahora_str())])
                         st.rerun()
-                    except:
-                        st.error("Formato inválido (usar HH:MM:SS)")
+                # Botón de edición siempre disponible
+                if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia], use_container_width=False):
+                    pass
+
+        # Input manual debajo de la fila si está activo
+        if st.session_state.get(f"show_manual_{materia}", False):
+            nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
+            if st.button("Guardar", key=f"save_{materia}"):
+                try:
+                    batch_write([(info["time"], hms_a_fraction(nuevo))])
+                    st.session_state[f"show_manual_{materia}"] = False
+                    st.rerun()
+                except:
+                    st.error("Formato inválido (usar HH:MM:SS)")
 
 # -------------------------------------------------------------------
 # PANEL OTRO USUARIO (solo lectura)
@@ -434,5 +435,6 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
