@@ -2,7 +2,7 @@ import json
 from google.oauth2 import service_account
 import streamlit as st
 from googleapiclient.discovery import build
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from zoneinfo import ZoneInfo
 
 # -------------------------------------------------------------------
@@ -32,44 +32,65 @@ service = build("sheets", "v4", credentials=creds)
 sheet = service.spreadsheets()
 
 # -------------------------------------------------------------------
-# ZONA HORARIA ARGENTINA
+# ZONA HORARIA ARGENTINA (centralizada)
 # -------------------------------------------------------------------
 TZ = ZoneInfo("America/Argentina/Cordoba")
 
 def ahora_str():
-    """Devuelve fecha-hora actual con zona horaria explícita para guardar en Sheets."""
-    return datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S%z")
+    """
+    Devuelve fecha-hora actual con offset en formato ISO 'YYYY-MM-DD HH:MM:SS±HH:MM'
+    Ej: '2025-12-03 21:00:00-03:00'
+    """
+    # usamos isoformat para tener el offset con ':' -> cómodo para parsear
+    return datetime.now(TZ).isoformat(sep=" ", timespec="seconds")
 
 def parse_datetime(s):
     """
-    Parsea una fecha guardada en Google Sheets y la convierte correctamente
-    a datetime con zona horaria Argentina.
-    Funciona tanto si viene con offset como si no.
+    Parsea una marca temporal proveniente de Google Sheets y la normaliza
+    a datetime con tzinfo = TZ.
+    Acepta:
+      - 'YYYY-MM-DD HH:MM:SS±HH:MM'  (ISO con offset)
+      - 'YYYY-MM-DD HH:MM:SS±HHMM'   (offset sin colon)
+      - 'YYYY-MM-DD HH:MM:SS'        (sin offset -> interpretada como hora local TZ)
+      - 'YYYY-MM-DDTHH:MM:SS±HH:MM'  (T separador)
+      - '...Z'                      (Z -> UTC)
     """
     if not s or str(s).strip() == "":
         raise ValueError("Marca vacía")
 
     s = str(s).strip()
 
-    # 1) Si viene con offset, ej: 2025-12-02 21:00:00-03:00
+    # 1) Intentar fromisoformat (suele manejar muchos formatos ISO y offsets con ':')
     try:
-        dt = datetime.strptime(s, "%Y-%m-%d %H:%M:%S%z")
-        return dt.astimezone(TZ)
-    except:
+        # fromisoformat acepta 'YYYY-MM-DD HH:MM:SS+HH:MM' y 'YYYY-MM-DDTHH:MM:SSZ' (py3.11+)
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))  # si hay 'Z' lo tratamos como +00:00
+        if dt.tzinfo is None:
+            # si es naive -> asumir que la hora está expresada en hora local TZ
+            return datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, tzinfo=TZ)
+        else:
+            return dt.astimezone(TZ)
+    except Exception:
         pass
 
-    # 2) Si viene SIN offset, interpretarla como hora local
-    #    (Esto Google Sheets lo hace a veces)
-    try:
-        dt = datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
-        # Construimos la hora ASSUMIENDO que es hora argentina real
-        return datetime(
-            dt.year, dt.month, dt.day,
-            dt.hour, dt.minute, dt.second,
-            tzinfo=TZ
-        )
-    except:
-        raise ValueError(f"Formato inválido en marca temporal: {s}")
+    # 2) Intentar strptime con %z (acepta +HHMM y +HH:MM en py3.7+)
+    fmts = [
+        "%Y-%m-%d %H:%M:%S%z",
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%d %H:%M:%S",   # sin offset
+        "%Y-%m-%dT%H:%M:%S",
+    ]
+    for fmt in fmts:
+        try:
+            dt = datetime.strptime(s, fmt)
+            if dt.tzinfo is None:
+                return datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, tzinfo=TZ)
+            else:
+                return dt.astimezone(TZ)
+        except Exception:
+            continue
+
+    # 3) Si nada funcionó -> error claro
+    raise ValueError(f"Formato inválido en marca temporal: {s}")
 
 # -------------------------------------------------------------------
 # FILA DINÁMICA SEGÚN LA FECHA
@@ -131,7 +152,7 @@ USERS = {
 # FUNCIONES DE TIEMPO
 # -------------------------------------------------------------------
 def hms_a_segundos(hms):
-    if not hms or hms.strip() == "":
+    if not hms or str(hms).strip() == "":
         return 0
     h, m, s = map(int, hms.split(":"))
     return h*3600 + m*60 + s
@@ -270,7 +291,7 @@ with colA:
 
     materia_en_curso = None
     for m, info in mis_materias.items():
-        if datos[USUARIO_ACTUAL]["estado"][m].strip() != "":
+        if str(datos[USUARIO_ACTUAL]["estado"][m]).strip() != "":
             materia_en_curso = m
             break
 
@@ -283,9 +304,13 @@ with colA:
             st.markdown(f"**{materia}**")
 
             tiempo_anadido_seg = 0
-            if est_raw.strip() != "":
-                inicio = parse_datetime(est_raw)
-                tiempo_anadido_seg = int((datetime.now(TZ) - inicio).total_seconds())
+            if str(est_raw).strip() != "":
+                try:
+                    inicio = parse_datetime(est_raw)
+                    tiempo_anadido_seg = int((datetime.now(TZ) - inicio).total_seconds())
+                except Exception as e:
+                    st.error(f"Error parseando marca: {e}")
+                    tiempo_anadido_seg = 0
 
             tiempo_acum_seg = hms_a_segundos(tiempo_acum)
             tiempo_total = tiempo_acum_seg + max(0, tiempo_anadido_seg)
@@ -293,7 +318,7 @@ with colA:
 
             st.write(f"🕒 Total: **{tiempo_total_hms}**")
 
-            if est_raw.strip() != "":
+            if str(est_raw).strip() != "":
                 st.caption(f"Base: {tiempo_acum} | En proceso: +{segundos_a_hms(tiempo_anadido_seg)}")
                 st.markdown("🟢 **Estudiando**")
             else:
@@ -305,14 +330,19 @@ with colA:
             if materia_en_curso == materia:
                 with b1:
                     if st.button("⛔", key=f"det_{materia}"):
-                        diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
+                        try:
+                            diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
+                        except Exception as e:
+                            st.error(f"No se pudo calcular diferencia: {e}")
+                            diff_seg = 0
                         diff_min = diff_seg / 60
                         # Acumular en marcas
                         acumular_tiempo(USUARIO_ACTUAL, materia, diff_min)
-                        # Actualizar duración en hoja de materias
+                        # Actualizar duración en hoja de materias, guardamos como fracción de día
                         nuevo_total = tiempo_acum_seg + diff_seg
+                        fraccion = hms_a_fraction(segundos_a_hms(nuevo_total))
                         batch_write([
-                            (info["time"], hms_a_fraction(segundos_a_hms(nuevo_total))),
+                            (info["time"], fraccion),
                             (info["est"], "")
                         ])
                         st.rerun()
@@ -325,6 +355,7 @@ with colA:
             with b1:
                 if st.button("▶", key=f"est_{materia}"):
                     limpiar_estudiando(mis_materias)
+                    # guardamos la marca con offset legible: 'YYYY-MM-DD HH:MM:SS±HH:MM'
                     batch_write([(info["est"], ahora_str())])
                     st.rerun()
 
@@ -337,10 +368,11 @@ with colA:
                 nuevo = st.text_input(f"Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
                 if st.button("Guardar", key=f"save_{materia}"):
                     try:
+                        # convertimos HH:MM:SS a fracción y escribimos en la celda time
                         batch_write([(info["time"], hms_a_fraction(nuevo))])
                         st.session_state[f"show_manual_{materia}"] = False
                         st.rerun()
-                    except:
+                    except Exception:
                         st.error("Formato inválido (usar HH:MM:SS)")
 
 # -------------------------------------------------------------------
@@ -358,15 +390,18 @@ with colB:
             st.markdown(f"**{materia}**")
 
             tiempo_anadido = 0
-            if est_raw.strip() != "":
-                tiempo_anadido = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
+            if str(est_raw).strip() != "":
+                try:
+                    tiempo_anadido = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
+                except Exception as e:
+                    st.error(f"Error parseando marca (otro): {e}")
+                    tiempo_anadido = 0
 
             total = hms_a_segundos(tiempo) + max(0, tiempo_anadido)
             st.write(f"🕒 Total: **{segundos_a_hms(total)}**")
 
-            if est_raw.strip() != "":
+            if str(est_raw).strip() != "":
                 st.caption(f"Base: {tiempo} | En proceso: +{segundos_a_hms(tiempo_anadido)}")
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
-
