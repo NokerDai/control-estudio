@@ -307,21 +307,13 @@ with colA:
     st.subheader(f"👤 {USUARIO_ACTUAL}")
 
     # -----------------------------
-    # POPUP PARA USUARIO ACTUAL
+    # POPUP COMO EXPANDER PARA USUARIO ACTUAL
     # -----------------------------
-    if st.button("ℹ️ Info", key=f"info_{USUARIO_ACTUAL}"):
-        st.session_state[f"show_info_{USUARIO_ACTUAL}"] = True
-
-    if st.session_state.get(f"show_info_{USUARIO_ACTUAL}", False):
-        with st.modal(f"Información de {USUARIO_ACTUAL}"):
-            if USUARIO_ACTUAL == "Facundo":
-                st.markdown(MD_FACUNDO)
-            else:
-                st.markdown(MD_IVAN)
-
-            if st.button("Cerrar", key=f"cerrar_{USUARIO_ACTUAL}"):
-                st.session_state[f"show_info_{USUARIO_ACTUAL}"] = False
-                st.rerun()
+    with st.expander(f"ℹ️ Información de {USUARIO_ACTUAL}", expanded=False):
+        if USUARIO_ACTUAL == "Facundo":
+            st.markdown(MD_FACUNDO)
+        else:
+            st.markdown(MD_IVAN)
 
     try:
         per_min = resumen_marcas[USUARIO_ACTUAL]["per_min"]
@@ -419,21 +411,13 @@ with colB:
     st.subheader(f"👤 {otro}")
 
     # -----------------------------
-    # POPUP DEL OTRO USUARIO
+    # POPUP COMO EXPANDER PARA OTRO USUARIO
     # -----------------------------
-    if st.button("ℹ️ Info", key=f"info_{otro}"):
-        st.session_state[f"show_info_{otro}"] = True
-
-    if st.session_state.get(f"show_info_{otro}", False):
-        with st.modal(f"Información de {otro}"):
-            if otro == "Facundo":
-                st.markdown(MD_FACUNDO)
-            else:
-                st.markdown(MD_IVAN)
-
-            if st.button("Cerrar", key=f"cerrar_{otro}"):
-                st.session_state[f"show_info_{otro}"] = False
-                st.rerun()
+    with st.expander(f"ℹ️ Información de {otro}", expanded=False):
+        if otro == "Facundo":
+            st.markdown(MD_FACUNDO)
+        else:
+            st.markdown(MD_IVAN)
 
     try:
         per_min = resumen_marcas[otro]["per_min"]
