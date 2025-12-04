@@ -304,7 +304,7 @@ with colA:
     try:
         per_min = resumen_marcas[USUARIO_ACTUAL]["per_min"]
         total = resumen_marcas[USUARIO_ACTUAL]["total"]
-        st.markdown(f"**{per_min} por minuto | {total} total**")
+        st.markdown(f"**${per_min}/minuto | {total} total**")
     except:
         st.markdown("**— | —**")
 
@@ -399,7 +399,7 @@ with colB:
     try:
         per_min = resumen_marcas[otro]["per_min"]
         total = resumen_marcas[otro]["total"]
-        st.markdown(f"**{per_min} por minuto | {total} total**")
+        st.markdown(f"**${per_min}/minuto | {total} total**")
     except:
         st.markdown("**— | —**")
 
@@ -426,3 +426,4 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
