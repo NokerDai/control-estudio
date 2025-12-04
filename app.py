@@ -309,7 +309,7 @@ with colA:
     # -----------------------------
     # POPUP COMO EXPANDER PARA USUARIO ACTUAL
     # -----------------------------
-    with st.expander(f"ℹ️ Información de {USUARIO_ACTUAL}", expanded=False):
+    with st.expander(f"ℹ️ Fe", expanded=False):
         if USUARIO_ACTUAL == "Facundo":
             st.markdown(MD_FACUNDO)
         else:
@@ -413,7 +413,7 @@ with colB:
     # -----------------------------
     # POPUP COMO EXPANDER PARA OTRO USUARIO
     # -----------------------------
-    with st.expander(f"ℹ️ Información de {otro}", expanded=False):
+    with st.expander(f"ℹ️ Fe", expanded=False):
         if otro == "Facundo":
             st.markdown(MD_FACUNDO)
         else:
@@ -449,3 +449,4 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
