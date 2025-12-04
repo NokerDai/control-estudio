@@ -332,7 +332,7 @@ with colA:
             minutos_totales += minutos_base + minutos_progreso
 
         total_calc = minutos_totales * per_min_val
-        st.markdown(f"**{per_min_str} por minuto | {total_calc:.2f} total**")
+        st.markdown(f"**{per_min_str} por minuto | ${total_calc:.2f} total**")
     except:
         st.markdown("**— | —**")
 
@@ -431,7 +431,7 @@ with colB:
             mins_otro += mins_base + mins_prog
 
         total_otro = mins_otro * per_min_val
-        st.markdown(f"**{per_min_str} por minuto | {total_otro:.2f} total**")
+        st.markdown(f"**{per_min_str} por minuto | ${total_otro:.2f} total**")
     except:
         st.markdown("**— | —**")
 
@@ -458,3 +458,4 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
