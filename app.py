@@ -21,10 +21,7 @@ try:
     key_dict = json.loads(st.secrets["textkey"])
     creds = service_account.Credentials.from_service_account_info(
         key_dict,
-        scopes=[
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/documents.readonly"
-        ]
+        scopes=["https://www.googleapis.com/auth/spreadsheets"]
     )
 except KeyError:
     st.error("Error: Falta configurar el secreto 'textkey'.")
@@ -33,24 +30,6 @@ except KeyError:
 # Servicio Google Sheets
 service = build("sheets", "v4", credentials=creds)
 sheet = service.spreadsheets()
-
-# Servicio Google Docs
-docs_service = build("docs", "v1", credentials=creds)
-
-# -------------------------------------------------------------------
-# FUNCIÓN PARA LEER GOOGLE DOCS
-# -------------------------------------------------------------------
-def leer_google_doc(doc_id):
-    try:
-        doc = docs_service.documents().get(documentId=doc_id).execute()
-        texto = ""
-        for elem in doc.get("body", {}).get("content", []):
-            if "paragraph" in elem:
-                for run in elem["paragraph"].get("elements", []):
-                    texto += run.get("textRun", {}).get("content", "")
-        return texto.strip()
-    except Exception as e:
-        return f"Error leyendo documento ({e})"
 
 # -------------------------------------------------------------------
 # ZONA HORARIA ARGENTINA
@@ -99,7 +78,7 @@ def fila_para_fecha(fecha_actual):
     delta = (fecha_actual - FECHA_BASE).days
     return FILA_BASE + delta
 
-hoy = datetime.now(TZ).date()
+hoy = datetime.now(TZ).date()       # ← CORRECCIÓN IMPORTANTE
 TIME_ROW = fila_para_fecha(hoy)
 MARCAS_ROW = 2
 
@@ -310,48 +289,15 @@ st.title("⏳ Control de Estudio")
 datos = cargar_todo()
 resumen_marcas = cargar_resumen_marcas()
 
-# -------------------------------------------------------------------
-# BOTONES: ACTUALIZAR + FE
-# -------------------------------------------------------------------
-col_btn1, col_btn2 = st.columns([0.8, 0.2])
+if st.button("🔄 Actualizar tiempos"):
+    st.rerun()
 
-with col_btn1:
-    if st.button("🔄 Actualizar tiempos"):
-        st.rerun()
-
-with col_btn2:
-    if st.button("Fe"):
-        st.switch_page("fe.py")
-
-with col_fe:
-    with st.popover("Fe", use_container_width=True):
-
-        # Determinar orden según usuario activo
-        if USUARIO_ACTUAL == "Facundo":
-            texto_izq = leer_google_doc(st.secrets["facundo_doc"])
-            texto_der = leer_google_doc(st.secrets["ivan_doc"])
-            nom_izq, nom_der = "Facundo", "Iván"
-        else:
-            texto_izq = leer_google_doc(st.secrets["ivan_doc"])
-            texto_der = leer_google_doc(st.secrets["facundo_doc"])
-            nom_izq, nom_der = "Iván", "Facundo"
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.markdown(f"### {nom_izq}")
-            st.write(texto_izq)
-
-        with col2:
-            st.markdown(f"### {nom_der}")
-            st.write(texto_der)
+otro = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
+colA, colB = st.columns(2)
 
 # -------------------------------------------------------------------
 # PANEL USUARIO ACTUAL
 # -------------------------------------------------------------------
-otro = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
-colA, colB = st.columns(2)
-
 with colA:
     st.subheader(f"👤 {USUARIO_ACTUAL}")
 
@@ -480,4 +426,3 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
-
