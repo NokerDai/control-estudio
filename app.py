@@ -102,7 +102,7 @@ def fila_para_fecha(fecha_actual):
     delta = (fecha_actual - FECHA_BASE).days
     return FILA_BASE + delta
 
-hoy = date.today()
+hoy = datetime.now(TZ).date()
 TIME_ROW = fila_para_fecha(hoy)
 MARCAS_ROW = 2  # fila fija para marcas
 
@@ -405,3 +405,4 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
