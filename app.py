@@ -381,7 +381,7 @@ with colA:
     
         # Botón editar ✏️ (mismo tamaño que ▶)
         with col_accion2:
-            if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia], use_container_width=True):
+            if st.button("E", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia], use_container_width=True):
                 pass
     
         # Input manual debajo de la fila si está activo
@@ -435,6 +435,7 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
 
