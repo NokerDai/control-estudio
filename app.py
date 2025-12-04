@@ -313,11 +313,15 @@ resumen_marcas = cargar_resumen_marcas()
 # -------------------------------------------------------------------
 # BOTONES: ACTUALIZAR + FE
 # -------------------------------------------------------------------
-col_upd, col_fe = st.columns([0.7, 0.3])
+col_btn1, col_btn2 = st.columns([0.8, 0.2])
 
-with col_upd:
-    if st.button("🔄 Actualizar tiempos", use_container_width=True):
+with col_btn1:
+    if st.button("🔄 Actualizar tiempos"):
         st.rerun()
+
+with col_btn2:
+    if st.button("Fe"):
+        st.switch_page("fe.py")
 
 with col_fe:
     with st.popover("Fe", use_container_width=True):
@@ -476,3 +480,4 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
