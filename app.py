@@ -2,7 +2,7 @@ import json
 from google.oauth2 import service_account
 import streamlit as st
 from googleapiclient.discovery import build
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 
 # -------------------------------------------------------------------
@@ -37,19 +37,39 @@ sheet = service.spreadsheets()
 TZ = ZoneInfo("America/Argentina/Cordoba")
 
 def ahora_str():
-    return datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S")
+    """Devuelve fecha-hora actual con zona horaria explícita para guardar en Sheets."""
+    return datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S%z")
 
 def parse_datetime(s):
+    """
+    Parsea una fecha guardada en Google Sheets y la convierte correctamente
+    a datetime con zona horaria Argentina.
+    Funciona tanto si viene con offset como si no.
+    """
     if not s or str(s).strip() == "":
         raise ValueError("Marca vacía")
+
     s = str(s).strip()
+
+    # 1) Si viene con offset, ej: 2025-12-02 21:00:00-03:00
     try:
         dt = datetime.strptime(s, "%Y-%m-%d %H:%M:%S%z")
         return dt.astimezone(TZ)
     except:
         pass
-    dt = datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
-    return dt.replace(tzinfo=TZ)
+
+    # 2) Si viene SIN offset, interpretarla como hora local
+    #    (Esto Google Sheets lo hace a veces)
+    try:
+        dt = datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
+        # Construimos la hora ASSUMIENDO que es hora argentina real
+        return datetime(
+            dt.year, dt.month, dt.day,
+            dt.hour, dt.minute, dt.second,
+            tzinfo=TZ
+        )
+    except:
+        raise ValueError(f"Formato inválido en marca temporal: {s}")
 
 # -------------------------------------------------------------------
 # FILA DINÁMICA SEGÚN LA FECHA
@@ -349,3 +369,4 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
