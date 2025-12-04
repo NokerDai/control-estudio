@@ -353,15 +353,15 @@ with colA:
             else:
                 st.markdown("⚪")
     
-        # Botón iniciar ▶
+        # Botón iniciar inicial
         with cols[1]:
             if materia_en_curso is None:
-                if st.button("▶", key=f"est_{materia}", use_container_width=True):
+                if st.button("inicial", key=f"est_{materia}", use_container_width=True):
                     limpiar_estudiando(mis_materias)
                     batch_write([(info["est"], ahora_str())])
                     st.rerun()
             elif materia_en_curso == materia:
-                if st.button("⛔", key=f"det_{materia}", use_container_width=True):
+                if st.button("detener", key=f"det_{materia}", use_container_width=True):
                     try:
                         diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
                     except:
@@ -379,7 +379,7 @@ with colA:
         # Botón editar ✏️
         with cols[2]:
             if materia_en_curso is None:
-                if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia], use_container_width=True):
+                if st.button("editar", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia], use_container_width=True):
                     pass
     
         # Input manual debajo del nombre
@@ -434,4 +434,5 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
