@@ -355,10 +355,6 @@ with col_btn1:
     if st.button("🔄 Actualizar tiempos"):
         st.rerun()
 
-with col_btn2:
-    # Mostrar fecha/hora local
-    st.write(ahora_str())
-
 otro = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
 colA, colB = st.columns(2)
 
@@ -509,5 +505,6 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
