@@ -15,13 +15,16 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------------
-# CARGA ARCHIVOS MARKDOWN DESDE SECRETS (NO EXPUESTO EN GITHUB)
+# CARGA DE MARKDOWN Y EMAILS DESDE SECRETS
 # -------------------------------------------------------------------
+MAIL_FACUNDO = st.secrets["auth"]["facundo"].lower()
+MAIL_IVAN = st.secrets["auth"]["ivan"].lower()
+
 MD_FACUNDO = st.secrets["md"]["facundo"]
 MD_IVAN = st.secrets["md"]["ivan"]
 
 # -------------------------------------------------------------------
-# CARGA DE CREDENCIALES
+# CARGA DE CREDENCIALES GOOGLE (como tenías)
 # -------------------------------------------------------------------
 try:
     key_dict = json.loads(st.secrets["textkey"])
@@ -38,7 +41,7 @@ service = build("sheets", "v4", credentials=creds)
 sheet = service.spreadsheets()
 
 # -------------------------------------------------------------------
-# ZONA HORARIA ARGENTINA
+# ZONA HORARIA
 # -------------------------------------------------------------------
 TZ = ZoneInfo("America/Argentina/Cordoba")
 
@@ -75,7 +78,7 @@ def parse_datetime(s):
     raise ValueError(f"Formato inválido en marca temporal: {s}")
 
 # -------------------------------------------------------------------
-# FILA DINÁMICA SEGÚN LA FECHA
+# FILA DINÁMICA
 # -------------------------------------------------------------------
 FILA_BASE = 170
 FECHA_BASE = date(2025, 12, 2)
@@ -89,15 +92,12 @@ TIME_ROW = fila_para_fecha(hoy)
 MARCAS_ROW = 2
 
 # -------------------------------------------------------------------
-# HOJAS
+# HOJAS Y USUARIOS
 # -------------------------------------------------------------------
 SHEET_FACUNDO = "F. Economía"
 SHEET_IVAN = "I. Física"
 SHEET_MARCAS = "marcas"
 
-# -------------------------------------------------------------------
-# MAPEO DE USUARIOS Y MATERIAS
-# -------------------------------------------------------------------
 USERS = {
     "Facundo": {
         "Matemática para Economistas 1": {
@@ -158,7 +158,7 @@ def enable_manual_input(materia_key):
     st.session_state[f"show_manual_{materia_key}"] = True
 
 # -------------------------------------------------------------------
-# LECTURA MASIVA
+# LECTURA / ESCRITURA SHEETS
 # -------------------------------------------------------------------
 def cargar_todo():
     sheet_id = st.secrets["sheet_id"]
@@ -189,9 +189,6 @@ def cargar_todo():
             data[user]["tiempos"][materia] = time_val
     return data
 
-# -------------------------------------------------------------------
-# RESUMEN DE MARCAS PARA MOSTRAR DEBAJO DEL NOMBRE
-# -------------------------------------------------------------------
 def cargar_resumen_marcas():
     sheet_id = st.secrets["sheet_id"]
     ranges = [
@@ -229,9 +226,6 @@ def cargar_resumen_marcas():
         }
     }
 
-# -------------------------------------------------------------------
-# ESCRITURA MASIVA
-# -------------------------------------------------------------------
 def batch_write(updates):
     sheet_id = st.secrets["sheet_id"]
     body = {
@@ -262,29 +256,89 @@ def acumular_tiempo(usuario, materia, minutos_sumar):
     batch_write([(info["est"], nuevo_total)])
 
 # -------------------------------------------------------------------
-# LOGIN
+# POPUP: compatibilidad con st.modal (si existe) o fallback
 # -------------------------------------------------------------------
-if "usuario_seleccionado" not in st.session_state:
-    st.title("¿Quién sos? 👤")
-    col_u1, col_u2 = st.columns(2)
+def show_md_popup(flag_key, title, md_text, close_key):
+    """
+    Si st.modal existe lo usa. Si no, usa un fallback con st.expander.
+    flag_key: session_state flag (True = mostrar)
+    title: título para modal/expander
+    md_text: contenido Markdown
+    close_key: key del botón cerrar
+    """
+    if not st.session_state.get(flag_key, False):
+        return
 
-    with col_u1:
-        if st.button("Soy Facundo", use_container_width=True):
-            st.session_state["usuario_seleccionado"] = "Facundo"
-            st.rerun()
+    # Preferir st.modal si está disponible
+    if hasattr(st, "modal"):
+        try:
+            with st.modal(title):
+                st.markdown(md_text)
+                if st.button("Cerrar", key=close_key):
+                    st.session_state[flag_key] = False
+                    st.experimental_rerun()
+        except Exception:
+            # por seguridad usar fallback si algo falla
+            with st.expander(title, expanded=True):
+                st.markdown(md_text)
+                if st.button("Cerrar", key=close_key+"_fb"):
+                    st.session_state[flag_key] = False
+                    st.experimental_rerun()
+    else:
+        # Fallback: expander (funciona en todas las versiones)
+        with st.expander(title, expanded=True):
+            st.markdown(md_text)
+            if st.button("Cerrar", key=close_key+"_fb2"):
+                st.session_state[flag_key] = False
+                st.experimental_rerun()
 
-    with col_u2:
-        if st.button("Soy Iván", use_container_width=True):
-            st.session_state["usuario_seleccionado"] = "Iván"
-            st.rerun()
+# -------------------------------------------------------------------
+# LOGIN: intento automático vía Streamlit Cloud, fallback a selector
+# -------------------------------------------------------------------
+def detectar_usuario():
+    # Intento obtener usuario desde st.context.user (Streamlit Cloud privado)
+    user = None
+    try:
+        # st.context puede no existir en algunas versiones locales
+        user = st.context.user
+    except Exception:
+        user = None
 
-    st.stop()
+    if user is not None:
+        email = user.get("email", "").lower()
+        if email == MAIL_FACUNDO:
+            return "Facundo"
+        elif email == MAIL_IVAN:
+            return "Iván"
+        else:
+            st.error("No tenés permiso para acceder a esta aplicación.")
+            st.stop()
 
-USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
+    # Fallback local: selector con botones (útil para desarrollo local)
+    if "usuario_seleccionado" not in st.session_state:
+        st.title("¿Quién sos? 👤")
+        col_u1, col_u2 = st.columns(2)
+        with col_u1:
+            if st.button("Soy Facundo", use_container_width=True):
+                st.session_state["usuario_seleccionado"] = "Facundo"
+                st.experimental_rerun()
+        with col_u2:
+            if st.button("Soy Iván", use_container_width=True):
+                st.session_state["usuario_seleccionado"] = "Iván"
+                st.experimental_rerun()
+        st.stop()
+    return st.session_state["usuario_seleccionado"]
+
+USUARIO_ACTUAL = detectar_usuario()
+
+if "usuario_seleccionado" in st.session_state and hasattr(st, "context") and getattr(st.context, "user", None) is not None:
+    # si estamos autenticados por Streamlit Cloud, eliminamos selector guardado (no necesario)
+    st.session_state.pop("usuario_seleccionado", None)
 
 if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
-    del st.session_state["usuario_seleccionado"]
-    st.rerun()
+    # Si estamos en modo local, permite cambiar usuario
+    st.session_state.pop("usuario_seleccionado", None)
+    st.experimental_rerun()
 
 # -------------------------------------------------------------------
 # INTERFAZ PRINCIPAL
@@ -294,8 +348,16 @@ st.title("⏳ Control de Estudio")
 datos = cargar_todo()
 resumen_marcas = cargar_resumen_marcas()
 
-if st.button("🔄 Actualizar tiempos"):
-    st.rerun()
+# Botón actualizar
+col_btn1, col_btn2 = st.columns([0.8, 0.2])
+
+with col_btn1:
+    if st.button("🔄 Actualizar tiempos"):
+        st.experimental_rerun()
+
+with col_btn2:
+    # Mostrar fecha/hora local
+    st.write(ahora_str())
 
 otro = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
 colA, colB = st.columns(2)
@@ -306,23 +368,15 @@ colA, colB = st.columns(2)
 with colA:
     st.subheader(f"👤 {USUARIO_ACTUAL}")
 
-    # -----------------------------
-    # POPUP PARA USUARIO ACTUAL
-    # -----------------------------
-    if st.button("ℹ️ Info", key=f"info_{USUARIO_ACTUAL}"):
+    # Botón para mostrar popup (activa flag)
+    if st.button("ℹ️ Info", key=f"info_btn_{USUARIO_ACTUAL}"):
         st.session_state[f"show_info_{USUARIO_ACTUAL}"] = True
 
-    if st.session_state.get(f"show_info_{USUARIO_ACTUAL}", False):
-        with st.modal(f"Información de {USUARIO_ACTUAL}"):
-            if USUARIO_ACTUAL == "Facundo":
-                st.markdown(MD_FACUNDO)
-            else:
-                st.markdown(MD_IVAN)
+    # Llamada al popup (usa st.modal si existe, si no expander)
+    md_text = MD_FACUNDO if USUARIO_ACTUAL == "Facundo" else MD_IVAN
+    show_md_popup(f"show_info_{USUARIO_ACTUAL}", f"Información de {USUARIO_ACTUAL}", md_text, f"cerrar_{USUARIO_ACTUAL}")
 
-            if st.button("Cerrar", key=f"cerrar_{USUARIO_ACTUAL}"):
-                st.session_state[f"show_info_{USUARIO_ACTUAL}"] = False
-                st.rerun()
-
+    # Resumen debajo del nombre
     try:
         per_min = resumen_marcas[USUARIO_ACTUAL]["per_min"]
         total = resumen_marcas[USUARIO_ACTUAL]["total"]
@@ -340,7 +394,7 @@ with colA:
 
     for materia, info in mis_materias.items():
         est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
-        tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
+        tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materoria]
 
         box = st.container()
         with box:
@@ -386,7 +440,7 @@ with colA:
                             (info["time"], fraccion),
                             (info["est"], "")
                         ])
-                        st.rerun()
+                        st.experimental_rerun()
                 continue
 
             if materia_en_curso is not None:
@@ -396,7 +450,7 @@ with colA:
                 if st.button("▶", key=f"est_{materia}"):
                     limpiar_estudiando(mis_materias)
                     batch_write([(info["est"], ahora_str())])
-                    st.rerun()
+                    st.experimental_rerun()
 
             with b2:
                 if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia]):
@@ -408,7 +462,7 @@ with colA:
                     try:
                         batch_write([(info["time"], hms_a_fraction(nuevo))])
                         st.session_state[f"show_manual_{materia}"] = False
-                        st.rerun()
+                        st.experimental_rerun()
                     except:
                         st.error("Formato inválido (usar HH:MM:SS)")
 
@@ -418,22 +472,12 @@ with colA:
 with colB:
     st.subheader(f"👤 {otro}")
 
-    # -----------------------------
-    # POPUP DEL OTRO USUARIO
-    # -----------------------------
-    if st.button("ℹ️ Info", key=f"info_{otro}"):
+    # Botón Info del otro usuario
+    if st.button("ℹ️ Info", key=f"info_btn_{otro}"):
         st.session_state[f"show_info_{otro}"] = True
 
-    if st.session_state.get(f"show_info_{otro}", False):
-        with st.modal(f"Información de {otro}"):
-            if otro == "Facundo":
-                st.markdown(MD_FACUNDO)
-            else:
-                st.markdown(MD_IVAN)
-
-            if st.button("Cerrar", key=f"cerrar_{otro}"):
-                st.session_state[f"show_info_{otro}"] = False
-                st.rerun()
+    md_text_otro = MD_FACUNDO if otro == "Facundo" else MD_IVAN
+    show_md_popup(f"show_info_{otro}", f"Información de {otro}", md_text_otro, f"cerrar_{otro}")
 
     try:
         per_min = resumen_marcas[otro]["per_min"]
