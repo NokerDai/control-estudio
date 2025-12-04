@@ -347,44 +347,41 @@ with colA:
         tiempo_total = hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido_seg)
         tiempo_total_hms = segundos_a_hms(tiempo_total)
     
-        # --- UI compacto: una fila por materia ---
-        col_materia, col_tiempo, col_accion1, col_accion2 = st.columns([0.5, 0.25, 0.125, 0.125], gap="small")
+        # Fila compacta
+        col_materia, col_tiempo, col_accion = st.columns([0.6, 0.2, 0.2], gap="small")
     
-        # Nombre de materia
+        # Nombre
         with col_materia:
             st.markdown(f"**{materia}**")
     
-        # Tiempo total
+        # Tiempo
         with col_tiempo:
             st.markdown(f"{tiempo_total_hms}")
     
-        # Botón iniciar ▶
-        with col_accion1:
-            if materia_en_curso is None:
-                if st.button("▶", key=f"est_{materia}", use_container_width=True):
-                    limpiar_estudiando(mis_materias)
-                    batch_write([(info["est"], ahora_str())])
-                    st.rerun()
-            elif materia_en_curso == materia:
-                if st.button("⛔", key=f"det_{materia}", use_container_width=True):
-                    try:
-                        diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
-                    except:
-                        diff_seg = 0
-                    diff_min = diff_seg / 60
-                    acumular_tiempo(USUARIO_ACTUAL, materia, diff_min)
-                    batch_write([
-                        (info["time"], hms_a_fraction(segundos_a_hms(diff_seg + hms_a_segundos(tiempo_acum)))),
-                        (info["est"], "")
-                    ])
-                    st.rerun()
+        # Botones con ancho fijo
+        with col_accion:
+            btn_style = "width: 2rem; height: 2rem; font-size:16px"  # mismo tamaño para ambos
     
-        # Botón editar ✏️ (mismo tamaño que ▶)
-        with col_accion2:
-            if st.button("E", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia], use_container_width=True):
-                pass
+            # Botón iniciar / detener
+            if materia_en_curso == materia:
+                btn_html = f"""
+                <button style="{btn_style}" onclick="window.streamlitWebsocket.send(JSON.stringify({{'type':'st_button','key':'det_{materia}'}}))">⛔</button>
+                """
+                st.markdown(btn_html, unsafe_allow_html=True)
+            else:
+                if materia_en_curso is None:
+                    btn_html = f"""
+                    <button style="{btn_style}" onclick="window.streamlitWebsocket.send(JSON.stringify({{'type':'st_button','key':'est_{materia}'}}))">▶</button>
+                    """
+                    st.markdown(btn_html, unsafe_allow_html=True)
     
-        # Input manual debajo de la fila si está activo
+                # Botón editar
+                btn_html = f"""
+                <button style="{btn_style}" onclick="window.streamlitWebsocket.send(JSON.stringify({{'type':'st_button','key':'edit_{materia}'}}))">✏️</button>
+                """
+                st.markdown(btn_html, unsafe_allow_html=True)
+    
+        # Input manual
         if st.session_state.get(f"show_manual_{materia}", False):
             nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
             if st.button("Guardar", key=f"save_{materia}"):
@@ -435,6 +432,7 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
 
