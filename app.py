@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 st.set_page_config(
     page_title="Control de Estudio",
     page_icon="⏳",
-    layout="centered"
+    layout="wide"
 )
 
 # -------------------------------------------------------------------
@@ -433,3 +433,4 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
