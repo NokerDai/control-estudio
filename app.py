@@ -345,10 +345,9 @@ with colA:
         tiempo_total_hms = segundos_a_hms(tiempo_total)
     
         # --- Fila compacta ---
-        # Columnas: nombre, tiempo, botón iniciar, botón editar
-        col_name, col_time, col_start, col_edit = st.columns([0.6, 0.2, 0.1, 0.1], gap="small")
+        col_name, col_time, col_actions = st.columns([0.6, 0.2, 0.2], gap="small")
     
-        # Nombre de la materia
+        # Nombre de materia
         with col_name:
             st.markdown(f"**{materia}**")
     
@@ -356,28 +355,32 @@ with colA:
         with col_time:
             st.markdown(f"🕒 {tiempo_total_hms}")
     
-        # Botón iniciar / detener
-        with col_start:
-            if materia_en_curso == materia:
-                if st.button("⛔", key=f"det_{materia}"):  # No use_container_width
-                    diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
-                    acumular_tiempo(USUARIO_ACTUAL, materia, diff_seg/60)
-                    batch_write([
-                        (info["time"], hms_a_fraction(segundos_a_hms(diff_seg + hms_a_segundos(tiempo_acum)))),
-                        (info["est"], "")
-                    ])
-                    st.rerun()
-            else:
-                if materia_en_curso is None:
-                    if st.button("▶", key=f"est_{materia}"):
-                        limpiar_estudiando(mis_materias)
-                        batch_write([(info["est"], ahora_str())])
-                        st.rerun()
+        # Botones ▶ y ✏️ juntos en la misma columna
+        with col_actions:
+            btn_start, btn_edit = st.columns([1,1], gap="small")  # dos botones uno al lado del otro
     
-        # Botón editar
-        with col_edit:
-            if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia]):
-                pass
+            # Botón iniciar / detener
+            with btn_start:
+                if materia_en_curso == materia:
+                    if st.button("⛔", key=f"det_{materia}"):
+                        diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
+                        acumular_tiempo(USUARIO_ACTUAL, materia, diff_seg/60)
+                        batch_write([
+                            (info["time"], hms_a_fraction(segundos_a_hms(diff_seg + hms_a_segundos(tiempo_acum)))),
+                            (info["est"], "")
+                        ])
+                        st.rerun()
+                else:
+                    if materia_en_curso is None:
+                        if st.button("▶", key=f"est_{materia}"):
+                            limpiar_estudiando(mis_materias)
+                            batch_write([(info["est"], ahora_str())])
+                            st.rerun()
+    
+            # Botón editar
+            with btn_edit:
+                if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia]):
+                    pass
     
         # Input manual debajo
         if st.session_state.get(f"show_manual_{materia}", False):
@@ -430,6 +433,7 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
 
