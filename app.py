@@ -158,7 +158,31 @@ def enable_manual_input(materia_key):
     st.session_state[f"show_manual_{materia_key}"] = True
 
 # -------------------------------------------------------------------
-# LECTURA MASIVA
+# FORMATEO MONETARIO
+# -------------------------------------------------------------------
+def parse_float_or_zero(s):
+    s = str(s).strip()
+    if s == "":
+        return 0.0
+    s = s.replace("$", "").replace("ARS", "").replace(" ", "")
+    s = s.replace(".", "")
+    s = s.replace(",", ".")
+    try:
+        return float(s)
+    except:
+        return 0.0
+
+def formato_moneda(num):
+    if num is None:
+        return "$ 0,00"
+    entero = int(num)
+    decimales = abs(num - entero)
+    entero_fmt = f"{entero:,}".replace(",", ".")
+    decimales_fmt = f"{decimales:.2f}".split(".")[1]
+    return f"$ {entero_fmt},{decimales_fmt}"
+
+# -------------------------------------------------------------------
+# LECTURA MASIVA MATERIAS
 # -------------------------------------------------------------------
 def cargar_todo():
     sheet_id = st.secrets["sheet_id"]
@@ -190,15 +214,13 @@ def cargar_todo():
     return data
 
 # -------------------------------------------------------------------
-# RESUMEN DE MARCAS PARA MOSTRAR DEBAJO DEL NOMBRE
+# SOLO CARGA PER_MIN — NO MÁS TOTAL DEL EXCEL
 # -------------------------------------------------------------------
 def cargar_resumen_marcas():
     sheet_id = st.secrets["sheet_id"]
     ranges = [
-        f"'{SHEET_MARCAS}'!C{TIME_ROW}",  # per_min Facundo
-        f"'{SHEET_MARCAS}'!B{TIME_ROW}",  # per_min Iván
-        f"'{SHEET_MARCAS}'!E{TIME_ROW}",  # total Facundo
-        f"'{SHEET_MARCAS}'!D{TIME_ROW}",  # total Iván
+        f"'{SHEET_MARCAS}'!C{TIME_ROW}",  # Facundo per_min
+        f"'{SHEET_MARCAS}'!B{TIME_ROW}",  # Iván per_min
     ]
 
     try:
@@ -213,20 +235,13 @@ def cargar_resumen_marcas():
 
     def _get(i):
         try:
-            val = vr[i].get("values", [[]])[0][0]
-            return "" if val is None else val
+            return vr[i].get("values", [[]])[0][0]
         except:
             return ""
 
     return {
-        "Facundo": {
-            "per_min": _get(0),
-            "total": _get(2)
-        },
-        "Iván": {
-            "per_min": _get(1),
-            "total": _get(3)
-        }
+        "Facundo": {"per_min": _get(0)},
+        "Iván": {"per_min": _get(1)}
     }
 
 # -------------------------------------------------------------------
@@ -299,39 +314,56 @@ otro = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
 colA, colB = st.columns(2)
 
 # -------------------------------------------------------------------
-# PANEL USUARIO ACTUAL - VERSIÓN COMPACTA
+# PANEL USUARIO ACTUAL
 # -------------------------------------------------------------------
 with colA:
     st.subheader(f"👤 {USUARIO_ACTUAL}")
 
-    # Expander de información / fe
     with st.expander(f"ℹ️ Fe", expanded=False):
-        if USUARIO_ACTUAL == "Facundo":
-            st.markdown(MD_FACUNDO)
-        else:
-            st.markdown(MD_IVAN)
+        st.markdown(MD_FACUNDO if USUARIO_ACTUAL == "Facundo" else MD_IVAN)
 
-    # Resumen por minuto / total
+    # === CÁLCULO TOTAL DINÁMICO ===
     try:
-        per_min = resumen_marcas[USUARIO_ACTUAL]["per_min"]
-        total = resumen_marcas[USUARIO_ACTUAL]["total"]
-        st.markdown(f"**{per_min} por minuto | {total} total**")
-    except:
+        per_min_str = resumen_marcas[USUARIO_ACTUAL]["per_min"]
+        per_min_val = parse_float_or_zero(per_min_str)
+
+        minutos_totales = 0
+        for materia, info in USERS[USUARIO_ACTUAL].items():
+            tiempo_base = hms_a_minutos(datos[USUARIO_ACTUAL]["tiempos"][materia])
+            est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
+
+            minutos_prog = 0
+            if str(est_raw).strip() != "":
+                try:
+                    inicio = parse_datetime(est_raw)
+                    minutos_prog = (datetime.now(TZ) - inicio).total_seconds() / 60
+                except:
+                    pass
+
+            minutos_totales += tiempo_base + minutos_prog
+
+        total_val = minutos_totales * per_min_val
+        total_fmt = formato_moneda(total_val)
+
+        st.markdown(f"**{formato_moneda(per_min_val)} por minuto | {total_fmt} total**")
+
+    except Exception:
         st.markdown("**— | —**")
 
     mis_materias = USERS[USUARIO_ACTUAL]
-    
-    # Determinar si hay alguna materia en curso
+
+    # Detectar si alguna materia está en curso
     materia_en_curso = None
     for m, info in mis_materias.items():
         if str(datos[USUARIO_ACTUAL]["estado"][m]).strip() != "":
             materia_en_curso = m
             break
-    
+
+    # Bloque materias usuario actual
     for materia, info in mis_materias.items():
         est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
         tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
-    
+
         # Calcular tiempo total
         tiempo_anadido_seg = 0
         if str(est_raw).strip() != "":
@@ -340,26 +372,25 @@ with colA:
                 tiempo_anadido_seg = int((datetime.now(TZ) - inicio).total_seconds())
             except:
                 tiempo_anadido_seg = 0
-    
+
         tiempo_total = hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido_seg)
         tiempo_total_hms = segundos_a_hms(tiempo_total)
-    
-        # --- Fila compacta ---
+
         col_name, col_time, col_actions = st.columns([0.6, 0.2, 0.2], gap="small")
-    
-        # Nombre de materia
+
+        # Nombre materia
         with col_name:
             st.markdown(f"**{materia}**")
-    
-        # Tiempo con emoji
+
+        # Tiempo
         with col_time:
             st.markdown(f"🕒 {tiempo_total_hms}")
-    
-        # Botones ▶ y ✏️ juntos en la misma columna
+
+        # Botones
         with col_actions:
-            btn_start, btn_edit = st.columns([1,1], gap="small")  # dos botones uno al lado del otro
-    
-            # Botón iniciar / detener
+            btn_start, btn_edit = st.columns([1,1], gap="small")
+
+            # Start/Stop
             with btn_start:
                 if materia_en_curso == materia:
                     if st.button("⛔", key=f"det_{materia}"):
@@ -376,13 +407,13 @@ with colA:
                             limpiar_estudiando(mis_materias)
                             batch_write([(info["est"], ahora_str())])
                             st.rerun()
-    
-            # Botón editar
+
+            # Editar
             with btn_edit:
                 if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia]):
                     pass
-    
-        # Input manual debajo
+
+        # Input manual
         if st.session_state.get(f"show_manual_{materia}", False):
             nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
             if st.button("Guardar", key=f"save_{materia}"):
@@ -400,18 +431,37 @@ with colB:
     st.subheader(f"👤 {otro}")
 
     with st.expander(f"ℹ️ Fe", expanded=False):
-        if otro == "Facundo":
-            st.markdown(MD_FACUNDO)
-        else:
-            st.markdown(MD_IVAN)
+        st.markdown(MD_FACUNDO if otro == "Facundo" else MD_IVAN)
 
+    # === TOTAL DINÁMICO OTRO USUARIO ===
     try:
-        per_min = resumen_marcas[otro]["per_min"]
-        total = resumen_marcas[otro]["total"]
-        st.markdown(f"**{per_min} por minuto | {total} total**")
-    except:
+        per_min_str = resumen_marcas[otro]["per_min"]
+        per_min_val = parse_float_or_zero(per_min_str)
+
+        minutos_totales = 0
+        for materia, info in USERS[otro].items():
+            tiempo_base = hms_a_minutos(datos[otro]["tiempos"][materia])
+            est_raw = datos[otro]["estado"][materia]
+
+            minutos_prog = 0
+            if str(est_raw).strip() != "":
+                try:
+                    inicio = parse_datetime(est_raw)
+                    minutos_prog = (datetime.now(TZ) - inicio).total_seconds() / 60
+                except:
+                    pass
+
+            minutos_totales += tiempo_base + minutos_prog
+
+        total_val = minutos_totales * per_min_val
+        total_fmt = formato_moneda(total_val)
+
+        st.markdown(f"**{formato_moneda(per_min_val)} por minuto | {total_fmt} total**")
+
+    except Exception:
         st.markdown("**— | —**")
 
+    # Materias del otro usuario
     for materia, info in USERS[otro].items():
         est_raw = datos[otro]["estado"][materia]
         tiempo = datos[otro]["tiempos"][materia]
@@ -424,6 +474,7 @@ with colB:
                 tiempo_anadido = 0
 
         total_seg = hms_a_segundos(tiempo) + max(0, tiempo_anadido)
+
         box = st.container()
         with box:
             st.markdown(f"**{materia}**")
@@ -433,8 +484,3 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
-
-
-
-
-
