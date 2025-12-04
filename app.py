@@ -330,79 +330,69 @@ with colA:
     for materia, info in mis_materias.items():
         est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
         tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
-
+    
         tiempo_anadido_seg = 0
         if str(est_raw).strip() != "":
             try:
                 inicio = parse_datetime(est_raw)
                 tiempo_anadido_seg = int((datetime.now(TZ) - inicio).total_seconds())
-            except Exception as e:
-                st.error(f"Error parseando marca: {e}")
+            except:
                 tiempo_anadido_seg = 0
-
+    
         tiempo_acum_seg = hms_a_segundos(tiempo_acum)
         tiempo_total = tiempo_acum_seg + max(0, tiempo_anadido_seg)
         tiempo_total_hms = segundos_a_hms(tiempo_total)
-
-        # --- Columnas para nombre y botones ---
-        box = st.container()
-        with box:
-            col_name, col_btn1, col_btn2 = st.columns([0.6, 0.2, 0.2])
-
-            with col_name:
-                st.markdown(f"**{materia}**")
-                st.write(f"🕒 Total: **{tiempo_total_hms}**")
-                if str(est_raw).strip() != "":
-                    st.caption(f"Base: {tiempo_acum} | En proceso: +{segundos_a_hms(tiempo_anadido_seg)}")
-                    st.markdown("🟢 **Estudiando**")
-                else:
-                    st.markdown("⚪")
-
-            # Si la materia está en curso mostramos solo ⛔
-            if materia_en_curso == materia:
-                with col_btn1:
-                    if st.button("⛔", key=f"det_{materia}", use_container_width=True):
-                        try:
-                            diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
-                        except:
-                            diff_seg = 0
-
-                        diff_min = diff_seg / 60
-                        acumular_tiempo(USUARIO_ACTUAL, materia, diff_min)
-                        nuevo_total = tiempo_acum_seg + diff_seg
-                        fraccion = hms_a_fraction(segundos_a_hms(nuevo_total))
-
-                        batch_write([
-                            (info["time"], fraccion),
-                            (info["est"], "")
-                        ])
-                        st.rerun()
-                continue
-
-            if materia_en_curso is not None:
-                continue
-
-            # Botones de iniciar y editar (mismo tamaño)
-            with col_btn1:
+    
+        # --- Layout compacto: nombre y botones en la misma línea ---
+        cols = st.columns([0.7, 0.15, 0.15])
+        with cols[0]:
+            st.markdown(f"**{materia}** 🕒 {tiempo_total_hms}")
+            if str(est_raw).strip() != "":
+                st.caption(f"Base: {tiempo_acum} | En proceso: +{segundos_a_hms(tiempo_anadido_seg)}")
+                st.markdown("🟢 Estudiando")
+            else:
+                st.markdown("⚪")
+    
+        # Botón iniciar ▶
+        with cols[1]:
+            if materia_en_curso is None:
                 if st.button("▶", key=f"est_{materia}", use_container_width=True):
                     limpiar_estudiando(mis_materias)
                     batch_write([(info["est"], ahora_str())])
                     st.rerun()
-
-            with col_btn2:
+            elif materia_en_curso == materia:
+                if st.button("⛔", key=f"det_{materia}", use_container_width=True):
+                    try:
+                        diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
+                    except:
+                        diff_seg = 0
+                    diff_min = diff_seg / 60
+                    acumular_tiempo(USUARIO_ACTUAL, materia, diff_min)
+                    nuevo_total = tiempo_acum_seg + diff_seg
+                    fraccion = hms_a_fraction(segundos_a_hms(nuevo_total))
+                    batch_write([
+                        (info["time"], fraccion),
+                        (info["est"], "")
+                    ])
+                    st.rerun()
+    
+        # Botón editar ✏️
+        with cols[2]:
+            if materia_en_curso is None:
                 if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia], use_container_width=True):
                     pass
-
-            if st.session_state.get(f"show_manual_{materia}", False):
-                with col_name:
-                    nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
-                    if st.button("Guardar", key=f"save_{materia}"):
-                        try:
-                            batch_write([(info["time"], hms_a_fraction(nuevo))])
-                            st.session_state[f"show_manual_{materia}"] = False
-                            st.rerun()
-                        except:
-                            st.error("Formato inválido (usar HH:MM:SS)")
+    
+        # Input manual debajo del nombre
+        if st.session_state.get(f"show_manual_{materia}", False):
+            with cols[0]:
+                nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
+                if st.button("Guardar", key=f"save_{materia}"):
+                    try:
+                        batch_write([(info["time"], hms_a_fraction(nuevo))])
+                        st.session_state[f"show_manual_{materia}"] = False
+                        st.rerun()
+                    except:
+                        st.error("Formato inválido (usar HH:MM:SS)")
 
 # -------------------------------------------------------------------
 # PANEL OTRO USUARIO (solo lectura)
@@ -444,3 +434,4 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
