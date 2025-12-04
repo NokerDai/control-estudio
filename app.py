@@ -1,7 +1,6 @@
 import json
 from google.oauth2 import service_account
 import streamlit as st
-from streamlit import auth
 from googleapiclient.discovery import build
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
@@ -426,5 +425,6 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
