@@ -1,6 +1,7 @@
 import json
 from google.oauth2 import service_account
 import streamlit as st
+from streamlit import auth
 from googleapiclient.discovery import build
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
@@ -17,7 +18,7 @@ st.set_page_config(
 # -------------------------------------------------------------------
 # LOGIN AUTOMÁTICO STREAMLIT CLOUD
 # -------------------------------------------------------------------
-user = st.context.user
+user = auth.get_current_user()
 
 if user is None:
     st.error("⚠️ Esta aplicación requiere que inicies sesión (solo usuarios autorizados).")
@@ -425,3 +426,4 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
