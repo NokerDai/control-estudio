@@ -246,19 +246,19 @@ def show_md_popup(flag_key, title, md_text, close_key):
                 st.markdown(md_text)
                 if st.button("Cerrar", key=close_key):
                     st.session_state[flag_key] = False
-                    st.experimental_rerun()
+                    st.rerun()
         except Exception:
             with st.expander(title, expanded=True):
                 st.markdown(md_text)
                 if st.button("Cerrar", key=close_key+"_fb"):
                     st.session_state[flag_key] = False
-                    st.experimental_rerun()
+                    st.rerun()
     else:
         with st.expander(title, expanded=True):
             st.markdown(md_text)
             if st.button("Cerrar", key=close_key+"_fb2"):
                 st.session_state[flag_key] = False
-                st.experimental_rerun()
+                st.rerun()
 
 # -------------------------------------------------------------------
 # LOGIN MANUAL
@@ -269,18 +269,18 @@ if "usuario_seleccionado" not in st.session_state:
     with col_u1:
         if st.button("Soy Facundo", use_container_width=True):
             st.session_state["usuario_seleccionado"] = "Facundo"
-            st.experimental_rerun()
+            st.rerun()
     with col_u2:
         if st.button("Soy Iván", use_container_width=True):
             st.session_state["usuario_seleccionado"] = "Iván"
-            st.experimental_rerun()
+            st.rerun()
     st.stop()
 
 USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
 
 if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
     del st.session_state["usuario_seleccionado"]
-    st.experimental_rerun()
+    st.rerun()
 
 # -------------------------------------------------------------------
 # INTERFAZ PRINCIPAL
@@ -294,7 +294,7 @@ resumen_marcas = cargar_resumen_marcas()
 col_btn1, col_btn2 = st.columns([0.8, 0.2])
 with col_btn1:
     if st.button("🔄 Actualizar tiempos"):
-        st.experimental_rerun()
+        st.rerun()
 # Hora arriba opcional
 # with col_btn2:
 #     st.write(ahora_str())
