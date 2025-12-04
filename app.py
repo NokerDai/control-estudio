@@ -20,20 +20,36 @@ st.set_page_config(
 user = st.experimental_user
 
 if user is None:
-    st.error("⚠️ Esta aplicación requiere que inicies sesión (solo usuarios autorizados).")
+    st.error("⚠️ Iniciá sesión primero (solo usuarios autorizados).")
     st.stop()
 
-email = user.email.lower()
+# DEBUG: ver qué atributos existen
+st.write("DEBUG user object:", user)
+st.write("Atributos disponibles:", dir(user))
 
+# Intentamos obtener email, username o full_name
+email = getattr(user, "email", None)
+username = getattr(user, "username", None)
+full_name = getattr(user, "full_name", None)
+
+if email is not None:
+    current_user = email.lower()
+elif username is not None:
+    current_user = username.lower()
+else:
+    st.error("❌ No se pudo detectar tu usuario correctamente.")
+    st.stop()
+
+# Comparación con secretos
 MAIL_FACUNDO = st.secrets["auth"]["facundo"].lower()
 MAIL_IVAN = st.secrets["auth"]["ivan"].lower()
 
-if email == MAIL_FACUNDO:
+if current_user == MAIL_FACUNDO:
     USUARIO_ACTUAL = "Facundo"
-elif email == MAIL_IVAN:
+elif current_user == MAIL_IVAN:
     USUARIO_ACTUAL = "Iván"
 else:
-    st.error(f"❌ No tenés permiso para usar esta app. ({email})")
+    st.error(f"❌ No tenés permiso para usar esta app. ({current_user})")
     st.stop()
 
 # -------------------------------------------------------------------
@@ -425,6 +441,7 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
 
