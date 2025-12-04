@@ -355,7 +355,7 @@ with colA:
     
         # Tiempo
         with col_time:
-            st.markdown(f"{tiempo_total_hms}")
+            st.markdown(f"🕒 {tiempo_total_hms}")
     
         # Botón iniciar / detener centrado
         with col_start:
@@ -433,4 +433,5 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
