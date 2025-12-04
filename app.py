@@ -331,66 +331,84 @@ with colA:
             materia_en_curso = m
             break
 
-    for materia, info in mis_materias.items():
-        est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
-        tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
-    
-        # Calcular tiempo total
-        tiempo_anadido_seg = 0
-        if str(est_raw).strip() != "":
-            try:
-                inicio = parse_datetime(est_raw)
-                tiempo_anadido_seg = int((datetime.now(TZ) - inicio).total_seconds())
-            except:
-                tiempo_anadido_seg = 0
-    
-        tiempo_total = hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido_seg)
-        tiempo_total_hms = segundos_a_hms(tiempo_total)
-    
-        # Fila compacta
-        col_materia, col_tiempo, col_accion = st.columns([0.6, 0.2, 0.2], gap="small")
-    
-        # Nombre
-        with col_materia:
-            st.markdown(f"**{materia}**")
-    
-        # Tiempo
-        with col_tiempo:
-            st.markdown(f"{tiempo_total_hms}")
-    
-        # Botones con ancho fijo
-        with col_accion:
-            btn_style = "width: 2rem; height: 2rem; font-size:16px"  # mismo tamaño para ambos
-    
-            # Botón iniciar / detener
-            if materia_en_curso == materia:
-                btn_html = f"""
-                <button style="{btn_style}" onclick="window.streamlitWebsocket.send(JSON.stringify({{'type':'st_button','key':'det_{materia}'}}))">⛔</button>
-                """
-                st.markdown(btn_html, unsafe_allow_html=True)
-            else:
-                if materia_en_curso is None:
-                    btn_html = f"""
-                    <button style="{btn_style}" onclick="window.streamlitWebsocket.send(JSON.stringify({{'type':'st_button','key':'est_{materia}'}}))">▶</button>
-                    """
-                    st.markdown(btn_html, unsafe_allow_html=True)
-    
-                # Botón editar
-                btn_html = f"""
-                <button style="{btn_style}" onclick="window.streamlitWebsocket.send(JSON.stringify({{'type':'st_button','key':'edit_{materia}'}}))">✏️</button>
-                """
-                st.markdown(btn_html, unsafe_allow_html=True)
-    
-        # Input manual
-        if st.session_state.get(f"show_manual_{materia}", False):
-            nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
-            if st.button("Guardar", key=f"save_{materia}"):
+for materia, info in mis_materias.items():
+    est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
+    tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
+
+    # Calcular tiempo total
+    tiempo_anadido_seg = 0
+    if str(est_raw).strip() != "":
+        try:
+            inicio = parse_datetime(est_raw)
+            tiempo_anadido_seg = int((datetime.now(TZ) - inicio).total_seconds())
+        except:
+            tiempo_anadido_seg = 0
+
+    tiempo_total = hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido_seg)
+    tiempo_total_hms = segundos_a_hms(tiempo_total)
+
+    # --- Fila compacta ---
+    col_materia, col_tiempo, col_accion1, col_accion2 = st.columns([0.6, 0.15, 0.12, 0.12], gap="small")
+
+    with col_materia:
+        st.markdown(f"**{materia}**")
+
+    with col_tiempo:
+        st.markdown(f"{tiempo_total_hms}")
+
+    # CSS para forzar ancho mínimo de botones
+    st.markdown(
+        """
+        <style>
+        div.stButton > button {
+            min-width: 2.2rem;
+            max-width: 2.2rem;
+            min-height: 2.2rem;
+            max-height: 2.2rem;
+            padding: 0px;
+            margin: 0px;
+        }
+        </style>
+        """, unsafe_allow_html=True
+    )
+
+    # Botón iniciar ▶
+    with col_accion1:
+        if materia_en_curso == materia:
+            if st.button("⛔", key=f"det_{materia}"):
                 try:
-                    batch_write([(info["time"], hms_a_fraction(nuevo))])
-                    st.session_state[f"show_manual_{materia}"] = False
-                    st.rerun()
+                    diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
                 except:
-                    st.error("Formato inválido (usar HH:MM:SS)")
+                    diff_seg = 0
+                diff_min = diff_seg / 60
+                acumular_tiempo(USUARIO_ACTUAL, materia, diff_min)
+                batch_write([
+                    (info["time"], hms_a_fraction(segundos_a_hms(diff_seg + hms_a_segundos(tiempo_acum)))),
+                    (info["est"], "")
+                ])
+                st.rerun()
+        else:
+            if materia_en_curso is None:
+                if st.button("▶", key=f"est_{materia}"):
+                    limpiar_estudiando(mis_materias)
+                    batch_write([(info["est"], ahora_str())])
+                    st.rerun()
+
+    # Botón editar ✏️
+    with col_accion2:
+        if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia]):
+            pass
+
+    # Input manual debajo de la fila
+    if st.session_state.get(f"show_manual_{materia}", False):
+        nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
+        if st.button("Guardar", key=f"save_{materia}"):
+            try:
+                batch_write([(info["time"], hms_a_fraction(nuevo))])
+                st.session_state[f"show_manual_{materia}"] = False
+                st.rerun()
+            except:
+                st.error("Formato inválido (usar HH:MM:SS)")
 
 # -------------------------------------------------------------------
 # PANEL OTRO USUARIO (solo lectura)
@@ -432,6 +450,7 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
 
