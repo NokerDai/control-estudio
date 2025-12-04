@@ -394,7 +394,7 @@ with colA:
 
     for materia, info in mis_materias.items():
         est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
-        tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materoria]
+        tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
 
         box = st.container()
         with box:
@@ -509,4 +509,5 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
