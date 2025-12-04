@@ -15,6 +15,12 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------------
+# CARGA ARCHIVOS MARKDOWN DESDE SECRETS (NO EXPUESTO EN GITHUB)
+# -------------------------------------------------------------------
+MD_FACUNDO = st.secrets["md"]["facundo"]
+MD_IVAN = st.secrets["md"]["ivan"]
+
+# -------------------------------------------------------------------
 # CARGA DE CREDENCIALES
 # -------------------------------------------------------------------
 try:
@@ -78,7 +84,7 @@ def fila_para_fecha(fecha_actual):
     delta = (fecha_actual - FECHA_BASE).days
     return FILA_BASE + delta
 
-hoy = datetime.now(TZ).date()       # ← CORRECCIÓN IMPORTANTE
+hoy = datetime.now(TZ).date()
 TIME_ROW = fila_para_fecha(hoy)
 MARCAS_ROW = 2
 
@@ -187,7 +193,6 @@ def cargar_todo():
 # RESUMEN DE MARCAS PARA MOSTRAR DEBAJO DEL NOMBRE
 # -------------------------------------------------------------------
 def cargar_resumen_marcas():
-
     sheet_id = st.secrets["sheet_id"]
     ranges = [
         f"'{SHEET_MARCAS}'!C{TIME_ROW}",  # per_min Facundo
@@ -301,6 +306,23 @@ colA, colB = st.columns(2)
 with colA:
     st.subheader(f"👤 {USUARIO_ACTUAL}")
 
+    # -----------------------------
+    # POPUP PARA USUARIO ACTUAL
+    # -----------------------------
+    if st.button("ℹ️ Info", key=f"info_{USUARIO_ACTUAL}"):
+        st.session_state[f"show_info_{USUARIO_ACTUAL}"] = True
+
+    if st.session_state.get(f"show_info_{USUARIO_ACTUAL}", False):
+        with st.modal(f"Información de {USUARIO_ACTUAL}"):
+            if USUARIO_ACTUAL == "Facundo":
+                st.markdown(MD_FACUNDO)
+            else:
+                st.markdown(MD_IVAN)
+
+            if st.button("Cerrar", key=f"cerrar_{USUARIO_ACTUAL}"):
+                st.session_state[f"show_info_{USUARIO_ACTUAL}"] = False
+                st.rerun()
+
     try:
         per_min = resumen_marcas[USUARIO_ACTUAL]["per_min"]
         total = resumen_marcas[USUARIO_ACTUAL]["total"]
@@ -395,6 +417,23 @@ with colA:
 # -------------------------------------------------------------------
 with colB:
     st.subheader(f"👤 {otro}")
+
+    # -----------------------------
+    # POPUP DEL OTRO USUARIO
+    # -----------------------------
+    if st.button("ℹ️ Info", key=f"info_{otro}"):
+        st.session_state[f"show_info_{otro}"] = True
+
+    if st.session_state.get(f"show_info_{otro}", False):
+        with st.modal(f"Información de {otro}"):
+            if otro == "Facundo":
+                st.markdown(MD_FACUNDO)
+            else:
+                st.markdown(MD_IVAN)
+
+            if st.button("Cerrar", key=f"cerrar_{otro}"):
+                st.session_state[f"show_info_{otro}"] = False
+                st.rerun()
 
     try:
         per_min = resumen_marcas[otro]["per_min"]
