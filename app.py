@@ -18,13 +18,13 @@ st.set_page_config(
 # -------------------------------------------------------------------
 # LOGIN AUTOMÁTICO STREAMLIT CLOUD
 # -------------------------------------------------------------------
-user = auth.get_current_user()
+user = st.experimental_user
 
 if user is None:
     st.error("⚠️ Esta aplicación requiere que inicies sesión (solo usuarios autorizados).")
     st.stop()
 
-email = user.get("email", "").lower()
+email = user.email.lower()
 
 MAIL_FACUNDO = st.secrets["auth"]["facundo"].lower()
 MAIL_IVAN = st.secrets["auth"]["ivan"].lower()
@@ -426,4 +426,5 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
