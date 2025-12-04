@@ -289,8 +289,6 @@ if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
 # -------------------------------------------------------------------
 # INTERFAZ PRINCIPAL
 # -------------------------------------------------------------------
-st.title("⏳ Control de Estudio")
-
 datos = cargar_todo()
 resumen_marcas = cargar_resumen_marcas()
 
@@ -433,5 +431,6 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
