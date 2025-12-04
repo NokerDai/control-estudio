@@ -6,7 +6,7 @@ from datetime import datetime, date
 from zoneinfo import ZoneInfo
 
 # -------------------------------------------------------------------
-# CONFIG STREAMLIT
+# CONFIGURACIÓN STREAMLIT
 # -------------------------------------------------------------------
 st.set_page_config(
     page_title="Control de Estudio",
@@ -15,29 +15,13 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------------
-# LOGIN AUTOMÁTICO STREAMLIT CLOUD
+# CARGA ARCHIVOS MARKDOWN DESDE SECRETS (NO EXPUESTO EN GITHUB)
 # -------------------------------------------------------------------
-if "usuario_seleccionado" not in st.session_state:
-    st.title("¿Quién sos? 👤")
-    col_u1, col_u2 = st.columns(2)
-    with col_u1:
-        if st.button("Soy Facundo", use_container_width=True):
-            st.session_state["usuario_seleccionado"] = "Facundo"
-            st.rerun()
-    with col_u2:
-        if st.button("Soy Iván", use_container_width=True):
-            st.session_state["usuario_seleccionado"] = "Iván"
-            st.rerun()
-    st.stop()
-
-USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
-
-if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
-    del st.session_state["usuario_seleccionado"]
-    st.rerun()
+MD_FACUNDO = st.secrets["md"]["facundo"]
+MD_IVAN = st.secrets["md"]["ivan"]
 
 # -------------------------------------------------------------------
-# CARGA DE CREDENCIALES GOOGLE SHEETS
+# CARGA DE CREDENCIALES
 # -------------------------------------------------------------------
 try:
     key_dict = json.loads(st.secrets["textkey"])
@@ -49,6 +33,7 @@ except KeyError:
     st.error("Error: Falta configurar el secreto 'textkey'.")
     st.stop()
 
+# Servicio Google Sheets
 service = build("sheets", "v4", credentials=creds)
 sheet = service.spreadsheets()
 
@@ -152,7 +137,7 @@ def hms_a_segundos(hms):
     if not hms or str(hms).strip() == "":
         return 0
     h, m, s = map(int, hms.split(":"))
-    return h * 3600 + m * 60 + s
+    return h*3600 + m*60 + s
 
 def segundos_a_hms(seg):
     h = seg // 3600
@@ -163,33 +148,36 @@ def segundos_a_hms(seg):
 def hms_a_fraction(hms):
     return hms_a_segundos(hms) / 86400
 
-# -------------------------------------------------------------------
-# POPUP (simulado con expander)
-# -------------------------------------------------------------------
-def popup_markdown(usuario):
-    md = st.secrets["markdown"]["facundo_md"] if usuario == "Facundo" else st.secrets["markdown"]["ivan_md"]
-    with st.expander(f"ℹ️ Información de {usuario}"):
-        st.markdown(md)
+def hms_a_minutos(hms):
+    return hms_a_segundos(hms) / 60
 
 # -------------------------------------------------------------------
-# CARGA MASIVA
+# UTILS UI
+# -------------------------------------------------------------------
+def enable_manual_input(materia_key):
+    st.session_state[f"show_manual_{materia_key}"] = True
+
+# -------------------------------------------------------------------
+# LECTURA MASIVA
 # -------------------------------------------------------------------
 def cargar_todo():
     sheet_id = st.secrets["sheet_id"]
     ranges = []
-    for userx, materias in USERS.items():
+    for user, materias in USERS.items():
         for m, info in materias.items():
             ranges.append(info["est"])
             ranges.append(info["time"])
+
     res = sheet.values().batchGet(
         spreadsheetId=sheet_id,
         ranges=ranges,
         valueRenderOption="FORMATTED_VALUE"
     ).execute()
+
     values = res.get("valueRanges", [])
     data = {u: {"estado": {}, "tiempos": {}} for u in USERS}
     idx = 0
-    for userx, materias in USERS.items():
+    for user, materias in USERS.items():
         for materia, info in materias.items():
             est_val = values[idx].get("values", [[]])
             est_val = est_val[0][0] if est_val and est_val[0] else ""
@@ -197,21 +185,22 @@ def cargar_todo():
             time_val = values[idx].get("values", [[]])
             time_val = time_val[0][0] if time_val and time_val[0] else "00:00:00"
             idx += 1
-            data[userx]["estado"][materia] = est_val
-            data[userx]["tiempos"][materia] = time_val
+            data[user]["estado"][materia] = est_val
+            data[user]["tiempos"][materia] = time_val
     return data
 
 # -------------------------------------------------------------------
-# RESUMEN MARCAS
+# RESUMEN DE MARCAS PARA MOSTRAR DEBAJO DEL NOMBRE
 # -------------------------------------------------------------------
 def cargar_resumen_marcas():
     sheet_id = st.secrets["sheet_id"]
     ranges = [
-        f"'{SHEET_MARCAS}'!C{TIME_ROW}",  
-        f"'{SHEET_MARCAS}'!B{TIME_ROW}",  
-        f"'{SHEET_MARCAS}'!E{TIME_ROW}",
-        f"'{SHEET_MARCAS}'!D{TIME_ROW}",
+        f"'{SHEET_MARCAS}'!C{TIME_ROW}",  # per_min Facundo
+        f"'{SHEET_MARCAS}'!B{TIME_ROW}",  # per_min Iván
+        f"'{SHEET_MARCAS}'!E{TIME_ROW}",  # total Facundo
+        f"'{SHEET_MARCAS}'!D{TIME_ROW}",  # total Iván
     ]
+
     try:
         res = sheet.values().batchGet(
             spreadsheetId=sheet_id,
@@ -230,12 +219,18 @@ def cargar_resumen_marcas():
             return ""
 
     return {
-        "Facundo": {"per_min": _get(0), "total": _get(2)},
-        "Iván":    {"per_min": _get(1), "total": _get(3)},
+        "Facundo": {
+            "per_min": _get(0),
+            "total": _get(2)
+        },
+        "Iván": {
+            "per_min": _get(1),
+            "total": _get(3)
+        }
     }
 
 # -------------------------------------------------------------------
-# ESCRITURA
+# ESCRITURA MASIVA
 # -------------------------------------------------------------------
 def batch_write(updates):
     sheet_id = st.secrets["sheet_id"]
@@ -267,28 +262,42 @@ def acumular_tiempo(usuario, materia, minutos_sumar):
     batch_write([(info["est"], nuevo_total)])
 
 # -------------------------------------------------------------------
+# LOGIN
+# -------------------------------------------------------------------
+if "usuario_seleccionado" not in st.session_state:
+    st.title("¿Quién sos? 👤")
+    col_u1, col_u2 = st.columns(2)
+
+    with col_u1:
+        if st.button("Soy Facundo", use_container_width=True):
+            st.session_state["usuario_seleccionado"] = "Facundo"
+            st.rerun()
+
+    with col_u2:
+        if st.button("Soy Iván", use_container_width=True):
+            st.session_state["usuario_seleccionado"] = "Iván"
+            st.rerun()
+
+    st.stop()
+
+USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
+
+if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
+    del st.session_state["usuario_seleccionado"]
+    st.rerun()
+
+# -------------------------------------------------------------------
 # INTERFAZ PRINCIPAL
 # -------------------------------------------------------------------
 st.title("⏳ Control de Estudio")
 
-# BOTONES SUPERIORES
-col_btn1, col_btn2 = st.columns([0.8, 0.2])
-
-with col_btn1:
-    if st.button("🔄 Actualizar tiempos"):
-        st.rerun()
-
-with col_btn2:
-    st.write("")  # eliminado reloj visible
-
-# POPUP AL LADO DEL NOMBRE
-popup_markdown(USUARIO_ACTUAL)
-
-otro = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
-
 datos = cargar_todo()
 resumen_marcas = cargar_resumen_marcas()
 
+if st.button("🔄 Actualizar tiempos"):
+    st.rerun()
+
+otro = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
 colA, colB = st.columns(2)
 
 # -------------------------------------------------------------------
@@ -297,14 +306,29 @@ colA, colB = st.columns(2)
 with colA:
     st.subheader(f"👤 {USUARIO_ACTUAL}")
 
+    # -----------------------------
+    # POPUP PARA USUARIO ACTUAL
+    # -----------------------------
+    if st.button("ℹ️ Info", key=f"info_{USUARIO_ACTUAL}"):
+        st.session_state[f"show_info_{USUARIO_ACTUAL}"] = True
+
+    if st.session_state.get(f"show_info_{USUARIO_ACTUAL}", False):
+        with st.modal(f"Información de {USUARIO_ACTUAL}"):
+            if USUARIO_ACTUAL == "Facundo":
+                st.markdown(MD_FACUNDO)
+            else:
+                st.markdown(MD_IVAN)
+
+            if st.button("Cerrar", key=f"cerrar_{USUARIO_ACTUAL}"):
+                st.session_state[f"show_info_{USUARIO_ACTUAL}"] = False
+                st.rerun()
+
     try:
         per_min = resumen_marcas[USUARIO_ACTUAL]["per_min"]
         total = resumen_marcas[USUARIO_ACTUAL]["total"]
         st.markdown(f"**{per_min} por minuto | {total} total**")
     except:
         st.markdown("**— | —**")
-
-    popup_markdown(USUARIO_ACTUAL)
 
     mis_materias = USERS[USUARIO_ACTUAL]
 
@@ -327,7 +351,8 @@ with colA:
                 try:
                     inicio = parse_datetime(est_raw)
                     tiempo_anadido_seg = int((datetime.now(TZ) - inicio).total_seconds())
-                except:
+                except Exception as e:
+                    st.error(f"Error parseando marca: {e}")
                     tiempo_anadido_seg = 0
 
             tiempo_acum_seg = hms_a_segundos(tiempo_acum)
@@ -374,8 +399,8 @@ with colA:
                     st.rerun()
 
             with b2:
-                if st.button("✏️", key=f"edit_{materia}"):
-                    st.session_state[f"show_manual_{materia}"] = True
+                if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia]):
+                    pass
 
             if st.session_state.get(f"show_manual_{materia}", False):
                 nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
@@ -393,14 +418,29 @@ with colA:
 with colB:
     st.subheader(f"👤 {otro}")
 
+    # -----------------------------
+    # POPUP DEL OTRO USUARIO
+    # -----------------------------
+    if st.button("ℹ️ Info", key=f"info_{otro}"):
+        st.session_state[f"show_info_{otro}"] = True
+
+    if st.session_state.get(f"show_info_{otro}", False):
+        with st.modal(f"Información de {otro}"):
+            if otro == "Facundo":
+                st.markdown(MD_FACUNDO)
+            else:
+                st.markdown(MD_IVAN)
+
+            if st.button("Cerrar", key=f"cerrar_{otro}"):
+                st.session_state[f"show_info_{otro}"] = False
+                st.rerun()
+
     try:
         per_min = resumen_marcas[otro]["per_min"]
         total = resumen_marcas[otro]["total"]
         st.markdown(f"**{per_min} por minuto | {total} total**")
     except:
         st.markdown("**— | —**")
-
-    popup_markdown(otro)
 
     for materia, info in USERS[otro].items():
         est_raw = datos[otro]["estado"][materia]
