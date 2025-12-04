@@ -360,7 +360,7 @@ with colA:
         # Botón iniciar / detener
         with col_start:
             if materia_en_curso == materia:
-                if st.button("⛔", key=f"det_{materia}"):
+                if st.button("P", key=f"det_{materia}"):
                     diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
                     acumular_tiempo(USUARIO_ACTUAL, materia, diff_seg/60)
                     batch_write([
@@ -370,14 +370,14 @@ with colA:
                     st.rerun()
             else:
                 if materia_en_curso is None:
-                    if st.button("▶", key=f"est_{materia}"):
+                    if st.button("I", key=f"est_{materia}"):
                         limpiar_estudiando(mis_materias)
                         batch_write([(info["est"], ahora_str())])
                         st.rerun()
     
         # Botón editar
         with col_edit:
-            if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia]):
+            if st.button("E", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia]):
                 pass
     
         # Input manual debajo de la fila
@@ -431,6 +431,7 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
 
