@@ -32,51 +32,29 @@ service = build("sheets", "v4", credentials=creds)
 sheet = service.spreadsheets()
 
 # -------------------------------------------------------------------
-# ZONA HORARIA ARGENTINA (centralizada)
+# ZONA HORARIA ARGENTINA
 # -------------------------------------------------------------------
 TZ = ZoneInfo("America/Argentina/Cordoba")
 
 def ahora_str():
-    """
-    Devuelve fecha-hora actual con offset en formato ISO 'YYYY-MM-DD HH:MM:SS±HH:MM'
-    Ej: '2025-12-03 21:00:00-03:00'
-    """
-    # usamos isoformat para tener el offset con ':' -> cómodo para parsear
     return datetime.now(TZ).isoformat(sep=" ", timespec="seconds")
 
 def parse_datetime(s):
-    """
-    Parsea una marca temporal proveniente de Google Sheets y la normaliza
-    a datetime con tzinfo = TZ.
-    Acepta:
-      - 'YYYY-MM-DD HH:MM:SS±HH:MM'  (ISO con offset)
-      - 'YYYY-MM-DD HH:MM:SS±HHMM'   (offset sin colon)
-      - 'YYYY-MM-DD HH:MM:SS'        (sin offset -> interpretada como hora local TZ)
-      - 'YYYY-MM-DDTHH:MM:SS±HH:MM'  (T separador)
-      - '...Z'                      (Z -> UTC)
-    """
     if not s or str(s).strip() == "":
         raise ValueError("Marca vacía")
-
     s = str(s).strip()
-
-    # 1) Intentar fromisoformat (suele manejar muchos formatos ISO y offsets con ':')
     try:
-        # fromisoformat acepta 'YYYY-MM-DD HH:MM:SS+HH:MM' y 'YYYY-MM-DDTHH:MM:SSZ' (py3.11+)
-        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))  # si hay 'Z' lo tratamos como +00:00
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
         if dt.tzinfo is None:
-            # si es naive -> asumir que la hora está expresada en hora local TZ
             return datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, tzinfo=TZ)
         else:
             return dt.astimezone(TZ)
     except Exception:
         pass
-
-    # 2) Intentar strptime con %z (acepta +HHMM y +HH:MM en py3.7+)
     fmts = [
         "%Y-%m-%d %H:%M:%S%z",
         "%Y-%m-%dT%H:%M:%S%z",
-        "%Y-%m-%d %H:%M:%S",   # sin offset
+        "%Y-%m-%d %H:%M:%S",
         "%Y-%m-%dT%H:%M:%S",
     ]
     for fmt in fmts:
@@ -88,23 +66,21 @@ def parse_datetime(s):
                 return dt.astimezone(TZ)
         except Exception:
             continue
-
-    # 3) Si nada funcionó -> error claro
     raise ValueError(f"Formato inválido en marca temporal: {s}")
 
 # -------------------------------------------------------------------
 # FILA DINÁMICA SEGÚN LA FECHA
 # -------------------------------------------------------------------
 FILA_BASE = 170
-FECHA_BASE = date(2025, 12, 2)  # fila 170 = 2/12/2025
+FECHA_BASE = date(2025, 12, 2)
 
 def fila_para_fecha(fecha_actual):
     delta = (fecha_actual - FECHA_BASE).days
     return FILA_BASE + delta
 
-hoy = datetime.now(TZ).date()
+hoy = datetime.now(TZ).date()       # ← CORRECCIÓN IMPORTANTE
 TIME_ROW = fila_para_fecha(hoy)
-MARCAS_ROW = 2  # fila fija para marcas
+MARCAS_ROW = 2
 
 # -------------------------------------------------------------------
 # HOJAS
@@ -164,15 +140,13 @@ def segundos_a_hms(seg):
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 def hms_a_fraction(hms):
-    """Convierte 'HH:MM:SS' a fracción de día para Google Sheets."""
     return hms_a_segundos(hms) / 86400
 
 def hms_a_minutos(hms):
-    """Convierte HH:MM:SS a minutos."""
     return hms_a_segundos(hms) / 60
 
 # -------------------------------------------------------------------
-# UTILS PARA UI Y ESTADO
+# UTILS UI
 # -------------------------------------------------------------------
 def enable_manual_input(materia_key):
     st.session_state[f"show_manual_{materia_key}"] = True
@@ -210,12 +184,53 @@ def cargar_todo():
     return data
 
 # -------------------------------------------------------------------
+# RESUMEN DE MARCAS PARA MOSTRAR DEBAJO DEL NOMBRE
+# -------------------------------------------------------------------
+def cargar_resumen_marcas():
+
+    sheet_id = st.secrets["sheet_id"]
+    ranges = [
+        f"'{SHEET_MARCAS}'!C{TIME_ROW}",  # per_min Facundo
+        f"'{SHEET_MARCAS}'!B{TIME_ROW}",  # per_min Iván
+        f"'{SHEET_MARCAS}'!E{TIME_ROW}",  # total Facundo
+        f"'{SHEET_MARCAS}'!D{TIME_ROW}",  # total Iván
+    ]
+
+    try:
+        res = sheet.values().batchGet(
+            spreadsheetId=sheet_id,
+            ranges=ranges,
+            valueRenderOption="FORMATTED_VALUE"
+        ).execute()
+        vr = res.get("valueRanges", [])
+    except Exception:
+        vr = [{} for _ in ranges]
+
+    def _get(i):
+        try:
+            val = vr[i].get("values", [[]])[0][0]
+            return "" if val is None else val
+        except:
+            return ""
+
+    return {
+        "Facundo": {
+            "per_min": _get(0),
+            "total": _get(2)
+        },
+        "Iván": {
+            "per_min": _get(1),
+            "total": _get(3)
+        }
+    }
+
+# -------------------------------------------------------------------
 # ESCRITURA MASIVA
 # -------------------------------------------------------------------
 def batch_write(updates):
     sheet_id = st.secrets["sheet_id"]
     body = {
-        "valueInputOption": "USER_ENTERED",  # permite interpretar duración y números
+        "valueInputOption": "USER_ENTERED",
         "data": [{"range": r, "values": [[v]]} for r, v in updates]
     }
     sheet.values().batchUpdate(
@@ -227,11 +242,7 @@ def limpiar_estudiando(materias):
     updates = [(datos["est"], "") for materia, datos in materias.items()]
     batch_write(updates)
 
-# -------------------------------------------------------------------
-# FUNCION PARA ACUMULAR MINUTOS EN MARCAS
-# -------------------------------------------------------------------
 def acumular_tiempo(usuario, materia, minutos_sumar):
-    """Suma los minutos a la celda correspondiente en marcas."""
     info = USERS[usuario][materia]
     res = sheet.values().get(
         spreadsheetId=st.secrets["sheet_id"],
@@ -246,7 +257,7 @@ def acumular_tiempo(usuario, materia, minutos_sumar):
     batch_write([(info["est"], nuevo_total)])
 
 # -------------------------------------------------------------------
-# SELECCIÓN DE USUARIO
+# LOGIN
 # -------------------------------------------------------------------
 if "usuario_seleccionado" not in st.session_state:
     st.title("¿Quién sos? 👤")
@@ -274,7 +285,9 @@ if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
 # INTERFAZ PRINCIPAL
 # -------------------------------------------------------------------
 st.title("⏳ Control de Estudio")
+
 datos = cargar_todo()
+resumen_marcas = cargar_resumen_marcas()
 
 if st.button("🔄 Actualizar tiempos"):
     st.rerun()
@@ -287,6 +300,14 @@ colA, colB = st.columns(2)
 # -------------------------------------------------------------------
 with colA:
     st.subheader(f"👤 {USUARIO_ACTUAL}")
+
+    try:
+        per_min = resumen_marcas[USUARIO_ACTUAL]["per_min"]
+        total = resumen_marcas[USUARIO_ACTUAL]["total"]
+        st.markdown(f"**{per_min} por minuto | {total} total**")
+    except:
+        st.markdown("**— | —**")
+
     mis_materias = USERS[USUARIO_ACTUAL]
 
     materia_en_curso = None
@@ -326,21 +347,19 @@ with colA:
 
             b1, b2, _ = st.columns([0.2, 0.2, 0.6])
 
-            # DETENER ESTUDIO ⛔
             if materia_en_curso == materia:
                 with b1:
                     if st.button("⛔", key=f"det_{materia}"):
                         try:
                             diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
-                        except Exception as e:
-                            st.error(f"No se pudo calcular diferencia: {e}")
+                        except:
                             diff_seg = 0
+
                         diff_min = diff_seg / 60
-                        # Acumular en marcas
                         acumular_tiempo(USUARIO_ACTUAL, materia, diff_min)
-                        # Actualizar duración en hoja de materias, guardamos como fracción de día
                         nuevo_total = tiempo_acum_seg + diff_seg
                         fraccion = hms_a_fraction(segundos_a_hms(nuevo_total))
+
                         batch_write([
                             (info["time"], fraccion),
                             (info["est"], "")
@@ -351,28 +370,24 @@ with colA:
             if materia_en_curso is not None:
                 continue
 
-            # COMENZAR ESTUDIO ▶
             with b1:
                 if st.button("▶", key=f"est_{materia}"):
                     limpiar_estudiando(mis_materias)
-                    # guardamos la marca con offset legible: 'YYYY-MM-DD HH:MM:SS±HH:MM'
                     batch_write([(info["est"], ahora_str())])
                     st.rerun()
 
-            # EDITAR TIEMPO ✏️
             with b2:
                 if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia]):
                     pass
 
             if st.session_state.get(f"show_manual_{materia}", False):
-                nuevo = st.text_input(f"Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
+                nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
                 if st.button("Guardar", key=f"save_{materia}"):
                     try:
-                        # convertimos HH:MM:SS a fracción y escribimos en la celda time
                         batch_write([(info["time"], hms_a_fraction(nuevo))])
                         st.session_state[f"show_manual_{materia}"] = False
                         st.rerun()
-                    except Exception:
+                    except:
                         st.error("Formato inválido (usar HH:MM:SS)")
 
 # -------------------------------------------------------------------
@@ -380,6 +395,13 @@ with colA:
 # -------------------------------------------------------------------
 with colB:
     st.subheader(f"👤 {otro}")
+
+    try:
+        per_min = resumen_marcas[otro]["per_min"]
+        total = resumen_marcas[otro]["total"]
+        st.markdown(f"**{per_min} por minuto | {total} total**")
+    except:
+        st.markdown("**— | —**")
 
     for materia, info in USERS[otro].items():
         est_raw = datos[otro]["estado"][materia]
@@ -393,16 +415,14 @@ with colB:
             if str(est_raw).strip() != "":
                 try:
                     tiempo_anadido = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
-                except Exception as e:
-                    st.error(f"Error parseando marca (otro): {e}")
+                except:
                     tiempo_anadido = 0
 
-            total = hms_a_segundos(tiempo) + max(0, tiempo_anadido)
-            st.write(f"🕒 Total: **{segundos_a_hms(total)}**")
+            total_seg = hms_a_segundos(tiempo) + max(0, tiempo_anadido)
+            st.write(f"🕒 Total: **{segundos_a_hms(total_seg)}**")
 
             if str(est_raw).strip() != "":
                 st.caption(f"Base: {tiempo} | En proceso: +{segundos_a_hms(tiempo_anadido)}")
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
-
