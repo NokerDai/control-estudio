@@ -306,9 +306,6 @@ colA, colB = st.columns(2)
 with colA:
     st.subheader(f"👤 {USUARIO_ACTUAL}")
 
-    # -----------------------------
-    # POPUP COMO EXPANDER PARA USUARIO ACTUAL
-    # -----------------------------
     with st.expander(f"ℹ️ Fe", expanded=False):
         if USUARIO_ACTUAL == "Facundo":
             st.markdown(MD_FACUNDO)
@@ -334,36 +331,37 @@ with colA:
         est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
         tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
 
+        tiempo_anadido_seg = 0
+        if str(est_raw).strip() != "":
+            try:
+                inicio = parse_datetime(est_raw)
+                tiempo_anadido_seg = int((datetime.now(TZ) - inicio).total_seconds())
+            except Exception as e:
+                st.error(f"Error parseando marca: {e}")
+                tiempo_anadido_seg = 0
+
+        tiempo_acum_seg = hms_a_segundos(tiempo_acum)
+        tiempo_total = tiempo_acum_seg + max(0, tiempo_anadido_seg)
+        tiempo_total_hms = segundos_a_hms(tiempo_total)
+
+        # --- Columnas para nombre y botones ---
         box = st.container()
         with box:
-            st.markdown(f"**{materia}**")
+            col_name, col_btn1, col_btn2 = st.columns([0.6, 0.2, 0.2])
 
-            tiempo_anadido_seg = 0
-            if str(est_raw).strip() != "":
-                try:
-                    inicio = parse_datetime(est_raw)
-                    tiempo_anadido_seg = int((datetime.now(TZ) - inicio).total_seconds())
-                except Exception as e:
-                    st.error(f"Error parseando marca: {e}")
-                    tiempo_anadido_seg = 0
+            with col_name:
+                st.markdown(f"**{materia}**")
+                st.write(f"🕒 Total: **{tiempo_total_hms}**")
+                if str(est_raw).strip() != "":
+                    st.caption(f"Base: {tiempo_acum} | En proceso: +{segundos_a_hms(tiempo_anadido_seg)}")
+                    st.markdown("🟢 **Estudiando**")
+                else:
+                    st.markdown("⚪")
 
-            tiempo_acum_seg = hms_a_segundos(tiempo_acum)
-            tiempo_total = tiempo_acum_seg + max(0, tiempo_anadido_seg)
-            tiempo_total_hms = segundos_a_hms(tiempo_total)
-
-            st.write(f"🕒 Total: **{tiempo_total_hms}**")
-
-            if str(est_raw).strip() != "":
-                st.caption(f"Base: {tiempo_acum} | En proceso: +{segundos_a_hms(tiempo_anadido_seg)}")
-                st.markdown("🟢 **Estudiando**")
-            else:
-                st.markdown("⚪")
-
-            b1, b2, _ = st.columns([0.2, 0.2, 0.6])
-
+            # Si la materia está en curso mostramos solo ⛔
             if materia_en_curso == materia:
-                with b1:
-                    if st.button("⛔", key=f"det_{materia}"):
+                with col_btn1:
+                    if st.button("⛔", key=f"det_{materia}", use_container_width=True):
                         try:
                             diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
                         except:
@@ -384,25 +382,27 @@ with colA:
             if materia_en_curso is not None:
                 continue
 
-            with b1:
-                if st.button("▶", key=f"est_{materia}"):
+            # Botones de iniciar y editar (mismo tamaño)
+            with col_btn1:
+                if st.button("▶", key=f"est_{materia}", use_container_width=True):
                     limpiar_estudiando(mis_materias)
                     batch_write([(info["est"], ahora_str())])
                     st.rerun()
 
-            with b2:
-                if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia]):
+            with col_btn2:
+                if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia], use_container_width=True):
                     pass
 
             if st.session_state.get(f"show_manual_{materia}", False):
-                nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
-                if st.button("Guardar", key=f"save_{materia}"):
-                    try:
-                        batch_write([(info["time"], hms_a_fraction(nuevo))])
-                        st.session_state[f"show_manual_{materia}"] = False
-                        st.rerun()
-                    except:
-                        st.error("Formato inválido (usar HH:MM:SS)")
+                with col_name:
+                    nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
+                    if st.button("Guardar", key=f"save_{materia}"):
+                        try:
+                            batch_write([(info["time"], hms_a_fraction(nuevo))])
+                            st.session_state[f"show_manual_{materia}"] = False
+                            st.rerun()
+                        except:
+                            st.error("Formato inválido (usar HH:MM:SS)")
 
 # -------------------------------------------------------------------
 # PANEL OTRO USUARIO (solo lectura)
@@ -410,9 +410,6 @@ with colA:
 with colB:
     st.subheader(f"👤 {otro}")
 
-    # -----------------------------
-    # POPUP COMO EXPANDER PARA OTRO USUARIO
-    # -----------------------------
     with st.expander(f"ℹ️ Fe", expanded=False):
         if otro == "Facundo":
             st.markdown(MD_FACUNDO)
@@ -430,23 +427,20 @@ with colB:
         est_raw = datos[otro]["estado"][materia]
         tiempo = datos[otro]["tiempos"][materia]
 
+        tiempo_anadido = 0
+        if str(est_raw).strip() != "":
+            try:
+                tiempo_anadido = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
+            except:
+                tiempo_anadido = 0
+
+        total_seg = hms_a_segundos(tiempo) + max(0, tiempo_anadido)
         box = st.container()
         with box:
             st.markdown(f"**{materia}**")
-
-            tiempo_anadido = 0
-            if str(est_raw).strip() != "":
-                try:
-                    tiempo_anadido = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
-                except:
-                    tiempo_anadido = 0
-
-            total_seg = hms_a_segundos(tiempo) + max(0, tiempo_anadido)
             st.write(f"🕒 Total: **{segundos_a_hms(total_seg)}**")
-
             if str(est_raw).strip() != "":
                 st.caption(f"Base: {tiempo} | En proceso: +{segundos_a_hms(tiempo_anadido)}")
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
-
