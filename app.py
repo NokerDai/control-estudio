@@ -611,4 +611,4 @@ for materia, info in mis_materias.items():
 
     if st.session_state.get(f"show_manual_{materia}", False):
         st.markdown("</div>", unsafe_allow_html=True)
-        nuevo = st.text_input("nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{USUARIO_ACTUAL}_{materia}")
+        nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{USUARIO_ACTUAL}_{materia}")
