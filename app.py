@@ -372,7 +372,7 @@ with colA:
         
         st.markdown(
             f"""
-            <div style="width:100%; background-color:#e0e0e0; border-radius:8px; height:18px; margin:4px 0 10px 0;">
+            <div style="width:100%; background-color:#262730; border-radius:8px; height:6px; margin:4px 0 10px 0;">
                 <div style="
                     width:{progreso_porcentaje}%;
                     background-color:{color};
@@ -558,3 +558,4 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
