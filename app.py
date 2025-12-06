@@ -196,13 +196,17 @@ def leer_marcas_row_cached():
 def cargar_resumen_marcas():
     """
     Usa la fila cached de marcas para devolver per_min de Iván (O) y Facundo (P)
+    en el mismo formato que esperabas antes.
     """
     marcas = leer_marcas_row_cached()
 
     per_min_ivan = "" if marcas.get("O", 0) == 0 else str(marcas["O"])
     per_min_fac  = "" if marcas.get("P", 0) == 0 else str(marcas["P"])
 
-    return per_min_fac, per_min_ivan
+    return {
+        "Facundo": {"per_min": per_min_fac},
+        "Iván": {"per_min": per_min_ivan}
+    }
 
 # -------------------------------------------------------------------
 # CARGA DE ESTADO Y TIEMPOS
@@ -298,7 +302,7 @@ if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
 # -------------------------------------------------------------------
 datos = cargar_todo()
 resumen_marcas = cargar_resumen_marcas()
-marcas_row = leer_marcas_row_cached()  # diccionario B..P -> float cached
+marcas_row = leer_marcas_row_cached()  # diccionario {"O":..., "P":...} cached
 
 if st.button("🔄 Actualizar tiempos"):
     st.rerun()
@@ -316,12 +320,14 @@ with colA:
         st.markdown(MD_FACUNDO if USUARIO_ACTUAL == "Facundo" else MD_IVAN)
 
     # -------- CALCULAR TOTAL (NO EXCEL) --------
+    # aseguramos mis_materias siempre definido
+    mis_materias = USERS[USUARIO_ACTUAL]
+
     try:
         per_min_str = resumen_marcas[USUARIO_ACTUAL].get("per_min", "")
         per_min_val = parse_float_or_zero(per_min_str)
 
         minutos_totales = 0.0
-        mis_materias = USERS[USUARIO_ACTUAL]
 
         for materia, info in mis_materias.items():
             base_hms = datos[USUARIO_ACTUAL]["tiempos"][materia]
@@ -341,11 +347,12 @@ with colA:
         total_calc = minutos_totales * per_min_val
 
         # --- calcular pago por objetivo del usuario actual usando el dict cached marcas_row
-        objetivo = 0
-        if otro == "Iván":
-            objetivo = marcas_row["P"]
+        # Ahora usamos SOLO O (Iván) y P (Facundo)
+        if USUARIO_ACTUAL == "Iván":
+            objetivo = marcas_row.get("O", 0.0)
         else:  # Facundo
-            objetivo = marcas_row["O"]
+            objetivo = marcas_row.get("P", 0.0)
+
         pago_por_objetivo_actual = per_min_val * objetivo
 
         # mostrar línea con $ escapados para que Markdown no interprete LaTeX
@@ -456,11 +463,10 @@ with colB:
         total_otro = mins_otro * per_min_val_otro
 
         # --- calcular pago por objetivo del 'otro' usando marcas_row (cached)
-        objetivo_otro = 0
         if otro == "Iván":
-            objetivo_otro = marcas_row["O"]
+            objetivo_otro = marcas_row.get("O", 0.0)
         else:  # Facundo
-            objetivo_otro = marcas_row["P"]
+            objetivo_otro = marcas_row.get("P", 0.0)
         pago_por_objetivo_otro = per_min_val_otro * objetivo_otro
 
         st.markdown(
@@ -496,11 +502,3 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
-
-
-
-
-
-
-
-
