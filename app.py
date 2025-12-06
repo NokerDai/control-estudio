@@ -169,31 +169,29 @@ def parse_float_or_zero(s):
 # -------------------------------------------------------------------
 # LECTURAS OPTIMIZADAS (1 request para la fila de 'marcas', cached)
 # -------------------------------------------------------------------
-@st.cache_data(ttl=10)
-def leer_marcas_row_cached(row):
+@st.cache_data(ttl=15)
+def leer_marcas_row_cached():
     """
-    Lee B{row}:P{row} de la hoja 'marcas' y devuelve un dict con claves 'B'..'P' -> float.
-    TTL corto para que la app sea reactiva pero reduzca llamadas.
+    Lee solo las columnas O y P de la fila TIME_ROW en la hoja 'marcas'.
+    Devuelve: {"O": float, "P": float}
     """
-    cols = [chr(c) for c in range(ord('B'), ord('P') + 1)]  # B..P
-    rango = f"'{SHEET_MARCAS}'!B{row}:P{row}"
+    sheet_id = st.secrets["sheet_id"]
+    rango = f"'{SHEET_MARCAS}'!O{TIME_ROW}:P{TIME_ROW}"
+
     try:
         res = sheet.values().get(
-            spreadsheetId=st.secrets["sheet_id"],
+            spreadsheetId=sheet_id,
             range=rango,
             valueRenderOption="FORMATTED_VALUE"
         ).execute()
-        values = res.get("values", [[]])
-        row_vals = values[0] if values and values[0] else []
+        raw_vals = res.get("values", [[]])[0]
     except:
-        row_vals = []
+        raw_vals = ["", ""]
 
-    # Map columns to floats (si falta un valor, -> 0.0)
-    mapped = {}
-    for i, col in enumerate(cols):
-        v = row_vals[i] if i < len(row_vals) else ""
-        mapped[col] = parse_float_or_zero(v)
-    return mapped
+    O_val = parse_float_or_zero(raw_vals[0]) if len(raw_vals) > 0 else 0.0
+    P_val = parse_float_or_zero(raw_vals[1]) if len(raw_vals) > 1 else 0.0
+
+    return {"O": O_val, "P": P_val}
 
 def cargar_resumen_marcas():
     """
@@ -303,7 +301,7 @@ if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
 # -------------------------------------------------------------------
 datos = cargar_todo()
 resumen_marcas = cargar_resumen_marcas()
-marcas_row = leer_marcas_row_cached(TIME_ROW)  # diccionario B..P -> float cached
+marcas_row = leer_marcas_row_cached()  # diccionario B..P -> float cached
 
 if st.button("🔄 Actualizar tiempos"):
     st.rerun()
@@ -348,9 +346,9 @@ with colA:
         # --- calcular pago por objetivo del usuario actual usando el dict cached marcas_row
         objetivo = 0
         if otro == "Iván":
-            objetivo = marcas_row.get("O", 0.0)
+            objetivo = marcas_row["P"]
         else:  # Facundo
-            objetivo = marcas_row.get("P", 0.0)
+            objetivo = marcas_row["O"]
         pago_por_objetivo_actual = per_min_val * objetivo
 
         # mostrar línea con $ escapados para que Markdown no interprete LaTeX
@@ -463,9 +461,9 @@ with colB:
         # --- calcular pago por objetivo del 'otro' usando marcas_row (cached)
         objetivo_otro = 0
         if otro == "Iván":
-            objetivo_otro = marcas_row.get("O", 0.0)
+            objetivo_otro = marcas_row["O"]
         else:  # Facundo
-            objetivo_otro = marcas_row.get("P", 0.0)
+            objetivo_otro = marcas_row["P"]
         pago_por_objetivo_otro = per_min_val_otro * objetivo_otro
 
         st.markdown(
@@ -501,6 +499,7 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
 
