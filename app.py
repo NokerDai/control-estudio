@@ -351,7 +351,7 @@ with colA:
             objetivo = marcas_row.get("O", 0.0)
         else:  # Facundo
             objetivo = marcas_row.get("P", 0.0)
-        pago_por_objetivo_otro = per_min_val * objetivo
+        pago_por_objetivo_actual = per_min_val * objetivo
 
         # mostrar línea con $ escapados para que Markdown no interprete LaTeX
         st.markdown(
@@ -501,5 +501,6 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
