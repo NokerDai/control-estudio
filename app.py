@@ -384,7 +384,7 @@ objetivo_hms = segundos_a_hms(int(m_obj * 60))
 
 st.markdown(f"""
     <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-        <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Tu Ganancia Hoy</div>
+        <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
         <div style="font-size: 3rem; font-weight: bold; color: #fff; line-height: 1;">${m_tot:.2f}</div>
         <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
             <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
@@ -406,7 +406,7 @@ with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
     st.markdown(f"""
     <div style="margin-bottom: 10px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size: 1.1rem; color: #ddd;">Ganancia: <b>${o_tot:.2f}</b></span>
+            <span style="font-size: 1.1rem; color: #ddd;"><b>${o_tot:.2f}</b></span>
             <span style="font-size: 0.9rem; color: #888;">Meta: ${o_pago_obj:.2f}</span>
         </div>
         <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
@@ -543,3 +543,4 @@ for materia, info in mis_materias.items():
                 st.error("Formato inválido")
 
     st.write("")
+
