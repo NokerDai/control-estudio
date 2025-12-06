@@ -166,48 +166,16 @@ def parse_float_or_zero(s):
     except:
         return 0.0
 
-# -------------------------------------------------------------------
-# LECTURAS OPTIMIZADAS (1 request para la fila de 'marcas', cached)
-# -------------------------------------------------------------------
-@st.cache_data(ttl=300)
-def leer_marcas_row_cached(row):
-    """
-    Lee B{row}:P{row} de la hoja 'marcas' y devuelve un dict con claves 'B'..'P' -> float.
-    TTL corto para que la app sea reactiva pero reduzca llamadas.
-    """
-    cols = [chr(c) for c in range(ord('B'), ord('P') + 1)]  # B..P
-    rango = f"'{SHEET_MARCAS}'!B{row}:P{row}"
+def leer_marca_col(col):
     try:
         res = sheet.values().get(
             spreadsheetId=st.secrets["sheet_id"],
-            range=rango,
-            valueRenderOption="FORMATTED_VALUE"
+            range=f"'{SHEET_MARCAS}'!{col}{TIME_ROW}"
         ).execute()
-        values = res.get("values", [[]])
-        row_vals = values[0] if values and values[0] else []
+        val = res.get("values", [[]])[0][0]
+        return parse_float_or_zero(val)
     except:
-        row_vals = []
-
-    # Map columns to floats (si falta un valor, -> 0.0)
-    mapped = {}
-    for i, col in enumerate(cols):
-        v = row_vals[i] if i < len(row_vals) else ""
-        mapped[col] = parse_float_or_zero(v)
-    return mapped
-
-def cargar_resumen_marcas():
-    """
-    Usa la fila cached de marcas para devolver per_min de Facundo (C) e Iván (B).
-    Devuelve strings iguales a lo que usabas antes ("" si vacío).
-    """
-    marcas = leer_marcas_row_cached(TIME_ROW)
-    # Obtener como string original si quieres, pero aquí devolvemos como string formateado simple
-    per_min_fac = "" if marcas.get("C", 0) == 0 else str(marcas.get("C", 0))
-    per_min_ivan = "" if marcas.get("B", 0) == 0 else str(marcas.get("B", 0))
-    return {
-        "Facundo": {"per_min": per_min_fac},
-        "Iván": {"per_min": per_min_ivan}
-    }
+        return 0.0
 
 # -------------------------------------------------------------------
 # CARGA DE ESTADO Y TIEMPOS
@@ -240,6 +208,38 @@ def cargar_todo():
             data[user]["estado"][materia] = est_val
             data[user]["tiempos"][materia] = time_val
     return data
+
+# -------------------------------------------------------------------
+# LECTURA DE per_min OPTIMIZADA
+# -------------------------------------------------------------------
+def cargar_resumen_marcas():
+    sheet_id = st.secrets["sheet_id"]
+    ranges = [
+        f"'{SHEET_MARCAS}'!C{TIME_ROW}",  # Facundo
+        f"'{SHEET_MARCAS}'!B{TIME_ROW}",  # Iván
+    ]
+
+    try:
+        res = sheet.values().batchGet(
+            spreadsheetId=sheet_id,
+            ranges=ranges,
+            valueRenderOption="FORMATTED_VALUE"
+        ).execute()
+        vr = res.get("valueRanges", [])
+    except:
+        vr = [{} for _ in ranges]
+
+    def _get(i):
+        try:
+            val = vr[i].get("values", [[]])[0][0]
+            return "" if val is None else val
+        except:
+            return ""
+
+    return {
+        "Facundo": {"per_min": _get(0)},
+        "Iván": {"per_min": _get(1)}
+    }
 
 # -------------------------------------------------------------------
 # ESCRITURA
@@ -303,7 +303,6 @@ if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
 # -------------------------------------------------------------------
 datos = cargar_todo()
 resumen_marcas = cargar_resumen_marcas()
-marcas_row = leer_marcas_row_cached(TIME_ROW)  # diccionario B..P -> float cached
 
 if st.button("🔄 Actualizar tiempos"):
     st.rerun()
@@ -320,7 +319,6 @@ with colA:
     with st.expander(f"ℹ️ Fe", expanded=False):
         st.markdown(MD_FACUNDO if USUARIO_ACTUAL == "Facundo" else MD_IVAN)
 
-    # -------- CALCULAR TOTAL (NO EXCEL) --------
     try:
         per_min_str = resumen_marcas[USUARIO_ACTUAL].get("per_min", "")
         per_min_val = parse_float_or_zero(per_min_str)
@@ -345,24 +343,27 @@ with colA:
 
         total_calc = minutos_totales * per_min_val
 
-        # --- calcular pago por objetivo del usuario actual usando el dict cached marcas_row
-        # Iván -> marcas B * marcas O
-        # Facundo -> marcas C * marcas P
+        # -------------------------
+        # OBJETIVO USUARIO ACTUAL
+        # -------------------------
         if USUARIO_ACTUAL == "Iván":
-            marca_B = marcas_row.get("B", 0.0)
-            marca_O = marcas_row.get("O", 0.0)
-            pago_por_objetivo_actual = marca_B * marca_O
-        else:  # Facundo
-            marca_C = marcas_row.get("C", 0.0)
-            marca_P = marcas_row.get("P", 0.0)
-            pago_por_objetivo_actual = marca_C * marca_P
+            marca_B = leer_marca_col("B")
+            objetivo_actual = leer_marca_col("O")
+        else:
+            marca_C = leer_marca_col("C")
+            objetivo_actual = leer_marca_col("P")
 
-        # mostrar línea con $ escapados para que Markdown no interprete LaTeX
+        pago_por_objetivo_actual = objetivo_actual * per_min_val
+
+        # convertir objetivo (minutos) → hh:mm:ss
+        objetivo_actual_hms = segundos_a_hms(int(objetivo_actual * 60))
+
         st.markdown(
-            f"**\\${total_calc:.2f} | \\${per_min_val:.2f} por minuto | \\${pago_por_objetivo_actual:.2f}**"
+            f"**\\${total_calc:.2f} | \\${per_min_val:.2f} por minuto | "
+            f"\\${pago_por_objetivo_actual:.2f} por {objetivo_actual_hms}**"
         )
-    except Exception as e:
-        # Para debugging podés descomentar: st.error(str(e))
+
+    except:
         st.markdown("**— | —**")
 
     # -------- MATERIAS --------
@@ -430,7 +431,7 @@ with colA:
                     st.error("Formato inválido (usar HH:MM:SS)")
 
 # -------------------------------------------------------------------
-# PANEL OTRO USUARIO (SOLO LECTURA)
+# PANEL OTRO USUARIO
 # -------------------------------------------------------------------
 with colB:
     st.subheader(f"👤 {otro}")
@@ -438,7 +439,6 @@ with colB:
     with st.expander(f"ℹ️ Fe", expanded=False):
         st.markdown(MD_FACUNDO if otro == "Facundo" else MD_IVAN)
 
-    # -------- TOTAL OTRO USUARIO --------
     try:
         per_min_str_otro = resumen_marcas[otro].get("per_min", "")
         per_min_val_otro = parse_float_or_zero(per_min_str_otro)
@@ -461,23 +461,24 @@ with colB:
 
         total_otro = mins_otro * per_min_val_otro
 
-        # --- calcular pago por objetivo del 'otro' usando marcas_row (cached)
-        objetivo_otro = 0
+        # ------------------------------
+        # OBJETIVO OTRO usuario
+        # ------------------------------
         if otro == "Iván":
-            objetivo_otro = marcas_row.get("O", 0.0)
-            pago_por_objetivo_otro = per_min_val_otro * objetivo_otro
-        else:  # Facundo
-            objetivo_otro = marcas_row.get("P", 0.0)
-            pago_por_objetivo_otro = per_min_val_otro * objetivo_otro
+            objetivo_otro = leer_marca_col("O")
+        else:
+            objetivo_otro = leer_marca_col("P")
+
+        pago_por_objetivo_otro = objetivo_otro * per_min_val_otro
+        objetivo_otro_hms = segundos_a_hms(int(objetivo_otro * 60))
 
         st.markdown(
-            f"**\\${total_otro:.2f} | \\${per_min_val_otro:.2f} por minuto | \\${pago_por_objetivo_otro:.2f} por {objetivo_otro/60} horas**"
+            f"**\\${total_otro:.2f} | \\${per_min_val_otro:.2f} por minuto | "
+            f"\\${pago_por_objetivo_otro:.2f} por {objetivo_otro_hms}**"
         )
-    except Exception as e:
-        # Para debugging: st.error(str(e))
+    except:
         st.markdown("**— | —**")
 
-    # -------- MATERIAS OTRO --------
     for materia, info in USERS[otro].items():
         est_raw = datos[otro]["estado"][materia]
         tiempo = datos[otro]["tiempos"][materia]
@@ -500,6 +501,3 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
-
-
-
