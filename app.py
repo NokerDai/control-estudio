@@ -14,45 +14,103 @@ st.set_page_config(
     layout="wide"
 )
 
+# -------------------------------------------------------------------
+# DETECTOR DE MÓVIL
+# -------------------------------------------------------------------
+import streamlit.components.v1 as components
+
+components.html("""
+<script>
+const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+window.parent.postMessage({type: 'mobileFlag', isMobile: isMobile }, "*");
+</script>
+""", height=0, width=0)
+
+# Esperamos mensaje
+if "is_mobile" not in st.session_state:
+    st.session_state["is_mobile"] = False
+
+def check_mobile():
+    import streamlit as st
+    msg = st.experimental_get_query_params()
+    return st.session_state["is_mobile"]
+
+# Listener
+def _recv():
+    import streamlit as st
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
+    ctx = get_script_run_ctx()
+    if ctx:
+        pass
+
+st.markdown("""
+<script>
+window.addEventListener("message", (event) => {
+    if (event.data.type === "mobileFlag") {
+        const mob = event.data.isMobile;
+        window.parent.postMessage({ type: "streamlit:setComponentValue", value: mob }, "*");
+    }
+});
+</script>
+""", unsafe_allow_html=True)
+
+# CSS PARA TARJETAS Y BOTONES EN MÓVIL
 st.markdown("""
 <style>
 
-.botonera-horizontal {
-    width: 100%;
-}
-
-/* Fuerza a que el contenido de la botonera sea horizontal */
-.botonera-horizontal > div {
-    display: flex !important;
-    flex-direction: row !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    width: 100% !important;
-}
-
-/* Botones tamaño normal en PC */
-.botonera-horizontal button {
-    width: 100%;
-    margin: 2px;
-}
-
-/* Ajustes específicos para MÓVIL */
 @media (max-width: 600px) {
 
-    .botonera-horizontal > div {
-        flex-direction: row !important;
-        justify-content: center !important;
-        width: 100% !important;
-        gap: 10px !important;
+    /* Tamaños globales */
+    html, body, div, span, p {
+        font-size: 19px !important;
     }
 
-    .botonera-horizontal button {
-        font-size: 24px !important;
-        padding: 16px !important;
-        width: 100% !important;
-        height: auto !important;
-        margin: 0 !important;
+    /* Contenedor principal */
+    .block-container {
+        padding-top: 0.5rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
     }
+
+    /* Tarjeta de materia */
+    .mobile-card {
+        background: #141414;
+        padding: 16px;
+        border-radius: 14px;
+        margin-bottom: 18px;
+        box-shadow: 0 0 10px #0005;
+    }
+
+    .mobile-title {
+        font-size: 20px;
+        font-weight: bold;
+        margin-bottom: 6px;
+    }
+
+    .mobile-time {
+        color: #ddd;
+        font-size: 17px;
+        margin-bottom: 12px;
+    }
+
+    /* Botones táctiles */
+    .mobile-btn {
+        display: inline-block;
+        padding: 10px 18px;
+        background: #262730;
+        border-radius: 10px;
+        font-size: 22px !important;
+        margin-right: 10px;
+        text-align: center;
+    }
+
+    /* Segunda columna va abajo */
+    .mobile-section-separator {
+        margin-top: 35px;
+        margin-bottom: 10px;
+        border-top: 1px solid #333;
+    }
+
 }
 </style>
 """, unsafe_allow_html=True)
@@ -347,7 +405,132 @@ if st.button("🔄 Actualizar tiempos"):
     st.rerun()
 
 otro = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
-colA, colB = st.columns(2)
+is_mobile = check_mobile()
+
+if is_mobile:
+    # ---------------------------------------------------------------
+    # 🟦 DISEÑO DE MÓVIL — TODO VERTICAL Y TIPO APP
+    # ---------------------------------------------------------------
+    st.subheader(f"👤 {USUARIO_ACTUAL}")
+
+    with st.expander("ℹ️ No pensar, actuar.", expanded=False):
+        st.markdown(MD_FACUNDO if USUARIO_ACTUAL == "Facundo" else MD_IVAN)
+
+    st.markdown("## Total del día")
+
+    # --- Total principal ---
+    st.markdown(
+        f"<div style='font-size:40px; font-weight:bold; color:#fff;'>${total_calc:.2f}</div>",
+        unsafe_allow_html=True
+    )
+
+    # Barra progreso
+    st.progress(progreso)
+
+    st.markdown("---")
+
+    # ========= MATERIAS DE USUARIO ACTUAL =========
+    st.markdown("### Mis materias")
+
+    mis_materias = USERS[USUARIO_ACTUAL]
+
+    for materia, info in mis_materias.items():
+
+        est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
+        tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
+
+        # Calcular tiempo total
+        tiempo_anadido = 0
+        if str(est_raw).strip() != "":
+            inicio = parse_datetime(est_raw)
+            tiempo_anadido = int((datetime.now(TZ) - inicio).total_seconds())
+
+        total_seg = hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido)
+        total_hms = segundos_a_hms(total_seg)
+
+        # Tarjeta
+        st.markdown(f"""
+        <div class="mobile-card">
+            <div class="mobile-title">{materia}</div>
+            <div class="mobile-time">🕒 {total_hms}</div>
+            <div>
+        """, unsafe_allow_html=True)
+
+        col1, col2 = st.columns([1,1])
+
+        # Botón iniciar/detener
+        with col1:
+            if str(est_raw).strip() != "":
+                if st.button("⛔ Detener", key=f"mob_stop_{materia}"):
+                    diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
+                    acumular_tiempo(USUARIO_ACTUAL, materia, diff_seg/60)
+                    batch_write([
+                        (info["time"], hms_a_fraction(segundos_a_hms(diff_seg + hms_a_segundos(tiempo_acum)))),
+                        (info["est"], "")
+                    ])
+                    st.rerun()
+            else:
+                if st.button("▶ Iniciar", key=f"mob_start_{materia}"):
+                    limpiar_estudiando(mis_materias)
+                    batch_write([(info["est"], ahora_str())])
+                    st.rerun()
+
+        # Botón editar
+        with col2:
+            if st.button("✏️ Editar", key=f"mob_edit_{materia}"):
+                st.session_state[f"show_manual_{materia}"] = True
+
+        st.markdown("</div></div>", unsafe_allow_html=True)
+
+        if st.session_state.get(f"show_manual_{materia}", False):
+            nuevo = st.text_input("Nuevo tiempo (HH:MM:SS)", key=f"inmob_{materia}")
+            if st.button("Guardar", key=f"savemob_{materia}"):
+                batch_write([(info["time"], hms_a_fraction(nuevo))])
+                st.session_state[f"show_manual_{materia}"] = False
+                st.rerun()
+
+    # =======================================================
+    # OTRO USUARIO — APARECE AL FINAL EN MÓVIL
+    # =======================================================
+    st.markdown("<div class='mobile-section-separator'></div>", unsafe_allow_html=True)
+
+    st.subheader(f"👤 {otro}")
+
+    with st.expander("ℹ️ No pensar, actuar.", expanded=False):
+        st.markdown(MD_FACUNDO if otro == "Facundo" else MD_IVAN)
+
+    st.markdown(f"### Total de {otro}")
+    st.markdown(
+        f"<div style='font-size:32px; font-weight:bold;'>${total_otro:.2f}</div>",
+        unsafe_allow_html=True
+    )
+    st.progress(progreso_otro)
+
+    st.markdown("### Materias de la otra persona:")
+
+    for materia, info in USERS[otro].items():
+        est_raw = datos[otro]["estado"][materia]
+        tiempo = datos[otro]["tiempos"][materia]
+
+        tiempo_anad = 0
+        if str(est_raw).strip() != "":
+            tiempo_anad = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
+
+        total_seg = hms_a_segundos(tiempo) + tiempo_anad
+        total_hms = segundos_a_hms(total_seg)
+
+        st.markdown(f"""
+        <div class="mobile-card">
+            <div class="mobile-title">{materia}</div>
+            <div class="mobile-time">🕒 {total_hms}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+else:
+    # ---------------------------------------------------------------
+    # 🟩 DISEÑO DE PC - SIGUE TU CÓDIGO ORIGINAL
+    # ---------------------------------------------------------------
+    colA, colB = st.columns(2)
 
 # -------------------------------------------------------------------
 # PANEL USUARIO ACTUAL
@@ -623,3 +806,4 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
