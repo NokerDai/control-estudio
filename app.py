@@ -20,56 +20,39 @@ st.set_page_config(
 st.markdown("""
 <style>
 
-    /* ---------- TIPOGRAFÍA MÁS GRANDE EN CELULAR ---------- */
+    /* ------- BOTONES LADO A LADO EN MÓVIL ------- */
     @media (max-width: 600px) {
 
-        /* Aumenta tamaño base del texto */
-        html, body, [class*="css"], .stMarkdown, .stText {
-            font-size: 18px !important;
+        /* Contenedores de columnas usados para los botones */
+        .row-widget.stButton > button {
+            width: 100% !important;
         }
 
-        /* Subtítulos */
-        h1, h2, h3, .stSubheader {
-            font-size: 26px !important;
+        /* Fuerza a que las columnas se comporten como flex fila */
+        .stButton, .element-container {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            align-items: center !important;
         }
 
-        /* Botones más grandes */
+        /* Evita que un botón ocupe toda la fila */
         .stButton button {
-            padding: 14px 24px !important;
-            font-size: 20px !important;
+            flex: 1 1 auto !important;
+            margin-right: 8px !important;
+            margin-left: 0 !important;
+        }
+
+        /* Último botón sin margen adicional */
+        .stButton button:last-child {
+            margin-right: 0 !important;
+        }
+
+        /* Hace los botones más grandes y tocables */
+        .stButton button {
+            padding: 14px !important;
+            font-size: 22px !important;
             border-radius: 10px !important;
-        }
-
-        /* Botones de acción (▶ ✏️ ⛔) más grandes */
-        button[kind="secondary"], button[kind="primary"] {
-            font-size: 24px !important;
-            padding: 12px !important;
-        }
-
-        /* Íconos dentro de texto (🕒 etc.) */
-        p, span {
-            font-size: 18px !important;
-        }
-
-        /* Columnas más ordenadas: se apilan en vertical */
-        .css-1kyxreq, .css-1u6l5a7, .css-1w6p1af {
-            flex-direction: column !important;
-        }
-
-        /* Reduce padding lateral para que no quede todo apretado */
-        .block-container {
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
-        }
-
-        /* Expander más grande */
-        .streamlit-expanderHeader {
-            font-size: 20px !important;
-        }
-
-        /* Espacio entre materias */
-        .stContainer {
-            margin-bottom: 18px !important;
         }
     }
 
@@ -642,4 +625,5 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
