@@ -47,6 +47,21 @@ st.markdown(
     }
 
     /* Botones: mejorar contraste */
+
+/* --- FIX: mantener botones lado a lado incluso en móvil --- */
+.stColumns {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 0.5rem !important;
+}
+
+@media (max-width: 600px) {
+    .stColumns {
+        flex-direction: row !important;
+    }
+}
+
+/* Botón interno */
     button.stButton>button {
         background-color: #1f2937;
         color: #e6eef8;
