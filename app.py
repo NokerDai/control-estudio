@@ -85,30 +85,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------------------------
-# BLOQUEO POR CONTRASEÑA
-# -------------------------------------------------------------------
-def check_password():
-    if "pw_correct" in st.session_state:
-        return st.session_state.pw_correct
-
-    st.title("🔒 Acceso protegido")
-    
-    # Intenta leer password de secrets, si no existe usa 'admin'
-    secret_pass = st.secrets.get("auth", {}).get("password", "admin")
-
-    password = st.text_input("Contraseña:", type="password")
-    if st.button("Entrar", use_container_width=True):
-        if password == secret_pass:
-            st.session_state.pw_correct = True
-            st.rerun()
-        else:
-            st.error("Contraseña incorrecta.")
-    return False
-
-if not check_password():
-    st.stop()
-
-# -------------------------------------------------------------------
 # ZONA HORARIA Y UTILS
 # -------------------------------------------------------------------
 def _argentina_now_global():
@@ -438,3 +414,4 @@ if st.button("🔄 Actualizar Datos", use_container_width=True):
 with st.expander("ℹ️ Manifiesto"):
     md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
     st.markdown(md_content)
+
