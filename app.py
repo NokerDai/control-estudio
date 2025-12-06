@@ -331,12 +331,12 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ---- MANIFIESTO ----
-with st.expander("ℹ️ Manifiesto del día"):
+with st.expander("ℹ️ No pensar, actuar."):
     md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
     st.markdown(md_content)
 
 # ---- PROGRESO DEL OTRO USUARIO (ahora expandido=True) ----
-with st.expander(f"👀 Ver progreso de {OTRO_USUARIO}", expanded=True):
+with st.expander(f"Progreso de {OTRO_USUARIO}", expanded=True):
     o_tot, o_rate, o_obj = calcular_metricas(OTRO_USUARIO)
     o_pago_obj = o_rate * o_obj
     o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
@@ -433,3 +433,4 @@ for materia, info in mis_materias.items():
 st.divider()
 if st.button("🔄 Actualizar Datos", use_container_width=True):
     st.rerun()
+
