@@ -166,6 +166,20 @@ def parse_float_or_zero(s):
     except:
         return 0.0
 
+# --- helper para leer una celda numérica en hoja 'marcas' en la fila TIME_ROW
+def leer_marca_col(col):
+    """Lee la celda en la hoja 'marcas' en la columna `col` y la fila TIME_ROW.
+    Devuelve float 0.0 si está vacía o hay error."""
+    try:
+        res = sheet.values().get(
+            spreadsheetId=st.secrets["sheet_id"],
+            range=f"'{SHEET_MARCAS}'!{col}{TIME_ROW}"
+        ).execute()
+        val = res.get("values", [[]])[0][0]
+        return parse_float_or_zero(val)
+    except:
+        return 0.0
+
 # -------------------------------------------------------------------
 # CARGA DE ESTADO Y TIEMPOS
 # -------------------------------------------------------------------
@@ -332,7 +346,23 @@ with colA:
             minutos_totales += minutos_base + minutos_progreso
 
         total_calc = minutos_totales * per_min_val
-        st.markdown(f"**\\${per_min_str} por minuto | \\${total_calc:.2f} total**")
+
+        # --- calcular pago por objetivo del usuario actual:
+        # Iván -> marcas B * marcas O
+        # Facundo -> marcas C * marcas P
+        if USUARIO_ACTUAL == "Iván":
+            marca_B = leer_marca_col("B")
+            marca_O = leer_marca_col("O")
+            pago_por_objetivo_actual = marca_B * marca_O
+        else:  # Facundo
+            marca_C = leer_marca_col("C")
+            marca_P = leer_marca_col("P")
+            pago_por_objetivo_actual = marca_C * marca_P
+
+        # mostrar línea con $ escapados para que Markdown no interprete LaTeX
+        st.markdown(
+            f"**\\${total_calc:.2f} total | \\${per_min_val:.2f} por minuto | \\${pago_por_objetivo_actual:.2f}**"
+        )
     except:
         st.markdown("**— | —**")
 
@@ -411,8 +441,8 @@ with colB:
 
     # -------- TOTAL OTRO USUARIO --------
     try:
-        per_min_str = resumen_marcas[otro].get("per_min", "")
-        per_min_val = parse_float_or_zero(per_min_str)
+        per_min_str_otro = resumen_marcas[otro].get("per_min", "")
+        per_min_val_otro = parse_float_or_zero(per_min_str_otro)
 
         mins_otro = 0.0
         for materia, info in USERS[otro].items():
@@ -430,8 +460,21 @@ with colB:
 
             mins_otro += mins_base + mins_prog
 
-        total_otro = mins_otro * per_min_val
-        st.markdown(f"**\\${per_min_str} por minuto | \\${total_otro:.2f} total**")
+        total_otro = mins_otro * per_min_val_otro
+
+        # --- calcular pago por objetivo del 'otro' (Iván o Facundo)
+        if otro == "Iván":
+            marca_B_otro = leer_marca_col("B")
+            marca_O_otro = leer_marca_col("O")
+            pago_por_objetivo_otro = marca_B_otro * marca_O_otro
+        else:  # Facundo
+            marca_C_otro = leer_marca_col("C")
+            marca_P_otro = leer_marca_col("P")
+            pago_por_objetivo_otro = marca_C_otro * marca_P_otro
+
+        st.markdown(
+            f"**\\${total_otro:.2f} total | \\${per_min_val_otro:.2f} por minuto | \\${pago_por_objetivo_otro:.2f}**"
+        )
     except:
         st.markdown("**— | —**")
 
@@ -458,5 +501,3 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
-
-
