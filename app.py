@@ -306,7 +306,7 @@ def calcular_metricas(usuario):
     
     return total_min * per_min, per_min, objetivo
 
-# --- RENDER MÉTRICAS PROPIAS ---
+# --- 1. RENDER MÉTRICAS PROPIAS ---
 m_tot, m_rate, m_obj = calcular_metricas(USUARIO_ACTUAL)
 pago_objetivo = m_rate * m_obj
 progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
@@ -327,7 +327,12 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- RENDER MÉTRICAS OTRO USUARIO (EXPANDER) ---
+# --- 2. MANIFIESTO (UBICADO EN MEDIO) ---
+with st.expander("ℹ️ Manifiesto del día"):
+    md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
+    st.markdown(md_content)
+
+# --- 3. RENDER MÉTRICAS OTRO USUARIO (EXPANDER) ---
 with st.expander(f"👀 Ver progreso de {OTRO_USUARIO}"):
     o_tot, o_rate, o_obj = calcular_metricas(OTRO_USUARIO)
     o_pago_obj = o_rate * o_obj
@@ -379,14 +384,16 @@ for materia, info in mis_materias.items():
     tiempo_total_hms = segundos_a_hms(hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido_seg))
     
     # --- RENDERIZADO DE TARJETA ---
-    # Corrección de indentación aplicada aquí:
-    html_card = f"""
-<div class="materia-card">
-    <div class="materia-title">{materia}</div>
-    {'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''}
-    <div class="materia-time">{tiempo_total_hms}</div>
-</div>
-"""
+    # Corrección CRÍTICA: HTML todo en una línea o sin indentación relativa para evitar 
+    # que markdown lo interprete como bloque de código.
+    badge_html = f'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''
+    
+    html_card = f"""<div class="materia-card">
+<div class="materia-title">{materia}</div>
+{badge_html}
+<div class="materia-time">{tiempo_total_hms}</div>
+</div>"""
+    
     st.markdown(html_card, unsafe_allow_html=True)
 
     # Botones debajo de la tarjeta
@@ -432,7 +439,3 @@ for materia, info in mis_materias.items():
 st.divider()
 if st.button("🔄 Actualizar Datos", use_container_width=True):
     st.rerun()
-
-with st.expander("ℹ️ Manifiesto"):
-    md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
-    st.markdown(md_content)
