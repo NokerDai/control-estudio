@@ -17,45 +17,6 @@ except Exception:
         pytz = None
 
 # -------------------------------------------------------------------
-# BLOQUEO POR CONTRASEÑA (Estilo app.py)
-# -------------------------------------------------------------------
-def check_password():
-    """Devuelve True si la contraseña es correcta."""
-    if "pw_correct" in st.session_state:
-        return st.session_state.pw_correct
-
-    st.set_page_config(page_title="Acceso Restringido", page_icon="🔒")
-    st.title("🔒 Acceso protegido")
-
-    # Nota: Asegúrate de tener [auth] password = "..." en tus secrets
-    # Si no tienes esa sección, puedes comentar esta validación temporalmente.
-    password = st.text_input("Contraseña:", type="password")
-    
-    if st.button("Entrar"):
-        # Verificamos si existe la clave en secrets, si no, usamos una por defecto o pasamos
-        secret_pass = st.secrets.get("auth", {}).get("password", "admin")
-        
-        if password == secret_pass:
-            st.session_state.pw_correct = True
-            st.rerun()
-        else:
-            st.error("Contraseña incorrecta.")
-
-    return False
-
-# Si la contraseña no es correcta → NO seguir cargando la app
-if not check_password():
-    st.stop()
-
-# -------------------------------------------------------------------
-# CONFIGURACIÓN DE LA PÁGINA (Una vez logueado)
-# -------------------------------------------------------------------
-# Nota: set_page_config solo se puede llamar una vez, por eso la condicional arriba
-# modificamos el título y layout dinámicamente si fuera necesario, pero Streamlit 
-# prefiere la configuración al principio. Como ya pasamos el login:
-pass 
-
-# -------------------------------------------------------------------
 # ZONA HORARIA ARGENTINA (Lógica robusta app.py)
 # -------------------------------------------------------------------
 def _argentina_now_global():
@@ -417,3 +378,4 @@ md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.
 
 with st.expander("ℹ️ No pensar, actuar (Manifiesto)", expanded=False):
     st.markdown(md_content)
+
