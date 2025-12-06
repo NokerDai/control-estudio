@@ -15,96 +15,6 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------------
-# CSS RESPONSIVO (REDISEÑO MÓVIL — OSCURO)
-# -------------------------------------------------------------------
-st.markdown("""
-<style>
-/* Bloques para controlar visibilidad sin tocar clases internas */
-.desktop-only { display: block; }
-.mobile-only { display: none; }
-
-/* Estilos generales estilo oscuro */
-body {
-    background: #0f1113;
-    color: #e6e6e6;
-}
-
-/* Estilos de tarjetas y tipografía mobile */
-@media (max-width: 650px) {
-
-    .desktop-only { display: none !important; }
-    .mobile-only { display: block !important; }
-
-    /* Container general */
-    .mobile-card {
-        background: linear-gradient(180deg, #0d0e10, #121214) !important;
-        border: 1px solid #242426 !important;
-        padding: 14px 12px !important;
-        border-radius: 12px !important;
-        margin-bottom: 14px !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.6) !important;
-    }
-
-    .mobile-title {
-        font-size: 20px !important;
-        font-weight: 700 !important;
-        color: #ffffff !important;
-        margin-bottom: 6px !important;
-    }
-
-    .mobile-time {
-        font-size: 17px !important;
-        color: #d6d6d6 !important;
-        margin-bottom: 10px !important;
-    }
-
-    .mobile-meta {
-        font-size: 14px !important;
-        color: #a8a8a8 !important;
-        margin-bottom: 8px !important;
-    }
-
-    /* Botones grandes táctiles */
-    .stButton button {
-        width: 100% !important;
-        padding: 12px 10px !important;
-        font-size: 18px !important;
-        border-radius: 10px !important;
-    }
-
-    /* Botones de acción dentro de la tarjeta: dos columnas */
-    .mobile-actions {
-        display: flex !important;
-        gap: 10px !important;
-    }
-    .mobile-actions .stButton {
-        flex: 1 1 0 !important;
-    }
-
-    /* Barra de progreso móvil más visible */
-    .progress-bar-mobile {
-        height: 12px !important;
-        border-radius: 10px !important;
-        margin: 8px 0 12px 0 !important;
-    }
-
-    /* Ajuste container */
-    .block-container {
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-        padding-top: 0.6rem !important;
-    }
-
-    /* Expander */
-    .streamlit-expanderHeader {
-        font-size: 18px !important;
-        padding: 10px !important;
-    }
-}
-</style>
-""", unsafe_allow_html=True)
-
-# -------------------------------------------------------------------
 # CARGA ARCHIVOS MARKDOWN DESDE SECRETS
 # -------------------------------------------------------------------
 MD_FACUNDO = st.secrets["md"]["facundo"]
@@ -337,7 +247,7 @@ def batch_write(updates):
         "data": [{"range": r, "values": [[v]]} for r, v in updates]
     }
     sheet.values().batchUpdate(
-        spreadsheetId=st.secrets["sheet_id"],
+        spreadsheetId=sheet_id,
         body=body
     ).execute()
 
@@ -441,13 +351,15 @@ with colA:
 
         # -------- TOTAL DEL DÍA (estilo nuevo) --------
         st.markdown(
-            f"<div style='font-size:32px; font-weight:bold; color:#e6e6e6; line-height:1; margin-bottom:4px;'>"
+            f"<div style='font-size:32px; font-weight:bold; color:#333333; line-height:1; margin-bottom:4px;'>"
             f"${total_calc:.2f}"
             f"</div>",
             unsafe_allow_html=True
         )
 
         progreso = min(total_calc / max(1, pago_por_objetivo_actual), 1.0)
+        # ---- BARRA DE PROGRESO CON COLORES DINÁMICOS ----
+        # progreso = total_calc / pago_por_objetivo_actual
         progreso_porcentaje = progreso * 100
         
         # Color según regla
@@ -460,7 +372,7 @@ with colA:
         
         st.markdown(
             f"""
-            <div class="progress-bar-mobile" style="width:100%; background-color:#262730; border-radius:8px; height:8px; margin:4px 0 10px 0;">
+            <div style="width:100%; background-color:#262730; border-radius:8px; height:8px; margin:4px 0 10px 0;">
                 <div style="
                     width:{progreso_porcentaje}%;
                     background-color:{color};
@@ -476,7 +388,7 @@ with colA:
         st.markdown(
             f"""
             <div style="
-                color:#9aa0a6;
+                color:#666;
                 font-size:13px;
                 margin-top:0px;
                 margin-bottom:12px;
@@ -497,9 +409,6 @@ with colA:
             materia_en_curso = m
             break
 
-    # --- Recorremos materias y renderizamos DOS vistas:
-    #     - Desktop (clase .desktop-only) : tu layout original
-    #     - Mobile  (clase .mobile-only)  : tarjeta amigable y botones táctiles
     for materia, info in mis_materias.items():
         est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
         tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
@@ -514,9 +423,6 @@ with colA:
 
         tiempo_total_seg = hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido_seg)
         tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
-
-        # ---------------- DESKTOP (igual que antes) ----------------
-        st.markdown('<div class="desktop-only">', unsafe_allow_html=True)
 
         col_name, col_time, col_actions = st.columns([0.6, 0.2, 0.2], gap="small")
 
@@ -559,69 +465,6 @@ with colA:
                     st.rerun()
                 except:
                     st.error("Formato inválido (usar HH:MM:SS)")
-
-        st.markdown('</div>', unsafe_allow_html=True)  # cerrar desktop-only
-
-        # ---------------- MOBILE (tarjeta) ----------------
-        st.markdown('<div class="mobile-only">', unsafe_allow_html=True)
-
-        # Tarjeta visual
-        st.markdown('<div class="mobile-card">', unsafe_allow_html=True)
-        st.markdown(f'<div class="mobile-title">{materia}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="mobile-time">🕒 {tiempo_total_hms}</div>', unsafe_allow_html=True)
-
-        # Meta / progreso pequeña
-        if str(est_raw).strip() != "":
-            st.markdown(f'<div class="mobile-meta">En progreso</div>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div class="mobile-meta">Inactiva</div>', unsafe_allow_html=True)
-
-        # Botones grandes táctiles (USAN KEYS DISTINTAS para evitar colisiones)
-        # Los handlers replican la lógica exacta de los botones desktop
-        st.markdown('<div class="mobile-actions">', unsafe_allow_html=True)
-        # Usamos columnas para que se alineen lado a lado en móvil
-        c1, c2 = st.columns([1,1], gap="small")
-        with c1:
-            # Si la materia está en curso: show stop; else show start (igual lógica)
-            if materia_en_curso == materia:
-                if st.button("⛔ Detener", key=f"mobile_det_{materia}"):
-                    try:
-                        diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
-                        acumular_tiempo(USUARIO_ACTUAL, materia, diff_seg/60)
-                        batch_write([
-                            (info["time"], hms_a_fraction(segundos_a_hms(diff_seg + hms_a_segundos(tiempo_acum)))),
-                            (info["est"], "")
-                        ])
-                        st.rerun()
-                    except Exception as e:
-                        # si falla parse, igual forzamos limpiar
-                        batch_write([(info["est"], "")])
-                        st.rerun()
-            else:
-                if materia_en_curso is None:
-                    if st.button("▶ Iniciar", key=f"mobile_est_{materia}"):
-                        limpiar_estudiando(mis_materias)
-                        batch_write([(info["est"], ahora_str())])
-                        st.rerun()
-
-        with c2:
-            if st.button("✏️ Editar", key=f"mobile_edit_{materia}", on_click=enable_manual_input, args=[materia]):
-                pass
-
-        st.markdown('</div>', unsafe_allow_html=True)  # cerrar mobile-actions
-
-        if st.session_state.get(f"show_manual_{materia}", False):
-            nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"mobile_in_{materia}")
-            if st.button("Guardar", key=f"mobile_save_{materia}"):
-                try:
-                    batch_write([(info["time"], hms_a_fraction(nuevo))])
-                    st.session_state[f"show_manual_{materia}"] = False
-                    st.rerun()
-                except:
-                    st.error("Formato inválido (usar HH:MM:SS)")
-
-        st.markdown('</div>', unsafe_allow_html=True)  # cerrar mobile-card
-        st.markdown('</div>', unsafe_allow_html=True)  # cerrar mobile-only
 
 # -------------------------------------------------------------------
 # PANEL OTRO USUARIO
@@ -666,7 +509,7 @@ with colB:
 
         # -------- TOTAL del otro (estilo nuevo) --------
         st.markdown(
-            f"<div style='font-size:32px; font-weight:bold; color:#e6e6e6; line-height:1; margin-bottom:4px;'>"
+            f"<div style='font-size:32px; font-weight:bold; color:#333333; line-height:1; margin-bottom:4px;'>"
             f"${total_otro:.2f}"
             f"</div>",
             unsafe_allow_html=True
@@ -684,7 +527,7 @@ with colB:
         
         st.markdown(
             f"""
-            <div class="progress-bar-mobile" style="width:100%; background-color:#262730; border-radius:8px; height:8px; margin:4px 0 10px 0;">
+            <div style="width:100%; background-color:#262730; border-radius:8px; height:8px; margin:4px 0 10px 0;">
                 <div style="
                     width:{progreso_porcentaje_otro}%;
                     background-color:{color_otro};
@@ -700,7 +543,7 @@ with colB:
         st.markdown(
             f"""
             <div style="
-                color:#9aa0a6;
+                color:#666;
                 font-size:13px;
                 margin-top:0px;
                 margin-bottom:12px;
@@ -714,7 +557,7 @@ with colB:
     except:
         st.markdown("**— | —**")
 
-    # -------- MATERIAS OTRO (también desktop + mobile) --------
+    # -------- MATERIAS OTRO --------
     for materia, info in USERS[otro].items():
         est_raw = datos[otro]["estado"][materia]
         tiempo = datos[otro]["tiempos"][materia]
@@ -728,8 +571,6 @@ with colB:
 
         total_seg = hms_a_segundos(tiempo) + max(0, tiempo_anad)
 
-        # --- DESKTOP for other user (compact)
-        st.markdown('<div class="desktop-only">', unsafe_allow_html=True)
         box = st.container()
         with box:
             st.markdown(f"**{materia}**")
@@ -739,17 +580,3 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # --- MOBILE card for other user
-        st.markdown('<div class="mobile-only">', unsafe_allow_html=True)
-        st.markdown('<div class="mobile-card">', unsafe_allow_html=True)
-        st.markdown(f'<div class="mobile-title">{materia}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="mobile-time">🕒 {segundos_a_hms(total_seg)}</div>', unsafe_allow_html=True)
-        if str(est_raw).strip() != "":
-            st.markdown(f'<div class="mobile-meta">Base: {tiempo} | En proceso: +{segundos_a_hms(tiempo_anad)}</div>', unsafe_allow_html=True)
-            st.markdown("🟢 Estudiando")
-        else:
-            st.markdown('<div class="mobile-meta">Inactiva</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
