@@ -15,6 +15,68 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------------
+# ESTILOS RESPONSIVOS PARA CELULAR
+# -------------------------------------------------------------------
+st.markdown("""
+<style>
+
+    /* ---------- TIPOGRAFÍA MÁS GRANDE EN CELULAR ---------- */
+    @media (max-width: 600px) {
+
+        /* Aumenta tamaño base del texto */
+        html, body, [class*="css"], .stMarkdown, .stText {
+            font-size: 18px !important;
+        }
+
+        /* Subtítulos */
+        h1, h2, h3, .stSubheader {
+            font-size: 26px !important;
+        }
+
+        /* Botones más grandes */
+        .stButton button {
+            padding: 14px 24px !important;
+            font-size: 20px !important;
+            border-radius: 10px !important;
+        }
+
+        /* Botones de acción (▶ ✏️ ⛔) más grandes */
+        button[kind="secondary"], button[kind="primary"] {
+            font-size: 24px !important;
+            padding: 12px !important;
+        }
+
+        /* Íconos dentro de texto (🕒 etc.) */
+        p, span {
+            font-size: 18px !important;
+        }
+
+        /* Columnas más ordenadas: se apilan en vertical */
+        .css-1kyxreq, .css-1u6l5a7, .css-1w6p1af {
+            flex-direction: column !important;
+        }
+
+        /* Reduce padding lateral para que no quede todo apretado */
+        .block-container {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+        }
+
+        /* Expander más grande */
+        .streamlit-expanderHeader {
+            font-size: 20px !important;
+        }
+
+        /* Espacio entre materias */
+        .stContainer {
+            margin-bottom: 18px !important;
+        }
+    }
+
+</style>
+""", unsafe_allow_html=True)
+
+# -------------------------------------------------------------------
 # CARGA ARCHIVOS MARKDOWN DESDE SECRETS
 # -------------------------------------------------------------------
 MD_FACUNDO = st.secrets["md"]["facundo"]
@@ -580,3 +642,4 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
