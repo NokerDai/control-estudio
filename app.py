@@ -166,19 +166,48 @@ def parse_float_or_zero(s):
     except:
         return 0.0
 
-# --- helper para leer una celda numérica en hoja 'marcas' en la fila TIME_ROW
-def leer_marca_col(col):
-    """Lee la celda en la hoja 'marcas' en la columna `col` y la fila TIME_ROW.
-    Devuelve float 0.0 si está vacía o hay error."""
+# -------------------------------------------------------------------
+# LECTURAS OPTIMIZADAS (1 request para la fila de 'marcas', cached)
+# -------------------------------------------------------------------
+@st.cache_data(ttl=10)
+def leer_marcas_row_cached(row):
+    """
+    Lee B{row}:P{row} de la hoja 'marcas' y devuelve un dict con claves 'B'..'P' -> float.
+    TTL corto para que la app sea reactiva pero reduzca llamadas.
+    """
+    cols = [chr(c) for c in range(ord('B'), ord('P') + 1)]  # B..P
+    rango = f"'{SHEET_MARCAS}'!B{row}:P{row}"
     try:
         res = sheet.values().get(
             spreadsheetId=st.secrets["sheet_id"],
-            range=f"'{SHEET_MARCAS}'!{col}{TIME_ROW}"
+            range=rango,
+            valueRenderOption="FORMATTED_VALUE"
         ).execute()
-        val = res.get("values", [[]])[0][0]
-        return parse_float_or_zero(val)
+        values = res.get("values", [[]])
+        row_vals = values[0] if values and values[0] else []
     except:
-        return 0.0
+        row_vals = []
+
+    # Map columns to floats (si falta un valor, -> 0.0)
+    mapped = {}
+    for i, col in enumerate(cols):
+        v = row_vals[i] if i < len(row_vals) else ""
+        mapped[col] = parse_float_or_zero(v)
+    return mapped
+
+def cargar_resumen_marcas():
+    """
+    Usa la fila cached de marcas para devolver per_min de Facundo (C) e Iván (B).
+    Devuelve strings iguales a lo que usabas antes ("" si vacío).
+    """
+    marcas = leer_marcas_row_cached(TIME_ROW)
+    # Obtener como string original si quieres, pero aquí devolvemos como string formateado simple
+    per_min_fac = "" if marcas.get("C", 0) == 0 else str(marcas.get("C", 0))
+    per_min_ivan = "" if marcas.get("B", 0) == 0 else str(marcas.get("B", 0))
+    return {
+        "Facundo": {"per_min": per_min_fac},
+        "Iván": {"per_min": per_min_ivan}
+    }
 
 # -------------------------------------------------------------------
 # CARGA DE ESTADO Y TIEMPOS
@@ -211,38 +240,6 @@ def cargar_todo():
             data[user]["estado"][materia] = est_val
             data[user]["tiempos"][materia] = time_val
     return data
-
-# -------------------------------------------------------------------
-# SOLO LEEMOS PER_MIN (YA NO TOTAL DEL EXCEL)
-# -------------------------------------------------------------------
-def cargar_resumen_marcas():
-    sheet_id = st.secrets["sheet_id"]
-    ranges = [
-        f"'{SHEET_MARCAS}'!C{TIME_ROW}",  # per_min Facundo
-        f"'{SHEET_MARCAS}'!B{TIME_ROW}",  # per_min Iván
-    ]
-
-    try:
-        res = sheet.values().batchGet(
-            spreadsheetId=sheet_id,
-            ranges=ranges,
-            valueRenderOption="FORMATTED_VALUE"
-        ).execute()
-        vr = res.get("valueRanges", [])
-    except:
-        vr = [{} for _ in ranges]
-
-    def _get(i):
-        try:
-            val = vr[i].get("values", [[]])[0][0]
-            return "" if val is None else val
-        except:
-            return ""
-
-    return {
-        "Facundo": {"per_min": _get(0)},
-        "Iván": {"per_min": _get(1)}
-    }
 
 # -------------------------------------------------------------------
 # ESCRITURA
@@ -306,6 +303,7 @@ if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
 # -------------------------------------------------------------------
 datos = cargar_todo()
 resumen_marcas = cargar_resumen_marcas()
+marcas_row = leer_marcas_row_cached(TIME_ROW)  # diccionario B..P -> float cached
 
 if st.button("🔄 Actualizar tiempos"):
     st.rerun()
@@ -347,23 +345,24 @@ with colA:
 
         total_calc = minutos_totales * per_min_val
 
-        # --- calcular pago por objetivo del usuario actual:
+        # --- calcular pago por objetivo del usuario actual usando el dict cached marcas_row
         # Iván -> marcas B * marcas O
         # Facundo -> marcas C * marcas P
         if USUARIO_ACTUAL == "Iván":
-            marca_B = leer_marca_col("B")
-            marca_O = leer_marca_col("O")
+            marca_B = marcas_row.get("B", 0.0)
+            marca_O = marcas_row.get("O", 0.0)
             pago_por_objetivo_actual = marca_B * marca_O
         else:  # Facundo
-            marca_C = leer_marca_col("C")
-            marca_P = leer_marca_col("P")
+            marca_C = marcas_row.get("C", 0.0)
+            marca_P = marcas_row.get("P", 0.0)
             pago_por_objetivo_actual = marca_C * marca_P
 
         # mostrar línea con $ escapados para que Markdown no interprete LaTeX
         st.markdown(
             f"**\\${total_calc:.2f} total | \\${per_min_val:.2f} por minuto | \\${pago_por_objetivo_actual:.2f}**"
         )
-    except:
+    except Exception as e:
+        # Para debugging podés descomentar: st.error(str(e))
         st.markdown("**— | —**")
 
     # -------- MATERIAS --------
@@ -462,20 +461,21 @@ with colB:
 
         total_otro = mins_otro * per_min_val_otro
 
-        # --- calcular pago por objetivo del 'otro' (Iván o Facundo)
+        # --- calcular pago por objetivo del 'otro' usando marcas_row (cached)
         if otro == "Iván":
-            marca_B_otro = leer_marca_col("B")
-            marca_O_otro = leer_marca_col("O")
+            marca_B_otro = marcas_row.get("B", 0.0)
+            marca_O_otro = marcas_row.get("O", 0.0)
             pago_por_objetivo_otro = marca_B_otro * marca_O_otro
         else:  # Facundo
-            marca_C_otro = leer_marca_col("C")
-            marca_P_otro = leer_marca_col("P")
+            marca_C_otro = marcas_row.get("C", 0.0)
+            marca_P_otro = marcas_row.get("P", 0.0)
             pago_por_objetivo_otro = marca_C_otro * marca_P_otro
 
         st.markdown(
             f"**\\${total_otro:.2f} total | \\${per_min_val_otro:.2f} por minuto | \\${pago_por_objetivo_otro:.2f}**"
         )
-    except:
+    except Exception as e:
+        # Para debugging: st.error(str(e))
         st.markdown("**— | —**")
 
     # -------- MATERIAS OTRO --------
