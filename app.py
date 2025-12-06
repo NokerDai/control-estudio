@@ -365,7 +365,7 @@ with colA:
             <div style="
                 color:#666;
                 font-size:13px;
-                margin-top:6px;
+                margin-top:0px;
                 margin-bottom:12px;
             ">
                 ${per_min_val:.2f} por minuto &nbsp; | &nbsp; ${pago_por_objetivo_actual:.2f} por {objetivo_actual_hms}
@@ -498,7 +498,7 @@ with colB:
             <div style="
                 color:#666;
                 font-size:13px;
-                margin-top:6px;
+                margin-top:0px;
                 margin-bottom:12px;
             ">
                 ${per_min_val_otro:.2f} por minuto &nbsp; | &nbsp; ${pago_por_objetivo_otro:.2f} por {objetivo_otro_hms}
@@ -533,4 +533,5 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
