@@ -169,7 +169,7 @@ def parse_float_or_zero(s):
 # -------------------------------------------------------------------
 # LECTURAS OPTIMIZADAS (1 request para la fila de 'marcas', cached)
 # -------------------------------------------------------------------
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=300)
 def leer_marcas_row_cached(row):
     """
     Lee B{row}:P{row} de la hoja 'marcas' y devuelve un dict con claves 'B'..'P' -> float.
@@ -462,17 +462,16 @@ with colB:
         total_otro = mins_otro * per_min_val_otro
 
         # --- calcular pago por objetivo del 'otro' usando marcas_row (cached)
+        objetivo_otro = 0
         if otro == "Iván":
-            marca_B_otro = marcas_row.get("B", 0.0)
-            marca_O_otro = marcas_row.get("O", 0.0)
-            pago_por_objetivo_otro = marca_B_otro * marca_O_otro
+            objetivo_otro = marcas_row.get("O", 0.0)
+            pago_por_objetivo_otro = per_min_val_otro * objetivo_otro
         else:  # Facundo
-            marca_C_otro = marcas_row.get("C", 0.0)
-            marca_P_otro = marcas_row.get("P", 0.0)
-            pago_por_objetivo_otro = marca_C_otro * marca_P_otro
+            objetivo_otro = marcas_row.get("P", 0.0)
+            pago_por_objetivo_otro = per_min_val_otro * objetivo_otro
 
         st.markdown(
-            f"**\\${total_otro:.2f} | \\${per_min_val_otro:.2f} por minuto | \\${pago_por_objetivo_otro:.2f}**"
+            f"**\\${total_otro:.2f}  |  \\${per_min_val_otro:.2f} por minuto  |  \\${pago_por_objetivo_otro:.2f} por {objetivo_otro/60:.0f}**"
         )
     except Exception as e:
         # Para debugging: st.error(str(e))
@@ -501,4 +500,5 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
