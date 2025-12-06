@@ -15,102 +15,92 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------------
-# CSS RESPONSIVO (REDISEÑO MÓVIL)
+# CSS RESPONSIVO (REDISEÑO MÓVIL — OSCURO)
 # -------------------------------------------------------------------
 st.markdown("""
 <style>
+/* Bloques para controlar visibilidad sin tocar clases internas */
+.desktop-only { display: block; }
+.mobile-only { display: none; }
 
-    /* ============================================================
-       DISEÑO SOLO EN MOBILE
-       ============================================================ */
-    @media (max-width: 650px) {
+/* Estilos generales estilo oscuro */
+body {
+    background: #0f1113;
+    color: #e6e6e6;
+}
 
-        /* --------- TIPOGRAFÍA --------- */
-        html, body, [class*="css"], .stMarkdown, .stText {
-            font-size: 18px !important;
-            line-height: 1.35 !important;
-        }
+/* Estilos de tarjetas y tipografía mobile */
+@media (max-width: 650px) {
 
-        h1, h2, h3, .stSubheader {
-            font-size: 26px !important;
-        }
+    .desktop-only { display: none !important; }
+    .mobile-only { display: block !important; }
 
-        /* --------- BOTONES PRINCIPALES --------- */
-        .stButton button {
-            width: 100% !important;
-            padding: 16px 0 !important;
-            font-size: 20px !important;
-            font-weight: 600 !important;
-            border-radius: 12px !important;
-            margin-top: 8px;
-            margin-bottom: 8px;
-        }
-
-        /* --------- BOTONES PEQUEÑOS (▶ ✏️ ⛔) --------- */
-        button[kind="secondary"], button[kind="primary"] {
-            padding: 14px 0 !important;
-            font-size: 24px !important;
-            border-radius: 12px !important;
-        }
-
-        /* --------- PROGRESO --------- */
-        .progress-bar-mobile {
-            height: 14px !important;
-            border-radius: 10px !important;
-            margin: 10px 0 16px 0 !important;
-        }
-
-        /* --------- TARJETAS DE MATERIAS --------- */
-        .materia-card {
-            background: #111111 !important;
-            padding: 16px !important;
-            border-radius: 14px !important;
-            margin-bottom: 18px !important;
-            border: 1px solid #222 !important;
-            box-shadow: 0px 2px 6px rgba(0,0,0,0.3) !important;
-        }
-
-        .materia-card-title {
-            font-size: 20px !important;
-            font-weight: bold !important;
-            margin-bottom: 6px !important;
-        }
-
-        /* --------- TIEMPO --------- */
-        .materia-time {
-            font-size: 18px !important;
-            margin-bottom: 10px !important;
-        }
-
-        /* --------- CONTENEDOR DE BOTONES DENTRO DE TARJETA --------- */
-        .materia-buttons {
-            display: flex !important;
-            flex-direction: row !important;
-            justify-content: space-between !important;
-            gap: 12px !important;
-            width: 100% !important;
-        }
-
-        /* --------- COLUMNS → STACK --------- */
-        .css-1kyxreq, .css-1u6l5a7, .css-1w6p1af, .css-1r6slb0 {
-            flex-direction: column !important;
-        }
-
-        /* --------- PADDING GLOBAL --------- */
-        .block-container {
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
-            padding-top: 0.5rem !important;
-        }
-
-        /* --------- EXPANDER --------- */
-        .streamlit-expanderHeader {
-            font-size: 20px !important;
-            padding: 14px !important;
-        }
-
+    /* Container general */
+    .mobile-card {
+        background: linear-gradient(180deg, #0d0e10, #121214) !important;
+        border: 1px solid #242426 !important;
+        padding: 14px 12px !important;
+        border-radius: 12px !important;
+        margin-bottom: 14px !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.6) !important;
     }
 
+    .mobile-title {
+        font-size: 20px !important;
+        font-weight: 700 !important;
+        color: #ffffff !important;
+        margin-bottom: 6px !important;
+    }
+
+    .mobile-time {
+        font-size: 17px !important;
+        color: #d6d6d6 !important;
+        margin-bottom: 10px !important;
+    }
+
+    .mobile-meta {
+        font-size: 14px !important;
+        color: #a8a8a8 !important;
+        margin-bottom: 8px !important;
+    }
+
+    /* Botones grandes táctiles */
+    .stButton button {
+        width: 100% !important;
+        padding: 12px 10px !important;
+        font-size: 18px !important;
+        border-radius: 10px !important;
+    }
+
+    /* Botones de acción dentro de la tarjeta: dos columnas */
+    .mobile-actions {
+        display: flex !important;
+        gap: 10px !important;
+    }
+    .mobile-actions .stButton {
+        flex: 1 1 0 !important;
+    }
+
+    /* Barra de progreso móvil más visible */
+    .progress-bar-mobile {
+        height: 12px !important;
+        border-radius: 10px !important;
+        margin: 8px 0 12px 0 !important;
+    }
+
+    /* Ajuste container */
+    .block-container {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        padding-top: 0.6rem !important;
+    }
+
+    /* Expander */
+    .streamlit-expanderHeader {
+        font-size: 18px !important;
+        padding: 10px !important;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -347,7 +337,7 @@ def batch_write(updates):
         "data": [{"range": r, "values": [[v]]} for r, v in updates]
     }
     sheet.values().batchUpdate(
-        spreadsheetId=sheet_id,
+        spreadsheetId=st.secrets["sheet_id"],
         body=body
     ).execute()
 
@@ -451,7 +441,7 @@ with colA:
 
         # -------- TOTAL DEL DÍA (estilo nuevo) --------
         st.markdown(
-            f"<div style='font-size:32px; font-weight:bold; color:#333333; line-height:1; margin-bottom:4px;'>"
+            f"<div style='font-size:32px; font-weight:bold; color:#e6e6e6; line-height:1; margin-bottom:4px;'>"
             f"${total_calc:.2f}"
             f"</div>",
             unsafe_allow_html=True
@@ -486,7 +476,7 @@ with colA:
         st.markdown(
             f"""
             <div style="
-                color:#666;
+                color:#9aa0a6;
                 font-size:13px;
                 margin-top:0px;
                 margin-bottom:12px;
@@ -507,6 +497,9 @@ with colA:
             materia_en_curso = m
             break
 
+    # --- Recorremos materias y renderizamos DOS vistas:
+    #     - Desktop (clase .desktop-only) : tu layout original
+    #     - Mobile  (clase .mobile-only)  : tarjeta amigable y botones táctiles
     for materia, info in mis_materias.items():
         est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
         tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
@@ -522,16 +515,16 @@ with colA:
         tiempo_total_seg = hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido_seg)
         tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
 
-        # Tarjeta (html wrapper) para mejor visual en móvil
-        st.markdown('<div class="materia-card">', unsafe_allow_html=True)
+        # ---------------- DESKTOP (igual que antes) ----------------
+        st.markdown('<div class="desktop-only">', unsafe_allow_html=True)
 
         col_name, col_time, col_actions = st.columns([0.6, 0.2, 0.2], gap="small")
 
         with col_name:
-            st.markdown(f'<div class="materia-card-title">{materia}</div>', unsafe_allow_html=True)
+            st.markdown(f"**{materia}**")
 
         with col_time:
-            st.markdown(f'<div class="materia-time">🕒 {tiempo_total_hms}</div>', unsafe_allow_html=True)
+            st.markdown(f"🕒 {tiempo_total_hms}")
 
         with col_actions:
             btn_start, btn_edit = st.columns([1,1], gap="small")
@@ -567,7 +560,68 @@ with colA:
                 except:
                     st.error("Formato inválido (usar HH:MM:SS)")
 
-        st.markdown('</div>', unsafe_allow_html=True)  # cerrar tarjeta
+        st.markdown('</div>', unsafe_allow_html=True)  # cerrar desktop-only
+
+        # ---------------- MOBILE (tarjeta) ----------------
+        st.markdown('<div class="mobile-only">', unsafe_allow_html=True)
+
+        # Tarjeta visual
+        st.markdown('<div class="mobile-card">', unsafe_allow_html=True)
+        st.markdown(f'<div class="mobile-title">{materia}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="mobile-time">🕒 {tiempo_total_hms}</div>', unsafe_allow_html=True)
+
+        # Meta / progreso pequeña
+        if str(est_raw).strip() != "":
+            st.markdown(f'<div class="mobile-meta">En progreso</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="mobile-meta">Inactiva</div>', unsafe_allow_html=True)
+
+        # Botones grandes táctiles (USAN KEYS DISTINTAS para evitar colisiones)
+        # Los handlers replican la lógica exacta de los botones desktop
+        st.markdown('<div class="mobile-actions">', unsafe_allow_html=True)
+        # Usamos columnas para que se alineen lado a lado en móvil
+        c1, c2 = st.columns([1,1], gap="small")
+        with c1:
+            # Si la materia está en curso: show stop; else show start (igual lógica)
+            if materia_en_curso == materia:
+                if st.button("⛔ Detener", key=f"mobile_det_{materia}"):
+                    try:
+                        diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
+                        acumular_tiempo(USUARIO_ACTUAL, materia, diff_seg/60)
+                        batch_write([
+                            (info["time"], hms_a_fraction(segundos_a_hms(diff_seg + hms_a_segundos(tiempo_acum)))),
+                            (info["est"], "")
+                        ])
+                        st.rerun()
+                    except Exception as e:
+                        # si falla parse, igual forzamos limpiar
+                        batch_write([(info["est"], "")])
+                        st.rerun()
+            else:
+                if materia_en_curso is None:
+                    if st.button("▶ Iniciar", key=f"mobile_est_{materia}"):
+                        limpiar_estudiando(mis_materias)
+                        batch_write([(info["est"], ahora_str())])
+                        st.rerun()
+
+        with c2:
+            if st.button("✏️ Editar", key=f"mobile_edit_{materia}", on_click=enable_manual_input, args=[materia]):
+                pass
+
+        st.markdown('</div>', unsafe_allow_html=True)  # cerrar mobile-actions
+
+        if st.session_state.get(f"show_manual_{materia}", False):
+            nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"mobile_in_{materia}")
+            if st.button("Guardar", key=f"mobile_save_{materia}"):
+                try:
+                    batch_write([(info["time"], hms_a_fraction(nuevo))])
+                    st.session_state[f"show_manual_{materia}"] = False
+                    st.rerun()
+                except:
+                    st.error("Formato inválido (usar HH:MM:SS)")
+
+        st.markdown('</div>', unsafe_allow_html=True)  # cerrar mobile-card
+        st.markdown('</div>', unsafe_allow_html=True)  # cerrar mobile-only
 
 # -------------------------------------------------------------------
 # PANEL OTRO USUARIO
@@ -612,7 +666,7 @@ with colB:
 
         # -------- TOTAL del otro (estilo nuevo) --------
         st.markdown(
-            f"<div style='font-size:32px; font-weight:bold; color:#333333; line-height:1; margin-bottom:4px;'>"
+            f"<div style='font-size:32px; font-weight:bold; color:#e6e6e6; line-height:1; margin-bottom:4px;'>"
             f"${total_otro:.2f}"
             f"</div>",
             unsafe_allow_html=True
@@ -646,7 +700,7 @@ with colB:
         st.markdown(
             f"""
             <div style="
-                color:#666;
+                color:#9aa0a6;
                 font-size:13px;
                 margin-top:0px;
                 margin-bottom:12px;
@@ -660,7 +714,7 @@ with colB:
     except:
         st.markdown("**— | —**")
 
-    # -------- MATERIAS OTRO --------
+    # -------- MATERIAS OTRO (también desktop + mobile) --------
     for materia, info in USERS[otro].items():
         est_raw = datos[otro]["estado"][materia]
         tiempo = datos[otro]["tiempos"][materia]
@@ -674,13 +728,28 @@ with colB:
 
         total_seg = hms_a_segundos(tiempo) + max(0, tiempo_anad)
 
-        # Tarjeta para otro usuario (solo visual)
-        st.markdown('<div class="materia-card">', unsafe_allow_html=True)
-        st.markdown(f"**{materia}**")
-        st.write(f"🕒 Total: **{segundos_a_hms(total_seg)}**")
+        # --- DESKTOP for other user (compact)
+        st.markdown('<div class="desktop-only">', unsafe_allow_html=True)
+        box = st.container()
+        with box:
+            st.markdown(f"**{materia}**")
+            st.write(f"🕒 Total: **{segundos_a_hms(total_seg)}**")
+            if str(est_raw).strip() != "":
+                st.caption(f"Base: {tiempo} | En proceso: +{segundos_a_hms(tiempo_anad)}")
+                st.markdown("🟢 Estudiando")
+            else:
+                st.markdown("⚪")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # --- MOBILE card for other user
+        st.markdown('<div class="mobile-only">', unsafe_allow_html=True)
+        st.markdown('<div class="mobile-card">', unsafe_allow_html=True)
+        st.markdown(f'<div class="mobile-title">{materia}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="mobile-time">🕒 {segundos_a_hms(total_seg)}</div>', unsafe_allow_html=True)
         if str(est_raw).strip() != "":
-            st.caption(f"Base: {tiempo} | En proceso: +{segundos_a_hms(tiempo_anad)}")
+            st.markdown(f'<div class="mobile-meta">Base: {tiempo} | En proceso: +{segundos_a_hms(tiempo_anad)}</div>', unsafe_allow_html=True)
             st.markdown("🟢 Estudiando")
         else:
-            st.markdown("⚪")
+            st.markdown('<div class="mobile-meta">Inactiva</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
