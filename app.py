@@ -346,22 +346,18 @@ with colA:
         total_calc = minutos_totales * per_min_val
 
         # --- calcular pago por objetivo del usuario actual usando el dict cached marcas_row
-        # Iván -> marcas B * marcas O
-        # Facundo -> marcas C * marcas P
-        if USUARIO_ACTUAL == "Iván":
-            marca_B = marcas_row.get("B", 0.0)
-            marca_O = marcas_row.get("O", 0.0)
-            pago_por_objetivo_actual = marca_B * marca_O
+        objetivo = 0
+        if otro == "Iván":
+            objetivo = marcas_row.get("O", 0.0)
         else:  # Facundo
-            marca_C = marcas_row.get("C", 0.0)
-            marca_P = marcas_row.get("P", 0.0)
-            pago_por_objetivo_actual = marca_C * marca_P
+            objetivo = marcas_row.get("P", 0.0)
+        pago_por_objetivo_otro = per_min_val * objetivo
 
         # mostrar línea con $ escapados para que Markdown no interprete LaTeX
         st.markdown(
             f"<b><span style='color: #00c853;'>\\${total_calc:.2f}</span> total | "
             f"\\${per_min_val:.2f} por minuto | "
-            f"\\${pago_por_objetivo_actual:.2f}</b>",
+            f"\\${pago_por_objetivo_actual:.2f} por {objetivo/60:.f} horas</b>",
             unsafe_allow_html=True
         )
     except Exception as e:
@@ -465,19 +461,17 @@ with colB:
         total_otro = mins_otro * per_min_val_otro
 
         # --- calcular pago por objetivo del 'otro' usando marcas_row (cached)
+        objetivo_otro = 0
         if otro == "Iván":
-            marca_B_otro = marcas_row.get("B", 0.0)
-            marca_O_otro = marcas_row.get("O", 0.0)
-            pago_por_objetivo_otro = marca_B_otro * marca_O_otro
+            objetivo_otro = marcas_row.get("O", 0.0)
         else:  # Facundo
-            marca_C_otro = marcas_row.get("C", 0.0)
-            marca_P_otro = marcas_row.get("P", 0.0)
-            pago_por_objetivo_otro = marca_C_otro * marca_P_otro
+            objetivo_otro = marcas_row.get("P", 0.0)
+        pago_por_objetivo_otro = per_min_val_otro * objetivo_otro
 
         st.markdown(
-            f"<b><span style='color: #00c853;'>\\${total_otro:.2f}</span> total | "
+            f"<b><span style='color: #00c853;'>\\${total_otro:.2f}</span> | "
             f"\\${per_min_val_otro:.2f} por minuto | "
-            f"\\${pago_por_objetivo_otro:.2f}</b>",
+            f"\\${pago_por_objetivo_otro:.2f} por {objetivo_otro/60:.2f} horas</b>",
             unsafe_allow_html=True
         )
     except Exception as e:
@@ -507,4 +501,5 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
