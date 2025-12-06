@@ -4,7 +4,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import datetime, date
 
-# Intentar importar manejo de zonas horarias de forma robusta (estilo app.py)
+# Intentar importar manejo de zonas horarias de forma robusta
 try:
     from zoneinfo import ZoneInfo
     _HAS_ZONEINFO = True
@@ -17,11 +17,103 @@ except Exception:
         pytz = None
 
 # -------------------------------------------------------------------
-# ZONA HORARIA ARGENTINA (Lógica robusta app.py)
+# CONFIGURACIÓN DE PÁGINA Y ESTILOS CSS (MOBILE FIRST)
+# -------------------------------------------------------------------
+st.set_page_config(
+    page_title="Control de Estudio",
+    page_icon="⏳",
+    layout="centered"  # Centered es mejor para móvil que Wide
+)
+
+# Inyectar CSS para agrandar fuentes y mejorar botones en móvil
+st.markdown("""
+    <style>
+    /* Agrandar la fuente global del cuerpo */
+    html, body, [class*="css"] {
+        font-size: 18px !important; 
+    }
+    
+    /* Agrandar títulos */
+    h1 { font-size: 2.5rem !important; }
+    h2 { font-size: 2rem !important; }
+    h3 { font-size: 1.5rem !important; }
+    
+    /* Estilo para Tarjetas de Materia */
+    .materia-card {
+        background-color: #262730;
+        border: 1px solid #464b5c;
+        padding: 20px;
+        border-radius: 15px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    .materia-title {
+        font-size: 1.4rem;
+        font-weight: bold;
+        color: #ffffff;
+        margin-bottom: 5px;
+    }
+    .materia-time {
+        font-size: 2.2rem;
+        font-weight: bold;
+        color: #00e676; /* Verde neón para contraste */
+        font-family: 'Courier New', monospace;
+        margin-bottom: 15px;
+    }
+    .status-badge {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 12px;
+        font-size: 0.9rem;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+    .status-active {
+        background-color: rgba(0, 230, 118, 0.2);
+        color: #00e676;
+        border: 1px solid #00e676;
+    }
+    
+    /* Ajuste de botones para que sean más altos y fáciles de tocar */
+    div.stButton > button {
+        height: 3.5rem;
+        font-size: 1.2rem !important;
+        font-weight: bold !important;
+        border-radius: 12px !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# -------------------------------------------------------------------
+# BLOQUEO POR CONTRASEÑA
+# -------------------------------------------------------------------
+def check_password():
+    if "pw_correct" in st.session_state:
+        return st.session_state.pw_correct
+
+    st.title("🔒 Acceso protegido")
+    
+    # Intenta leer password de secrets, si no existe usa 'admin'
+    secret_pass = st.secrets.get("auth", {}).get("password", "admin")
+
+    password = st.text_input("Contraseña:", type="password")
+    if st.button("Entrar", use_container_width=True):
+        if password == secret_pass:
+            st.session_state.pw_correct = True
+            st.rerun()
+        else:
+            st.error("Contraseña incorrecta.")
+    return False
+
+if not check_password():
+    st.stop()
+
+# -------------------------------------------------------------------
+# ZONA HORARIA Y UTILS
 # -------------------------------------------------------------------
 def _argentina_now_global():
     if ZoneInfo is not None:
-        return datetime.now(ZoneInfo('America/Argentina/Cordoba')) # Usando Cordoba como en tu script original
+        return datetime.now(ZoneInfo('America/Argentina/Cordoba'))
     if 'pytz' in globals() and pytz is not None:
         return datetime.now(pytz.timezone('America/Argentina/Cordoba'))
     return datetime.now()
@@ -43,10 +135,7 @@ def parse_datetime(s):
     except:
         pass
         
-    fmts = [
-        "%Y-%m-%d %H:%M:%S%z", "%Y-%m-%dT%H:%M:%S%z",
-        "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S",
-    ]
+    fmts = ["%Y-%m-%d %H:%M:%S%z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S"]
     for fmt in fmts:
         try:
             dt = datetime.strptime(s, fmt)
@@ -55,10 +144,10 @@ def parse_datetime(s):
             return dt.astimezone(TZ)
         except:
             continue
-    raise ValueError(f"Formato inválido en marca temporal: {s}")
+    raise ValueError(f"Formato inválido: {s}")
 
 # -------------------------------------------------------------------
-# CONEXIÓN Y UTILIDADES (Cacheada estilo app.py)
+# CONEXIÓN GOOGLE SHEETS
 # -------------------------------------------------------------------
 @st.cache_resource
 def get_service():
@@ -68,33 +157,27 @@ def get_service():
             key_dict,
             scopes=["https://www.googleapis.com/auth/spreadsheets"]
         )
-        service = build("sheets", "v4", credentials=creds)
-        return service.spreadsheets()
-    except KeyError:
-        st.error("Error: Falta configurar el secreto 'textkey'.")
+        return build("sheets", "v4", credentials=creds).spreadsheets()
+    except Exception as e:
+        st.error(f"Error config secrets: {e}")
         st.stop()
 
 sheet = get_service()
 
-# Variables Globales de Configuración
 FILA_BASE = 170
 FECHA_BASE = date(2025, 12, 2)
 SHEET_FACUNDO = "F. Economía"
 SHEET_IVAN = "I. Física"
 SHEET_MARCAS = "marcas"
 
-def fila_para_fecha(fecha_actual):
-    delta = (fecha_actual - FECHA_BASE).days
-    return FILA_BASE + delta
-
 def get_time_row():
     hoy = _argentina_now_global().date()
-    return fila_para_fecha(hoy)
+    delta = (hoy - FECHA_BASE).days
+    return FILA_BASE + delta
 
 TIME_ROW = get_time_row()
 MARCAS_ROW = 2
 
-# Mapeo de Usuarios
 USERS = {
     "Facundo": {
         "Matemática para Economistas 1": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"},
@@ -108,11 +191,9 @@ USERS = {
     }
 }
 
-# -------------------------------------------------------------------
-# FUNCIONES AUXILIARES (Tiempo y Formato)
-# -------------------------------------------------------------------
+# Utils conversión
 def hms_a_segundos(hms):
-    if not hms or str(hms).strip() == "": return 0
+    if not hms: return 0
     try:
         h, m, s = map(int, hms.split(":"))
         return h*3600 + m*60 + s
@@ -128,15 +209,14 @@ def hms_a_fraction(hms): return hms_a_segundos(hms) / 86400
 def hms_a_minutos(hms): return hms_a_segundos(hms) / 60
 def parse_float_or_zero(s):
     if s is None: return 0.0
-    s = str(s).replace(",", ".").strip()
-    try: return float(s)
+    try: return float(str(s).replace(",", ".").strip())
     except: return 0.0
 
 def enable_manual_input(materia_key):
     st.session_state[f"show_manual_{materia_key}"] = True
 
 # -------------------------------------------------------------------
-# LÓGICA GOOGLE SHEETS (Lectura/Escritura)
+# LÓGICA DATOS
 # -------------------------------------------------------------------
 def cargar_todo():
     ranges = []
@@ -171,14 +251,10 @@ def cargar_resumen_marcas():
     try:
         res = sheet.values().batchGet(spreadsheetId=st.secrets["sheet_id"], ranges=ranges, valueRenderOption="FORMATTED_VALUE").execute()
         vr = res.get("valueRanges", [])
+        return {"Facundo": {"per_min": vr[0].get("values",[[0]])[0][0]}, 
+                "Iván": {"per_min": vr[1].get("values",[[0]])[0][0]}}
     except:
-        vr = [{} for _ in ranges]
-    
-    def _get(i):
-        try: return vr[i].get("values", [[]])[0][0] or ""
-        except: return ""
-        
-    return {"Facundo": {"per_min": _get(0)}, "Iván": {"per_min": _get(1)}}
+        return {"Facundo": {"per_min": 0}, "Iván": {"per_min": 0}}
 
 def batch_write(updates):
     body = {"valueInputOption": "USER_ENTERED", "data": [{"range": r, "values": [[v]]} for r, v in updates]}
@@ -194,19 +270,21 @@ def acumular_tiempo(usuario, materia, minutos_sumar):
     batch_write([(info["est"], valor_prev + minutos_sumar)])
 
 # -------------------------------------------------------------------
-# SELECCIÓN DE USUARIO (Pantalla intermedia)
+# SELECCIÓN USUARIO
 # -------------------------------------------------------------------
 if "usuario_seleccionado" not in st.session_state:
-    st.markdown("<h1 style='text-align: center;'>¿Quién sos?</h1>", unsafe_allow_html=True)
-    st.write("")
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-        if st.button("👤 Soy Facundo", use_container_width=True):
-            st.session_state["usuario_seleccionado"] = "Facundo"
-            st.rerun()
-        if st.button("👤 Soy Iván", use_container_width=True):
-            st.session_state["usuario_seleccionado"] = "Iván"
-            st.rerun()
+    st.markdown("<h1 style='text-align: center; margin-bottom: 30px;'>¿Quién sos?</h1>", unsafe_allow_html=True)
+    
+    # Botones grandes para móvil
+    if st.button("👤 Soy Facundo", use_container_width=True):
+        st.session_state["usuario_seleccionado"] = "Facundo"
+        st.rerun()
+    
+    st.write("") # Espacio
+    
+    if st.button("👤 Soy Iván", use_container_width=True):
+        st.session_state["usuario_seleccionado"] = "Iván"
+        st.rerun()
     st.stop()
 
 # -------------------------------------------------------------------
@@ -215,39 +293,23 @@ if "usuario_seleccionado" not in st.session_state:
 USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
 OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
 
-# Encabezado con Logout en Sidebar
-st.sidebar.title(f"Hola, {USUARIO_ACTUAL}")
-if st.sidebar.button("Cerrar sesión / Cambiar"):
-    del st.session_state["usuario_seleccionado"]
-    st.rerun()
+# Sidebar simple
+with st.sidebar:
+    st.header(f"Hola, {USUARIO_ACTUAL}")
+    if st.button("Cerrar Sesión", use_container_width=True):
+        del st.session_state["usuario_seleccionado"]
+        st.rerun()
 
-st.title("⏳ Control de Estudio")
+st.title("⏳ Control Estudio")
 
-# Carga de Datos
+# Carga de datos
 datos = cargar_todo()
 resumen_marcas = cargar_resumen_marcas()
 
-# Función para renderizar barra de progreso (reutilizada para limpieza)
-def render_progress(total_calc, per_min_val, objetivo, objetivo_hms):
-    pago_objetivo = per_min_val * objetivo
-    progreso = min(total_calc / max(1, pago_objetivo), 1.0) * 100
-    color = "#5cb85c" if progreso >= 90 else "#f0ad4e" if progreso >= 50 else "#d9534f"
-    
-    st.markdown(f"<div style='font-size:32px; font-weight:bold; color:#333; line-height:1;'>${total_calc:.2f}</div>", unsafe_allow_html=True)
-    st.markdown(f"""
-        <div style="width:100%; background-color:#262730; border-radius:8px; height:8px; margin:4px 0 10px 0;">
-            <div style="width:{progreso}%; background-color:{color}; height:100%; border-radius:8px; transition: width 0.4s ease;"></div>
-        </div>
-        <div style="color:#666; font-size:13px; margin-bottom:12px;">
-            ${per_min_val:.2f}/min &nbsp;|&nbsp; Meta: ${pago_objetivo:.2f} ({objetivo_hms})
-        </div>
-    """, unsafe_allow_html=True)
-
-# --- CÁLCULO DE MÉTRICAS COMPARTIDAS ---
+# --- MÉTRICAS ---
 def calcular_metricas(usuario):
     per_min = parse_float_or_zero(resumen_marcas[usuario].get("per_min", ""))
     total_min = 0.0
-    
     for materia, info in USERS[usuario].items():
         base = hms_a_minutos(datos[usuario]["tiempos"][materia])
         progreso = 0
@@ -262,50 +324,45 @@ def calcular_metricas(usuario):
     col_obj = "O" if usuario == "Iván" else "P"
     objetivo = 0.0
     try:
-        # Nota: Esto es un poco ineficiente (hace call a API), pero mantiene la lógica original
         res = sheet.values().get(spreadsheetId=st.secrets["sheet_id"], range=f"'{SHEET_MARCAS}'!{col_obj}{TIME_ROW}").execute()
         objetivo = parse_float_or_zero(res.get("values", [[0]])[0][0])
     except: pass
     
-    return total_min * per_min, per_min, objetivo, segundos_a_hms(int(objetivo * 60))
+    return total_min * per_min, per_min, objetivo
+
+# Barra de progreso grande
+m_tot, m_rate, m_obj = calcular_metricas(USUARIO_ACTUAL)
+pago_objetivo = m_rate * m_obj
+progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
+color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
+
+st.markdown(f"""
+    <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+        <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Tu Ganancia Hoy</div>
+        <div style="font-size: 3rem; font-weight: bold; color: #fff; line-height: 1;">${m_tot:.2f}</div>
+        <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
+            <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
+        </div>
+        <div style="text-align: right; color: #888;">Meta: ${pago_objetivo:.2f}</div>
+    </div>
+""", unsafe_allow_html=True)
 
 # -------------------------------------------------------------------
-# PANEL SUPERIOR: MI PROGRESO vs EL DEL OTRO
+# LISTA DE MATERIAS (Diseño de Tarjetas Grandes)
 # -------------------------------------------------------------------
-col_me, col_other = st.columns(2)
+st.subheader("Tus Materias")
 
-with col_me:
-    st.subheader("Mi Día")
-    m_tot, m_rate, m_obj, m_obj_hms = calcular_metricas(USUARIO_ACTUAL)
-    render_progress(m_tot, m_rate, m_obj, m_obj_hms)
-
-with col_other:
-    st.subheader(f"Día de {OTRO_USUARIO}")
-    o_tot, o_rate, o_obj, o_obj_hms = calcular_metricas(OTRO_USUARIO)
-    render_progress(o_tot, o_rate, o_obj, o_obj_hms)
-
-if st.button("🔄 Sincronizar Tiempos", use_container_width=True):
-    st.rerun()
-
-# -------------------------------------------------------------------
-# SECCIÓN: MATERIAS (Estilo Tarjetas/Botones como app.py)
-# -------------------------------------------------------------------
-st.divider()
-st.subheader("📚 Mis Materias")
-
-materia_en_curso = None
 mis_materias = USERS[USUARIO_ACTUAL]
+materia_en_curso = None
 for m, info in mis_materias.items():
     if str(datos[USUARIO_ACTUAL]["estado"][m]).strip() != "":
         materia_en_curso = m
         break
 
-# Iterar materias y mostrarlas más limpias
 for materia, info in mis_materias.items():
     est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
     tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
     
-    # Calcular tiempo real
     tiempo_anadido_seg = 0
     en_curso = False
     if str(est_raw).strip() != "":
@@ -317,65 +374,62 @@ for materia, info in mis_materias.items():
 
     tiempo_total_hms = segundos_a_hms(hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido_seg))
     
-    # Contenedor visual para cada materia
-    with st.container():
-        c1, c2, c3 = st.columns([0.5, 0.3, 0.2])
-        
-        # Nombre y Estado Visual
-        with c1:
-            st.markdown(f"**{materia}**")
-            if en_curso:
-                st.caption("🟢 Estudiando ahora...")
-        
-        # Tiempo
-        with c2:
-            st.markdown(f"⏱️ `{tiempo_total_hms}`")
-        
-        # Acciones
-        with c3:
-            if materia_en_curso == materia:
-                # Botón de STOP
-                if st.button("⛔ Parar", key=f"stop_{materia}", use_container_width=True):
-                    diff_seg = int((_argentina_now_global() - parse_datetime(est_raw)).total_seconds())
-                    acumular_tiempo(USUARIO_ACTUAL, materia, diff_seg/60)
-                    batch_write([
-                        (info["time"], hms_a_fraction(segundos_a_hms(diff_seg + hms_a_segundos(tiempo_acum)))),
-                        (info["est"], "")
-                    ])
+    # --- RENDERIZADO DE TARJETA ---
+    # Usamos HTML puro para el contenido estático para controlar totalmente el tamaño
+    html_card = f"""
+    <div class="materia-card">
+        <div class="materia-title">{materia}</div>
+        {'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''}
+        <div class="materia-time">{tiempo_total_hms}</div>
+    </div>
+    """
+    st.markdown(html_card, unsafe_allow_html=True)
+
+    # Botones debajo de la tarjeta (fuera del HTML para mantener funcionalidad de Streamlit)
+    # Usamos columnas pero con ratios que funcionen en móvil (botones anchos)
+    c_actions = st.container()
+    
+    with c_actions:
+        if materia_en_curso == materia:
+            # BOTÓN DE PARAR (Rojo y Grande)
+            if st.button(f"⛔ DETENER {materia[:10]}...", key=f"stop_{materia}", use_container_width=True, type="primary"):
+                diff_seg = int((_argentina_now_global() - parse_datetime(est_raw)).total_seconds())
+                acumular_tiempo(USUARIO_ACTUAL, materia, diff_seg/60)
+                batch_write([
+                    (info["time"], hms_a_fraction(segundos_a_hms(diff_seg + hms_a_segundos(tiempo_acum)))),
+                    (info["est"], "")
+                ])
+                st.rerun()
+        else:
+            if materia_en_curso is None:
+                # BOTÓN DE INICIAR (Normal y Grande)
+                if st.button(f"▶ INICIAR", key=f"start_{materia}", use_container_width=True):
+                    limpiar_estudiando(mis_materias)
+                    batch_write([(info["est"], ahora_str())])
                     st.rerun()
             else:
-                if materia_en_curso is None:
-                    # Botón de PLAY
-                    if st.button("▶ Iniciar", key=f"start_{materia}", use_container_width=True):
-                        limpiar_estudiando(mis_materias)
-                        batch_write([(info["est"], ahora_str())])
-                        st.rerun()
-                else:
-                    st.button("...", disabled=True, key=f"dis_{materia}")
-                    
-            # Edición Manual (expander pequeño dentro de la fila o botón simple)
-            if st.button("✏️", key=f"btn_edit_{materia}"):
-                enable_manual_input(materia)
+                # Deshabilitado si otra corre
+                st.button("...", disabled=True, key=f"dis_{materia}", use_container_width=True)
 
-    # Input manual si está activo
-    if st.session_state.get(f"show_manual_{materia}", False):
-        c_edit_1, c_edit_2 = st.columns([0.7, 0.3])
-        new_val = c_edit_1.text_input("HH:MM:SS", value=tiempo_acum, key=f"input_{materia}")
-        if c_edit_2.button("Guardar", key=f"save_{materia}"):
+    # Botón Editar pequeño y discreto abajo a la derecha de la tarjeta
+    with st.expander("🛠️ Corregir tiempo manualmente"):
+        new_val = st.text_input("Tiempo (HH:MM:SS)", value=tiempo_acum, key=f"input_{materia}")
+        if st.button("Guardar Corrección", key=f"save_{materia}"):
             try:
                 batch_write([(info["time"], hms_a_fraction(new_val))])
-                st.session_state[f"show_manual_{materia}"] = False
                 st.rerun()
             except:
-                st.error("Error formato")
+                st.error("Formato inválido")
     
-    st.markdown("---") # Separador sutil
+    st.write("") # Margen extra entre tarjetas
 
 # -------------------------------------------------------------------
-# EXPANDER: INFO ADICIONAL (Estilo app.py "No pensar, actuar")
+# FOOTER / EXTRAS
 # -------------------------------------------------------------------
-md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
+st.divider()
+if st.button("🔄 Actualizar Datos", use_container_width=True):
+    st.rerun()
 
-with st.expander("ℹ️ No pensar, actuar (Manifiesto)", expanded=False):
+with st.expander("ℹ️ Manifiesto"):
+    md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
     st.markdown(md_content)
-
