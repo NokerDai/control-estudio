@@ -611,8 +611,7 @@ for materia, info in mis_materias.items():
 
     if st.session_state.get(f"show_manual_{materia}", False):
         st.markdown("</div>", unsafe_allow_html=True)
-        nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{USUARIO_ACTUAL}_{materia}")(f"show_manual_{materia}", False):
-        nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{USUARIO_ACTUAL}_{materia}")
+        nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=(f"show_manual_{materia}", False)uevo tiempo (HH:MM:SS):", key=f"in_{USUARIO_ACTUAL}_{materia}")
         if st.button("Guardar", key=f"save_{USUARIO_ACTUAL}_{materia}"):
             editar_manual(nuevo, info, materia)
 
