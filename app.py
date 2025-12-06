@@ -195,17 +195,14 @@ def leer_marcas_row_cached():
 
 def cargar_resumen_marcas():
     """
-    Usa la fila cached de marcas para devolver per_min de Facundo (C) e Iván (B).
-    Devuelve strings iguales a lo que usabas antes ("" si vacío).
+    Usa la fila cached de marcas para devolver per_min de Iván (O) y Facundo (P)
     """
     marcas = leer_marcas_row_cached()
-    # Obtener como string original si quieres, pero aquí devolvemos como string formateado simple
-    per_min_fac = "" if marcas.get("C", 0) == 0 else str(marcas.get("C", 0))
-    per_min_ivan = "" if marcas.get("B", 0) == 0 else str(marcas.get("B", 0))
-    return {
-        "Facundo": {"per_min": per_min_fac},
-        "Iván": {"per_min": per_min_ivan}
-    }
+
+    per_min_ivan = "" if marcas.get("O", 0) == 0 else str(marcas["O"])
+    per_min_fac  = "" if marcas.get("P", 0) == 0 else str(marcas["P"])
+
+    return per_min_fac, per_min_ivan
 
 # -------------------------------------------------------------------
 # CARGA DE ESTADO Y TIEMPOS
@@ -499,6 +496,7 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
 
