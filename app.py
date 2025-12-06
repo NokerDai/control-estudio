@@ -169,30 +169,31 @@ def parse_float_or_zero(s):
 # -------------------------------------------------------------------
 # LECTURAS OPTIMIZADAS (1 request para la fila de 'marcas', cached)
 # -------------------------------------------------------------------
-@st.cache_data(ttl=15)
-def leer_marcas_row_cached():
+@st.cache_data(ttl=10)
+def leer_marcas_row_cached(row):
     """
-    Carga de una sola vez las columnas O y P en la fila TIME_ROW.
-    Devuelve un dict: {"O": float, "P": float}
+    Lee B{row}:P{row} de la hoja 'marcas' y devuelve un dict con claves 'B'..'P' -> float.
+    TTL corto para que la app sea reactiva pero reduzca llamadas.
     """
-    sheet_id = st.secrets["sheet_id"]
-    rango = f"'{SHEET_MARCAS}'!O{TIME_ROW}:P{TIME_ROW}"
-
+    cols = [chr(c) for c in range(ord('B'), ord('P') + 1)]  # B..P
+    rango = f"'{SHEET_MARCAS}'!B{row}:P{row}"
     try:
         res = sheet.values().get(
-            spreadsheetId=sheet_id,
+            spreadsheetId=st.secrets["sheet_id"],
             range=rango,
             valueRenderOption="FORMATTED_VALUE"
         ).execute()
-        vals = res.get("values", [[]])[0]
+        values = res.get("values", [[]])
+        row_vals = values[0] if values and values[0] else []
     except:
-        vals = ["", ""]
+        row_vals = []
 
-    # Convertir a float seguro
-    O_val = parse_float_or_zero(vals[0]) if len(vals) > 0 else 0.0
-    P_val = parse_float_or_zero(vals[1]) if len(vals) > 1 else 0.0
-
-    return {"O": O_val, "P": P_val}
+    # Map columns to floats (si falta un valor, -> 0.0)
+    mapped = {}
+    for i, col in enumerate(cols):
+        v = row_vals[i] if i < len(row_vals) else ""
+        mapped[col] = parse_float_or_zero(v)
+    return mapped
 
 def cargar_resumen_marcas():
     """
@@ -347,9 +348,9 @@ with colA:
         # --- calcular pago por objetivo del usuario actual usando el dict cached marcas_row
         objetivo = 0
         if otro == "Iván":
-            objetivo = marcas_row.get("P", 0.0)
-        else:  # Facundo
             objetivo = marcas_row.get("O", 0.0)
+        else:  # Facundo
+            objetivo = marcas_row.get("P", 0.0)
         pago_por_objetivo_actual = per_min_val * objetivo
 
         # mostrar línea con $ escapados para que Markdown no interprete LaTeX
@@ -500,9 +501,6 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
-
-
-
 
 
 
