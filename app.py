@@ -48,6 +48,19 @@ st.markdown(
 
     /* Botones: mejorar contraste */
 
+/* Botones solo en filas de materias */
+.buttons-row {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 0.5rem !important;
+}
+
+@media (max-width: 600px) {
+    .buttons-row {
+        flex-direction: row !important;
+    }
+}
+
 /* --- FIX: mantener botones lado a lado incluso en móvil --- */
 .stColumns {
     display: flex !important;
@@ -577,6 +590,7 @@ for materia, info in mis_materias.items():
 
     st.markdown(f"**{materia}** — 🕒 {tiempo_total_hms}")
 
+    st.markdown("<div class='buttons-row'>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([0.4, 0.3, 0.3])
     with c1:
         if materia_en_curso == materia:
@@ -596,6 +610,8 @@ for materia, info in mis_materias.items():
             st.markdown("⚪")
 
     if st.session_state.get(f"show_manual_{materia}", False):
+        st.markdown("</div>", unsafe_allow_html=True)
+        nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{USUARIO_ACTUAL}_{materia}")(f"show_manual_{materia}", False):
         nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{USUARIO_ACTUAL}_{materia}")
         if st.button("Guardar", key=f"save_{USUARIO_ACTUAL}_{materia}"):
             editar_manual(nuevo, info, materia)
