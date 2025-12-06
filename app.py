@@ -372,20 +372,21 @@ def calcular_metricas(usuario):
     except:
         pass
     
-    return total_min * per_min, per_min, objetivo
+    return total_min * per_min, per_min, objetivo, total_min
 
 # ---- MÉTRICAS PROPIAS ----
-m_tot, m_rate, m_obj = calcular_metricas(USUARIO_ACTUAL)
+m_tot, m_rate, m_obj, total_min = calcular_metricas(USUARIO_ACTUAL)
 pago_objetivo = m_rate * m_obj
 progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
 color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
 
 objetivo_hms = segundos_a_hms(int(m_obj * 60))
+total_hms = segundos_a_hms(int(total_min * 60))
 
 st.markdown(f"""
     <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
         <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
-        <div style="font-size: 3rem; font-weight: bold; color: #fff; line-height: 1;">${m_tot:.2f}</div>
+        <div style="font-size: 3rem; font-weight: bold; color: #fff; line-height: 1;">${m_tot:.2f} | {total_hms}</div>
         <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
             <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
         </div>
@@ -543,4 +544,5 @@ for materia, info in mis_materias.items():
                 st.error("Formato inválido")
 
     st.write("")
+
 
