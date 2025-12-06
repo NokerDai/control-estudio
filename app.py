@@ -358,7 +358,32 @@ with colA:
         )
 
         progreso = min(total_calc / max(1, pago_por_objetivo_actual), 1.0)
-        st.progress(progreso)
+        # ---- BARRA DE PROGRESO CON COLORES DINÁMICOS ----
+        # progreso = total_calc / pago_por_objetivo_actual
+        progreso_porcentaje = progreso * 100
+        
+        # Color según regla
+        if progreso_porcentaje < 50:
+            color = "#d9534f"    # rojo
+        elif progreso_porcentaje < 90:
+            color = "#f0ad4e"    # amarillo
+        else:
+            color = "#5cb85c"    # verde
+        
+        st.markdown(
+            f"""
+            <div style="width:100%; background-color:#e0e0e0; border-radius:8px; height:18px; margin:4px 0 10px 0;">
+                <div style="
+                    width:{progreso_porcentaje}%;
+                    background-color:{color};
+                    height:100%;
+                    border-radius:8px;
+                    transition: width 0.4s ease;
+                "></div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
         st.markdown(
             f"""
@@ -533,5 +558,3 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
-
-
