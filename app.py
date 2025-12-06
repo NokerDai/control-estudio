@@ -361,7 +361,17 @@ with colA:
         st.progress(progreso)
 
         st.markdown(
-            f"**${per_min_val:.2f} por minuto | ${pago_por_objetivo_actual:.2f} por {objetivo_actual_hms}**"
+            f"""
+            <div style="
+                color:#666;
+                font-size:13px;
+                margin-top:6px;
+                margin-bottom:12px;
+            ">
+                ${per_min_val:.2f} por minuto &nbsp; | &nbsp; ${pago_por_objetivo_actual:.2f} por {objetivo_actual_hms}
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
     except:
@@ -484,7 +494,17 @@ with colB:
         st.progress(progreso_otro)
 
         st.markdown(
-            f"**${per_min_val_otro:.2f} por minuto | ${pago_por_objetivo_otro:.2f} por {objetivo_otro_hms}**"
+            f"""
+            <div style="
+                color:#666;
+                font-size:13px;
+                margin-top:6px;
+                margin-bottom:12px;
+            ">
+                ${per_min_val_otro:.2f} por minuto &nbsp; | &nbsp; ${pago_por_objetivo_otro:.2f} por {objetivo_otro_hms}
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
     except:
@@ -513,3 +533,4 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
