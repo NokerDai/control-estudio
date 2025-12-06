@@ -333,11 +333,6 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# ---- MANIFIESTO ----
-with st.expander("ℹ️ No pensar, actuar."):
-    md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
-    st.markdown(md_content)
-
 # ---- PROGRESO DEL OTRO USUARIO (ahora expandido=True) ----
 with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
     o_tot, o_rate, o_obj = calcular_metricas(OTRO_USUARIO)
@@ -360,6 +355,11 @@ with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+# ---- MANIFIESTO ----
+with st.expander("ℹ️ No pensar, actuar."):
+    md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
+    st.markdown(md_content)
 
 # -------------------------------------------------------------------
 # LISTA DE MATERIAS
@@ -432,4 +432,5 @@ for materia, info in mis_materias.items():
                 st.error("Formato inválido")
     
     st.write("")
+
 
