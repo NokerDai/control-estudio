@@ -33,7 +33,6 @@ except KeyError:
     st.error("Error: Falta configurar el secreto 'textkey'.")
     st.stop()
 
-# Servicio Google Sheets
 service = build("sheets", "v4", credentials=creds)
 sheet = service.spreadsheets()
 
@@ -75,7 +74,7 @@ def parse_datetime(s):
     raise ValueError(f"Formato inválido en marca temporal: {s}")
 
 # -------------------------------------------------------------------
-# FILA DINÁMICA SEGÚN LA FECHA
+# FILA DINÁMICA
 # -------------------------------------------------------------------
 FILA_BASE = 170
 FECHA_BASE = date(2025, 12, 2)
@@ -96,7 +95,7 @@ SHEET_IVAN = "I. Física"
 SHEET_MARCAS = "marcas"
 
 # -------------------------------------------------------------------
-# MAPEO DE USUARIOS Y MATERIAS
+# MAPEO
 # -------------------------------------------------------------------
 USERS = {
     "Facundo": {
@@ -131,7 +130,7 @@ USERS = {
 }
 
 # -------------------------------------------------------------------
-# FUNCIONES DE TIEMPO
+# FUNCIONES TIEMPO
 # -------------------------------------------------------------------
 def hms_a_segundos(hms):
     if not hms or str(hms).strip() == "":
@@ -166,48 +165,19 @@ def parse_float_or_zero(s):
     except:
         return 0.0
 
-# -------------------------------------------------------------------
-# LECTURAS OPTIMIZADAS (1 request para la fila de 'marcas', cached)
-# -------------------------------------------------------------------
-@st.cache_data(ttl=10)
-def leer_marcas_row_cached(row):
-    """
-    Lee B{row}:P{row} de la hoja 'marcas' y devuelve un dict con claves 'B'..'P' -> float.
-    TTL corto para que la app sea reactiva pero reduzca llamadas.
-    """
-    cols = [chr(c) for c in range(ord('B'), ord('P') + 1)]  # B..P
-    rango = f"'{SHEET_MARCAS}'!B{row}:P{row}"
+def leer_marca_col(col):
     try:
         res = sheet.values().get(
             spreadsheetId=st.secrets["sheet_id"],
-            range=rango,
-            valueRenderOption="FORMATTED_VALUE"
+            range=f"'{SHEET_MARCAS}'!{col}{TIME_ROW}"
         ).execute()
-        values = res.get("values", [[]])
-        row_vals = values[0] if values and values[0] else []
+        val = res.get("values", [[]])[0][0]
+        return parse_float_or_zero(val)
     except:
-        row_vals = []
-
-    mapped = {}
-    for i, col in enumerate(cols):
-        v = row_vals[i] if i < len(row_vals) else ""
-        mapped[col] = parse_float_or_zero(v)
-    return mapped
-
-def cargar_resumen_marcas():
-    """
-    Devuelve per_min como strings tal como usabas antes ("" si 0).
-    """
-    marcas = leer_marcas_row_cached(TIME_ROW)
-    per_min_fac = "" if marcas.get("C", 0) == 0 else str(marcas.get("C", 0))
-    per_min_ivan = "" if marcas.get("B", 0) == 0 else str(marcas.get("B", 0))
-    return {
-        "Facundo": {"per_min": per_min_fac},
-        "Iván": {"per_min": per_min_ivan}
-    }
+        return 0.0
 
 # -------------------------------------------------------------------
-# CARGA DE ESTADO Y TIEMPOS
+# CARGA
 # -------------------------------------------------------------------
 def cargar_todo():
     sheet_id = st.secrets["sheet_id"]
@@ -237,6 +207,35 @@ def cargar_todo():
             data[user]["estado"][materia] = est_val
             data[user]["tiempos"][materia] = time_val
     return data
+
+def cargar_resumen_marcas():
+    sheet_id = st.secrets["sheet_id"]
+    ranges = [
+        f"'{SHEET_MARCAS}'!C{TIME_ROW}",
+        f"'{SHEET_MARCAS}'!B{TIME_ROW}",
+    ]
+
+    try:
+        res = sheet.values().batchGet(
+            spreadsheetId=sheet_id,
+            ranges=ranges,
+            valueRenderOption="FORMATTED_VALUE"
+        ).execute()
+        vr = res.get("valueRanges", [])
+    except:
+        vr = [{} for _ in ranges]
+
+    def _get(i):
+        try:
+            val = vr[i].get("values", [[]])[0][0]
+            return "" if val is None else val
+        except:
+            return ""
+
+    return {
+        "Facundo": {"per_min": _get(0)},
+        "Iván": {"per_min": _get(1)}
+    }
 
 # -------------------------------------------------------------------
 # ESCRITURA
@@ -300,36 +299,12 @@ if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
 # -------------------------------------------------------------------
 datos = cargar_todo()
 resumen_marcas = cargar_resumen_marcas()
-marcas_row = leer_marcas_row_cached(TIME_ROW)  # cached dict B..P -> float
 
 if st.button("🔄 Actualizar tiempos"):
     st.rerun()
 
 otro = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
 colA, colB = st.columns(2)
-
-# -------------------------------------------------------------------
-# Helpers visuales
-# -------------------------------------------------------------------
-def color_por_progreso(p):
-    """Devuelve color hex según progreso p en [0,1]."""
-    if p < 0.5:
-        return "#e74c3c"  # rojo
-    if p < 0.9:
-        return "#f1c40f"  # amarillo
-    return "#2ecc71"      # verde
-
-def barra_progreso_html(p, color, altura_px=14):
-    """Devuelve HTML de barra de progreso estilizada."""
-    pct = max(0.0, min(p, 1.0)) * 100
-    return f"""
-    <div style="background:#eee;border-radius:8px;padding:6px 6px;">
-      <div style="width:100%;background:#ddd;height:{altura_px}px;border-radius:8px;overflow:hidden;">
-        <div style="width:{pct:.2f}%;background:{color};height:100%;border-radius:8px;"></div>
-      </div>
-      <div style="font-size:12px;color:#666;margin-top:6px;">Progreso: {pct:.0f}%</div>
-    </div>
-    """
 
 # -------------------------------------------------------------------
 # PANEL USUARIO ACTUAL
@@ -340,7 +315,7 @@ with colA:
     with st.expander(f"ℹ️ Fe", expanded=False):
         st.markdown(MD_FACUNDO if USUARIO_ACTUAL == "Facundo" else MD_IVAN)
 
-    # -------- CALCULAR TOTAL (NO EXCEL) --------
+    # -------- TOTAL ACTUAL --------
     try:
         per_min_str = resumen_marcas[USUARIO_ACTUAL].get("per_min", "")
         per_min_val = parse_float_or_zero(per_min_str)
@@ -365,57 +340,34 @@ with colA:
 
         total_calc = minutos_totales * per_min_val
 
-        # -------------------------
-        # OBJETIVO USUARIO ACTUAL (minutos)
-        # -------------------------
+        # objetivo usuario actual
         if USUARIO_ACTUAL == "Iván":
-            objetivo_actual = marcas_row.get("O", 0.0)   # minutos objetivo (O)
+            objetivo_actual = leer_marca_col("O")
         else:
-            objetivo_actual = marcas_row.get("P", 0.0)   # minutos objetivo (P)
+            objetivo_actual = leer_marca_col("P")
 
-        pago_por_objetivo_actual = objetivo_actual * per_min_val
+        pago_por_objetivo_actual = per_min_val * objetivo_actual
         objetivo_actual_hms = segundos_a_hms(int(objetivo_actual * 60))
 
-        # --- 1) TOTAL grande (tarjeta)
-        color_card = "#1f77b4" if USUARIO_ACTUAL == "Facundo" else "#3498db"
+        # -------- TOTAL DEL DÍA (estilo nuevo) --------
         st.markdown(
-            f"""
-            <div style="
-                background-color:{color_card};
-                padding:12px;
-                border-radius:10px;
-                color:white;
-                font-size:22px;
-                font-weight:bold;
-                margin-bottom:6px;
-            ">
-                Total del día: ${total_calc:.2f}
-            </div>
-            """,
+            f"<div style='font-size:32px; font-weight:bold; color:#333333; line-height:1; margin-bottom:4px;'>"
+            f"${total_calc:.2f}"
+            f"</div>",
             unsafe_allow_html=True
         )
 
-        # --- 2) BARRA DE PROGRESO (con color dinámico)
-        progreso = minutos_totales / objetivo_actual if objetivo_actual > 0 else 0
-        progreso = min(max(progreso, 0.0), 1.0)
-        color = color_por_progreso(progreso)
-        st.markdown(barra_progreso_html(progreso, color), unsafe_allow_html=True)
+        progreso = min(total_calc / max(1, pago_por_objetivo_actual), 1.0)
+        st.progress(progreso)
 
-        # --- 3) TEXTO INFORMATIVO
         st.markdown(
-            f"""
-            <div style="color:gray; font-size:14px; margin-top:6px;">
-                ${per_min_val:.2f} por minuto | ${pago_por_objetivo_actual:.2f} por {objetivo_actual_hms}
-            </div>
-            """,
-            unsafe_allow_html=True
+            f"**${per_min_val:.2f} por minuto | ${pago_por_objetivo_actual:.2f} por {objetivo_actual_hms}**"
         )
 
-    except Exception as e:
-        # st.error(str(e))
+    except:
         st.markdown("**— | —**")
 
-    # -------- MATERIAS --------
+    # -------- MATERIAS USUARIO ACTUAL --------
     materia_en_curso = None
     for m, info in mis_materias.items():
         if str(datos[USUARIO_ACTUAL]["estado"][m]).strip() != "":
@@ -488,6 +440,7 @@ with colB:
     with st.expander(f"ℹ️ Fe", expanded=False):
         st.markdown(MD_FACUNDO if otro == "Facundo" else MD_IVAN)
 
+    # -------- TOTAL OTRO USUARIO --------
     try:
         per_min_str_otro = resumen_marcas[otro].get("per_min", "")
         per_min_val_otro = parse_float_or_zero(per_min_str_otro)
@@ -510,55 +463,34 @@ with colB:
 
         total_otro = mins_otro * per_min_val_otro
 
-        # ------------------------------
-        # OBJETIVO OTRO usuario (minutos)
-        # ------------------------------
+        # objetivo OTRO
         if otro == "Iván":
-            objetivo_otro = marcas_row.get("O", 0.0)
+            objetivo_otro = leer_marca_col("O")
         else:
-            objetivo_otro = marcas_row.get("P", 0.0)
+            objetivo_otro = leer_marca_col("P")
 
-        pago_por_objetivo_otro = objetivo_otro * per_min_val_otro
+        pago_por_objetivo_otro = per_min_val_otro * objetivo_otro
         objetivo_otro_hms = segundos_a_hms(int(objetivo_otro * 60))
 
-        # --- 1) TOTAL grande (tarjeta)
-        color_card_otro = "#6a0dad" if otro == "Facundo" else "#8e44ad"
+        # -------- TOTAL del otro (estilo nuevo) --------
         st.markdown(
-            f"""
-            <div style="
-                background-color:{color_card_otro};
-                padding:12px;
-                border-radius:10px;
-                color:white;
-                font-size:22px;
-                font-weight:bold;
-                margin-bottom:6px;
-            ">
-                Total del día: ${total_otro:.2f}
-            </div>
-            """,
+            f"<div style='font-size:32px; font-weight:bold; color:#333333; line-height:1; margin-bottom:4px;'>"
+            f"${total_otro:.2f}"
+            f"</div>",
             unsafe_allow_html=True
         )
 
-        # --- 2) BARRA DE PROGRESO
-        progreso_otro = mins_otro / objetivo_otro if objetivo_otro > 0 else 0
-        progreso_otro = min(max(progreso_otro, 0.0), 1.0)
-        color_otro = color_por_progreso(progreso_otro)
-        st.markdown(barra_progreso_html(progreso_otro, color_otro), unsafe_allow_html=True)
+        progreso_otro = min(total_otro / max(1, pago_por_objetivo_otro), 1.0)
+        st.progress(progreso_otro)
 
-        # --- 3) TEXTO INFORMATIVO
         st.markdown(
-            f"""
-            <div style="color:gray; font-size:14px; margin-top:6px;">
-                ${per_min_val_otro:.2f} por minuto | ${pago_por_objetivo_otro:.2f} por {objetivo_otro_hms}
-            </div>
-            """,
-            unsafe_allow_html=True
+            f"**${per_min_val_otro:.2f} por minuto | ${pago_por_objetivo_otro:.2f} por {objetivo_otro_hms}**"
         )
-    except Exception as e:
-        # st.error(str(e))
+
+    except:
         st.markdown("**— | —**")
 
+    # -------- MATERIAS OTRO --------
     for materia, info in USERS[otro].items():
         est_raw = datos[otro]["estado"][materia]
         tiempo = datos[otro]["tiempos"][materia]
