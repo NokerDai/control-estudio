@@ -170,7 +170,7 @@ def parse_float_or_zero(s):
 # LECTURAS OPTIMIZADAS (1 request para la fila de 'marcas', cached)
 # -------------------------------------------------------------------
 @st.cache_data(ttl=15)
-def cargar_marcas_row():
+def leer_marcas_row_cached():
     """
     Carga de una sola vez las columnas O y P en la fila TIME_ROW.
     Devuelve un dict: {"O": float, "P": float}
@@ -500,6 +500,7 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
 
