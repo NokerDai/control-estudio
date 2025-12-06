@@ -471,7 +471,7 @@ with colB:
             pago_por_objetivo_otro = per_min_val_otro * objetivo_otro
 
         st.markdown(
-            f"**\\${total_otro:.2f}  |  \\${per_min_val_otro:.2f} por minuto  |  \\${pago_por_objetivo_otro:.2f} por {objetivo_otro/60:.0f}**"
+            f"**\\${total_otro:.2f} | \\${per_min_val_otro:.2f} por minuto | \\${pago_por_objetivo_otro:.2f} por {objetivo_otro/60} horas**"
         )
     except Exception as e:
         # Para debugging: st.error(str(e))
@@ -500,5 +500,6 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
