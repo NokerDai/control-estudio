@@ -357,7 +357,7 @@ with colA:
         st.markdown(
             f"<b><span style='color: #00c853;'>\\${total_calc:.2f}</span> total | "
             f"\\${per_min_val:.2f} por minuto | "
-            f"\\${pago_por_objetivo_actual:.2f} por {objetivo/60:.f} horas</b>",
+            f"\\${pago_por_objetivo_actual:.2f} por {objetivo/60:.2f} horas</b>",
             unsafe_allow_html=True
         )
     except Exception as e:
@@ -501,6 +501,7 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
 
