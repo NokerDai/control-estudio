@@ -169,40 +169,41 @@ def parse_float_or_zero(s):
 # -------------------------------------------------------------------
 # LECTURAS OPTIMIZADAS (1 request para la fila de 'marcas', cached)
 # -------------------------------------------------------------------
-@st.cache_data(ttl=15)
-def leer_marcas_row_cached():
+@st.cache_data(ttl=10)
+def leer_marcas_row_cached(row):
     """
-    Lee solo las columnas O y P de la fila TIME_ROW en la hoja 'marcas'.
-    Devuelve: {"O": float, "P": float}
+    Lee B{row}:P{row} de la hoja 'marcas' y devuelve un dict con claves 'B'..'P' -> float.
+    TTL corto para que la app sea reactiva pero reduzca llamadas.
     """
-    sheet_id = st.secrets["sheet_id"]
-    rango = f"'{SHEET_MARCAS}'!O{TIME_ROW}:P{TIME_ROW}"
-
+    cols = [chr(c) for c in range(ord('B'), ord('P') + 1)]  # B..P
+    rango = f"'{SHEET_MARCAS}'!B{row}:P{row}"
     try:
         res = sheet.values().get(
-            spreadsheetId=sheet_id,
+            spreadsheetId=st.secrets["sheet_id"],
             range=rango,
             valueRenderOption="FORMATTED_VALUE"
         ).execute()
-        raw_vals = res.get("values", [[]])[0]
+        values = res.get("values", [[]])
+        row_vals = values[0] if values and values[0] else []
     except:
-        raw_vals = ["", ""]
+        row_vals = []
 
-    O_val = parse_float_or_zero(raw_vals[0]) if len(raw_vals) > 0 else 0.0
-    P_val = parse_float_or_zero(raw_vals[1]) if len(raw_vals) > 1 else 0.0
-
-    return {"O": O_val, "P": P_val}
+    # Map columns to floats (si falta un valor, -> 0.0)
+    mapped = {}
+    for i, col in enumerate(cols):
+        v = row_vals[i] if i < len(row_vals) else ""
+        mapped[col] = parse_float_or_zero(v)
+    return mapped
 
 def cargar_resumen_marcas():
     """
-    Usa la fila cached de marcas para devolver per_min de Iván (O) y Facundo (P)
-    en el mismo formato que esperabas antes.
+    Usa la fila cached de marcas para devolver per_min de Facundo (C) e Iván (B).
+    Devuelve strings iguales a lo que usabas antes ("" si vacío).
     """
-    marcas = leer_marcas_row_cached()
-
-    per_min_ivan = "" if marcas.get("O", 0) == 0 else str(marcas["O"])
-    per_min_fac  = "" if marcas.get("P", 0) == 0 else str(marcas["P"])
-
+    marcas = leer_marcas_row_cached(TIME_ROW)
+    # Obtener como string original si quieres, pero aquí devolvemos como string formateado simple
+    per_min_fac = "" if marcas.get("C", 0) == 0 else str(marcas.get("C", 0))
+    per_min_ivan = "" if marcas.get("B", 0) == 0 else str(marcas.get("B", 0))
     return {
         "Facundo": {"per_min": per_min_fac},
         "Iván": {"per_min": per_min_ivan}
@@ -302,7 +303,7 @@ if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
 # -------------------------------------------------------------------
 datos = cargar_todo()
 resumen_marcas = cargar_resumen_marcas()
-marcas_row = leer_marcas_row_cached()  # diccionario {"O":..., "P":...} cached
+marcas_row = leer_marcas_row_cached(TIME_ROW)  # diccionario B..P -> float cached
 
 if st.button("🔄 Actualizar tiempos"):
     st.rerun()
@@ -320,14 +321,12 @@ with colA:
         st.markdown(MD_FACUNDO if USUARIO_ACTUAL == "Facundo" else MD_IVAN)
 
     # -------- CALCULAR TOTAL (NO EXCEL) --------
-    # aseguramos mis_materias siempre definido
-    mis_materias = USERS[USUARIO_ACTUAL]
-
     try:
         per_min_str = resumen_marcas[USUARIO_ACTUAL].get("per_min", "")
         per_min_val = parse_float_or_zero(per_min_str)
 
         minutos_totales = 0.0
+        mis_materias = USERS[USUARIO_ACTUAL]
 
         for materia, info in mis_materias.items():
             base_hms = datos[USUARIO_ACTUAL]["tiempos"][materia]
@@ -347,20 +346,20 @@ with colA:
         total_calc = minutos_totales * per_min_val
 
         # --- calcular pago por objetivo del usuario actual usando el dict cached marcas_row
-        # Ahora usamos SOLO O (Iván) y P (Facundo)
+        # Iván -> marcas B * marcas O
+        # Facundo -> marcas C * marcas P
         if USUARIO_ACTUAL == "Iván":
-            objetivo = marcas_row.get("O", 0.0)
+            marca_B = marcas_row.get("B", 0.0)
+            marca_O = marcas_row.get("O", 0.0)
+            pago_por_objetivo_actual = marca_B * marca_O
         else:  # Facundo
-            objetivo = marcas_row.get("P", 0.0)
-
-        pago_por_objetivo_actual = per_min_val * objetivo
+            marca_C = marcas_row.get("C", 0.0)
+            marca_P = marcas_row.get("P", 0.0)
+            pago_por_objetivo_actual = marca_C * marca_P
 
         # mostrar línea con $ escapados para que Markdown no interprete LaTeX
         st.markdown(
-            f"<b><span style='color: #00c853;'>\\${total_calc:.2f}</span> | "
-            f"\\${per_min_val:.2f} por minuto | "
-            f"\\${pago_por_objetivo_actual:.2f} por {objetivo/60:.2f} horas</b>",
-            unsafe_allow_html=True
+            f"**\\${total_calc:.2f} total | \\${per_min_val:.2f} por minuto | \\${pago_por_objetivo_actual:.2f}**"
         )
     except Exception as e:
         # Para debugging podés descomentar: st.error(str(e))
@@ -464,16 +463,16 @@ with colB:
 
         # --- calcular pago por objetivo del 'otro' usando marcas_row (cached)
         if otro == "Iván":
-            objetivo_otro = marcas_row.get("O", 0.0)
+            marca_B_otro = marcas_row.get("B", 0.0)
+            marca_O_otro = marcas_row.get("O", 0.0)
+            pago_por_objetivo_otro = marca_B_otro * marca_O_otro
         else:  # Facundo
-            objetivo_otro = marcas_row.get("P", 0.0)
-        pago_por_objetivo_otro = per_min_val_otro * objetivo_otro
+            marca_C_otro = marcas_row.get("C", 0.0)
+            marca_P_otro = marcas_row.get("P", 0.0)
+            pago_por_objetivo_otro = marca_C_otro * marca_P_otro
 
         st.markdown(
-            f"<b><span style='color: #00c853;'>\\${total_otro:.2f}</span> | "
-            f"\\${per_min_val_otro:.2f} por minuto | "
-            f"\\${pago_por_objetivo_otro:.2f} por {objetivo_otro/60:.2f} horas</b>",
-            unsafe_allow_html=True
+            f"**\\${total_otro:.2f} total | \\${per_min_val_otro:.2f} por minuto | \\${pago_por_objetivo_otro:.2f}**"
         )
     except Exception as e:
         # Para debugging: st.error(str(e))
