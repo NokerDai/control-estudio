@@ -14,48 +14,46 @@ st.set_page_config(
     layout="wide"
 )
 
-# -------------------------------------------------------------------
-# ESTILOS RESPONSIVOS PARA CELULAR
-# -------------------------------------------------------------------
 st.markdown("""
 <style>
 
-    /* ------- BOTONES LADO A LADO EN MÓVIL ------- */
-    @media (max-width: 600px) {
+.botonera-horizontal {
+    width: 100%;
+}
 
-        /* Contenedores de columnas usados para los botones */
-        .row-widget.stButton > button {
-            width: 100% !important;
-        }
+/* Fuerza a que el contenido de la botonera sea horizontal */
+.botonera-horizontal > div {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+}
 
-        /* Fuerza a que las columnas se comporten como flex fila */
-        .stButton, .element-container {
-            display: flex !important;
-            flex-direction: row !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-        }
+/* Botones tamaño normal en PC */
+.botonera-horizontal button {
+    width: 100%;
+    margin: 2px;
+}
 
-        /* Evita que un botón ocupe toda la fila */
-        .stButton button {
-            flex: 1 1 auto !important;
-            margin-right: 8px !important;
-            margin-left: 0 !important;
-        }
+/* Ajustes específicos para MÓVIL */
+@media (max-width: 600px) {
 
-        /* Último botón sin margen adicional */
-        .stButton button:last-child {
-            margin-right: 0 !important;
-        }
-
-        /* Hace los botones más grandes y tocables */
-        .stButton button {
-            padding: 14px !important;
-            font-size: 22px !important;
-            border-radius: 10px !important;
-        }
+    .botonera-horizontal > div {
+        flex-direction: row !important;
+        justify-content: center !important;
+        width: 100% !important;
+        gap: 10px !important;
     }
 
+    .botonera-horizontal button {
+        font-size: 24px !important;
+        padding: 16px !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: 0 !important;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -625,5 +623,6 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
