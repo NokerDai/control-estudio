@@ -15,103 +15,102 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------------
-# DETECTOR DE MÓVIL
+# CSS RESPONSIVO (REDISEÑO MÓVIL)
 # -------------------------------------------------------------------
-import streamlit.components.v1 as components
-
-components.html("""
-<script>
-const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-window.parent.postMessage({type: 'mobileFlag', isMobile: isMobile }, "*");
-</script>
-""", height=0, width=0)
-
-# Esperamos mensaje
-if "is_mobile" not in st.session_state:
-    st.session_state["is_mobile"] = False
-
-def check_mobile():
-    import streamlit as st
-    msg = st.experimental_get_query_params()
-    return st.session_state["is_mobile"]
-
-# Listener
-def _recv():
-    import streamlit as st
-    from streamlit.runtime.scriptrunner import get_script_run_ctx
-    ctx = get_script_run_ctx()
-    if ctx:
-        pass
-
-st.markdown("""
-<script>
-window.addEventListener("message", (event) => {
-    if (event.data.type === "mobileFlag") {
-        const mob = event.data.isMobile;
-        window.parent.postMessage({ type: "streamlit:setComponentValue", value: mob }, "*");
-    }
-});
-</script>
-""", unsafe_allow_html=True)
-
-# CSS PARA TARJETAS Y BOTONES EN MÓVIL
 st.markdown("""
 <style>
 
-@media (max-width: 600px) {
+    /* ============================================================
+       DISEÑO SOLO EN MOBILE
+       ============================================================ */
+    @media (max-width: 650px) {
 
-    /* Tamaños globales */
-    html, body, div, span, p {
-        font-size: 19px !important;
+        /* --------- TIPOGRAFÍA --------- */
+        html, body, [class*="css"], .stMarkdown, .stText {
+            font-size: 18px !important;
+            line-height: 1.35 !important;
+        }
+
+        h1, h2, h3, .stSubheader {
+            font-size: 26px !important;
+        }
+
+        /* --------- BOTONES PRINCIPALES --------- */
+        .stButton button {
+            width: 100% !important;
+            padding: 16px 0 !important;
+            font-size: 20px !important;
+            font-weight: 600 !important;
+            border-radius: 12px !important;
+            margin-top: 8px;
+            margin-bottom: 8px;
+        }
+
+        /* --------- BOTONES PEQUEÑOS (▶ ✏️ ⛔) --------- */
+        button[kind="secondary"], button[kind="primary"] {
+            padding: 14px 0 !important;
+            font-size: 24px !important;
+            border-radius: 12px !important;
+        }
+
+        /* --------- PROGRESO --------- */
+        .progress-bar-mobile {
+            height: 14px !important;
+            border-radius: 10px !important;
+            margin: 10px 0 16px 0 !important;
+        }
+
+        /* --------- TARJETAS DE MATERIAS --------- */
+        .materia-card {
+            background: #111111 !important;
+            padding: 16px !important;
+            border-radius: 14px !important;
+            margin-bottom: 18px !important;
+            border: 1px solid #222 !important;
+            box-shadow: 0px 2px 6px rgba(0,0,0,0.3) !important;
+        }
+
+        .materia-card-title {
+            font-size: 20px !important;
+            font-weight: bold !important;
+            margin-bottom: 6px !important;
+        }
+
+        /* --------- TIEMPO --------- */
+        .materia-time {
+            font-size: 18px !important;
+            margin-bottom: 10px !important;
+        }
+
+        /* --------- CONTENEDOR DE BOTONES DENTRO DE TARJETA --------- */
+        .materia-buttons {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            gap: 12px !important;
+            width: 100% !important;
+        }
+
+        /* --------- COLUMNS → STACK --------- */
+        .css-1kyxreq, .css-1u6l5a7, .css-1w6p1af, .css-1r6slb0 {
+            flex-direction: column !important;
+        }
+
+        /* --------- PADDING GLOBAL --------- */
+        .block-container {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-top: 0.5rem !important;
+        }
+
+        /* --------- EXPANDER --------- */
+        .streamlit-expanderHeader {
+            font-size: 20px !important;
+            padding: 14px !important;
+        }
+
     }
 
-    /* Contenedor principal */
-    .block-container {
-        padding-top: 0.5rem !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-    }
-
-    /* Tarjeta de materia */
-    .mobile-card {
-        background: #141414;
-        padding: 16px;
-        border-radius: 14px;
-        margin-bottom: 18px;
-        box-shadow: 0 0 10px #0005;
-    }
-
-    .mobile-title {
-        font-size: 20px;
-        font-weight: bold;
-        margin-bottom: 6px;
-    }
-
-    .mobile-time {
-        color: #ddd;
-        font-size: 17px;
-        margin-bottom: 12px;
-    }
-
-    /* Botones táctiles */
-    .mobile-btn {
-        display: inline-block;
-        padding: 10px 18px;
-        background: #262730;
-        border-radius: 10px;
-        font-size: 22px !important;
-        margin-right: 10px;
-        text-align: center;
-    }
-
-    /* Segunda columna va abajo */
-    .mobile-section-separator {
-        margin-top: 35px;
-        margin-bottom: 10px;
-        border-top: 1px solid #333;
-    }
-
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -405,132 +404,7 @@ if st.button("🔄 Actualizar tiempos"):
     st.rerun()
 
 otro = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
-is_mobile = check_mobile()
-
-if is_mobile:
-    # ---------------------------------------------------------------
-    # 🟦 DISEÑO DE MÓVIL — TODO VERTICAL Y TIPO APP
-    # ---------------------------------------------------------------
-    st.subheader(f"👤 {USUARIO_ACTUAL}")
-
-    with st.expander("ℹ️ No pensar, actuar.", expanded=False):
-        st.markdown(MD_FACUNDO if USUARIO_ACTUAL == "Facundo" else MD_IVAN)
-
-    st.markdown("## Total del día")
-
-    # --- Total principal ---
-    st.markdown(
-        f"<div style='font-size:40px; font-weight:bold; color:#fff;'>${total_calc:.2f}</div>",
-        unsafe_allow_html=True
-    )
-
-    # Barra progreso
-    st.progress(progreso)
-
-    st.markdown("---")
-
-    # ========= MATERIAS DE USUARIO ACTUAL =========
-    st.markdown("### Mis materias")
-
-    mis_materias = USERS[USUARIO_ACTUAL]
-
-    for materia, info in mis_materias.items():
-
-        est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
-        tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
-
-        # Calcular tiempo total
-        tiempo_anadido = 0
-        if str(est_raw).strip() != "":
-            inicio = parse_datetime(est_raw)
-            tiempo_anadido = int((datetime.now(TZ) - inicio).total_seconds())
-
-        total_seg = hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido)
-        total_hms = segundos_a_hms(total_seg)
-
-        # Tarjeta
-        st.markdown(f"""
-        <div class="mobile-card">
-            <div class="mobile-title">{materia}</div>
-            <div class="mobile-time">🕒 {total_hms}</div>
-            <div>
-        """, unsafe_allow_html=True)
-
-        col1, col2 = st.columns([1,1])
-
-        # Botón iniciar/detener
-        with col1:
-            if str(est_raw).strip() != "":
-                if st.button("⛔ Detener", key=f"mob_stop_{materia}"):
-                    diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
-                    acumular_tiempo(USUARIO_ACTUAL, materia, diff_seg/60)
-                    batch_write([
-                        (info["time"], hms_a_fraction(segundos_a_hms(diff_seg + hms_a_segundos(tiempo_acum)))),
-                        (info["est"], "")
-                    ])
-                    st.rerun()
-            else:
-                if st.button("▶ Iniciar", key=f"mob_start_{materia}"):
-                    limpiar_estudiando(mis_materias)
-                    batch_write([(info["est"], ahora_str())])
-                    st.rerun()
-
-        # Botón editar
-        with col2:
-            if st.button("✏️ Editar", key=f"mob_edit_{materia}"):
-                st.session_state[f"show_manual_{materia}"] = True
-
-        st.markdown("</div></div>", unsafe_allow_html=True)
-
-        if st.session_state.get(f"show_manual_{materia}", False):
-            nuevo = st.text_input("Nuevo tiempo (HH:MM:SS)", key=f"inmob_{materia}")
-            if st.button("Guardar", key=f"savemob_{materia}"):
-                batch_write([(info["time"], hms_a_fraction(nuevo))])
-                st.session_state[f"show_manual_{materia}"] = False
-                st.rerun()
-
-    # =======================================================
-    # OTRO USUARIO — APARECE AL FINAL EN MÓVIL
-    # =======================================================
-    st.markdown("<div class='mobile-section-separator'></div>", unsafe_allow_html=True)
-
-    st.subheader(f"👤 {otro}")
-
-    with st.expander("ℹ️ No pensar, actuar.", expanded=False):
-        st.markdown(MD_FACUNDO if otro == "Facundo" else MD_IVAN)
-
-    st.markdown(f"### Total de {otro}")
-    st.markdown(
-        f"<div style='font-size:32px; font-weight:bold;'>${total_otro:.2f}</div>",
-        unsafe_allow_html=True
-    )
-    st.progress(progreso_otro)
-
-    st.markdown("### Materias de la otra persona:")
-
-    for materia, info in USERS[otro].items():
-        est_raw = datos[otro]["estado"][materia]
-        tiempo = datos[otro]["tiempos"][materia]
-
-        tiempo_anad = 0
-        if str(est_raw).strip() != "":
-            tiempo_anad = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
-
-        total_seg = hms_a_segundos(tiempo) + tiempo_anad
-        total_hms = segundos_a_hms(total_seg)
-
-        st.markdown(f"""
-        <div class="mobile-card">
-            <div class="mobile-title">{materia}</div>
-            <div class="mobile-time">🕒 {total_hms}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-else:
-    # ---------------------------------------------------------------
-    # 🟩 DISEÑO DE PC - SIGUE TU CÓDIGO ORIGINAL
-    # ---------------------------------------------------------------
-    colA, colB = st.columns(2)
+colA, colB = st.columns(2)
 
 # -------------------------------------------------------------------
 # PANEL USUARIO ACTUAL
@@ -584,8 +458,6 @@ with colA:
         )
 
         progreso = min(total_calc / max(1, pago_por_objetivo_actual), 1.0)
-        # ---- BARRA DE PROGRESO CON COLORES DINÁMICOS ----
-        # progreso = total_calc / pago_por_objetivo_actual
         progreso_porcentaje = progreso * 100
         
         # Color según regla
@@ -598,7 +470,7 @@ with colA:
         
         st.markdown(
             f"""
-            <div style="width:100%; background-color:#262730; border-radius:8px; height:8px; margin:4px 0 10px 0;">
+            <div class="progress-bar-mobile" style="width:100%; background-color:#262730; border-radius:8px; height:8px; margin:4px 0 10px 0;">
                 <div style="
                     width:{progreso_porcentaje}%;
                     background-color:{color};
@@ -650,13 +522,16 @@ with colA:
         tiempo_total_seg = hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido_seg)
         tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
 
+        # Tarjeta (html wrapper) para mejor visual en móvil
+        st.markdown('<div class="materia-card">', unsafe_allow_html=True)
+
         col_name, col_time, col_actions = st.columns([0.6, 0.2, 0.2], gap="small")
 
         with col_name:
-            st.markdown(f"**{materia}**")
+            st.markdown(f'<div class="materia-card-title">{materia}</div>', unsafe_allow_html=True)
 
         with col_time:
-            st.markdown(f"🕒 {tiempo_total_hms}")
+            st.markdown(f'<div class="materia-time">🕒 {tiempo_total_hms}</div>', unsafe_allow_html=True)
 
         with col_actions:
             btn_start, btn_edit = st.columns([1,1], gap="small")
@@ -691,6 +566,8 @@ with colA:
                     st.rerun()
                 except:
                     st.error("Formato inválido (usar HH:MM:SS)")
+
+        st.markdown('</div>', unsafe_allow_html=True)  # cerrar tarjeta
 
 # -------------------------------------------------------------------
 # PANEL OTRO USUARIO
@@ -753,7 +630,7 @@ with colB:
         
         st.markdown(
             f"""
-            <div style="width:100%; background-color:#262730; border-radius:8px; height:8px; margin:4px 0 10px 0;">
+            <div class="progress-bar-mobile" style="width:100%; background-color:#262730; border-radius:8px; height:8px; margin:4px 0 10px 0;">
                 <div style="
                     width:{progreso_porcentaje_otro}%;
                     background-color:{color_otro};
@@ -797,13 +674,13 @@ with colB:
 
         total_seg = hms_a_segundos(tiempo) + max(0, tiempo_anad)
 
-        box = st.container()
-        with box:
-            st.markdown(f"**{materia}**")
-            st.write(f"🕒 Total: **{segundos_a_hms(total_seg)}**")
-            if str(est_raw).strip() != "":
-                st.caption(f"Base: {tiempo} | En proceso: +{segundos_a_hms(tiempo_anad)}")
-                st.markdown("🟢 Estudiando")
-            else:
-                st.markdown("⚪")
-
+        # Tarjeta para otro usuario (solo visual)
+        st.markdown('<div class="materia-card">', unsafe_allow_html=True)
+        st.markdown(f"**{materia}**")
+        st.write(f"🕒 Total: **{segundos_a_hms(total_seg)}**")
+        if str(est_raw).strip() != "":
+            st.caption(f"Base: {tiempo} | En proceso: +{segundos_a_hms(tiempo_anad)}")
+            st.markdown("🟢 Estudiando")
+        else:
+            st.markdown("⚪")
+        st.markdown('</div>', unsafe_allow_html=True)
