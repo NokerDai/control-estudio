@@ -3,6 +3,7 @@ import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import datetime, date
+from streamlit_autorefresh import st_autorefresh
 
 st_autorefresh(interval=10000, key="auto_refresh")
 
@@ -431,3 +432,4 @@ for materia, info in mis_materias.items():
                 st.error("Formato inválido")
     
     st.write("")
+
