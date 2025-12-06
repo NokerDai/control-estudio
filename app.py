@@ -4,6 +4,8 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import datetime, date
 
+st_autorefresh(interval=10000, key="auto_refresh")
+
 # Intentar importar manejo de zonas horarias de forma robusta
 try:
     from zoneinfo import ZoneInfo
@@ -429,9 +431,3 @@ for materia, info in mis_materias.items():
                 st.error("Formato inválido")
     
     st.write("")
-
-st.divider()
-if st.button("🔄 Actualizar Datos", use_container_width=True):
-    st.rerun()
-
-
