@@ -282,7 +282,7 @@ st.title("⏳ Control Estudio")
 datos = cargar_todo()
 resumen_marcas = cargar_resumen_marcas()
 
-# --- MÉTRICAS ---
+# --- FUNCION MÉTRICAS ---
 def calcular_metricas(usuario):
     per_min = parse_float_or_zero(resumen_marcas[usuario].get("per_min", ""))
     total_min = 0.0
@@ -306,13 +306,12 @@ def calcular_metricas(usuario):
     
     return total_min * per_min, per_min, objetivo
 
-# Barra de progreso grande
+# --- RENDER MÉTRICAS PROPIAS ---
 m_tot, m_rate, m_obj = calcular_metricas(USUARIO_ACTUAL)
 pago_objetivo = m_rate * m_obj
 progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
 color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
 
-# Calcular HMS del objetivo para mostrar
 objetivo_hms = segundos_a_hms(int(m_obj * 60))
 
 st.markdown(f"""
@@ -323,10 +322,34 @@ st.markdown(f"""
             <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
         </div>
         <div style="text-align: right; color: #888;">
-            Meta: ${pago_objetivo:.2f} ({objetivo_hms} hs a ${m_rate:.2f}/min)
+            Meta: ${pago_objetivo:.2f} ({objetivo_hms} hs)
         </div>
     </div>
 """, unsafe_allow_html=True)
+
+# --- RENDER MÉTRICAS OTRO USUARIO (EXPANDER) ---
+with st.expander(f"👀 Ver progreso de {OTRO_USUARIO}"):
+    o_tot, o_rate, o_obj = calcular_metricas(OTRO_USUARIO)
+    o_pago_obj = o_rate * o_obj
+    o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
+    o_color_bar = "#00e676" if o_progreso_pct >= 90 else "#ffeb3b" if o_progreso_pct >= 50 else "#ff1744"
+    o_obj_hms = segundos_a_hms(int(o_obj * 60))
+    
+    st.markdown(f"""
+    <div style="margin-bottom: 10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size: 1.1rem; color: #ddd;">Ganancia: <b>${o_tot:.2f}</b></span>
+            <span style="font-size: 0.9rem; color: #888;">Meta: ${o_pago_obj:.2f}</span>
+        </div>
+        <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
+            <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
+        </div>
+        <div style="text-align:right; font-size:0.8rem; color:#aaa; margin-top:5px;">
+             Objetivo tiempo: {o_obj_hms} hs
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 
 # -------------------------------------------------------------------
 # LISTA DE MATERIAS (Diseño de Tarjetas Grandes)
@@ -356,18 +379,17 @@ for materia, info in mis_materias.items():
     tiempo_total_hms = segundos_a_hms(hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido_seg))
     
     # --- RENDERIZADO DE TARJETA ---
-    # Usamos HTML puro para el contenido estático para controlar totalmente el tamaño
+    # Corrección de indentación aplicada aquí:
     html_card = f"""
-    <div class="materia-card">
-        <div class="materia-title">{materia}</div>
-        {'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''}
-        <div class="materia-time">{tiempo_total_hms}</div>
-    </div>
-    """
+<div class="materia-card">
+    <div class="materia-title">{materia}</div>
+    {'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''}
+    <div class="materia-time">{tiempo_total_hms}</div>
+</div>
+"""
     st.markdown(html_card, unsafe_allow_html=True)
 
-    # Botones debajo de la tarjeta (fuera del HTML para mantener funcionalidad de Streamlit)
-    # Usamos columnas pero con ratios que funcionen en móvil (botones anchos)
+    # Botones debajo de la tarjeta
     c_actions = st.container()
     
     with c_actions:
@@ -392,7 +414,7 @@ for materia, info in mis_materias.items():
                 # Deshabilitado si otra corre
                 st.button("...", disabled=True, key=f"dis_{materia}", use_container_width=True)
 
-    # Botón Editar pequeño y discreto abajo a la derecha de la tarjeta
+    # Botón Editar pequeño
     with st.expander("🛠️ Corregir tiempo manualmente"):
         new_val = st.text_input("Tiempo (HH:MM:SS)", value=tiempo_acum, key=f"input_{materia}")
         if st.button("Guardar Corrección", key=f"save_{materia}"):
@@ -414,4 +436,3 @@ if st.button("🔄 Actualizar Datos", use_container_width=True):
 with st.expander("ℹ️ Manifiesto"):
     md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
     st.markdown(md_content)
-
