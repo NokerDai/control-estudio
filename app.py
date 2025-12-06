@@ -516,7 +516,29 @@ with colB:
         )
 
         progreso_otro = min(total_otro / max(1, pago_por_objetivo_otro), 1.0)
-        st.progress(progreso_otro)
+        progreso_porcentaje_otro = progreso_otro * 100
+
+        if progreso_porcentaje_otro < 50:
+            color_otro = "#d9534f"
+        elif progreso_porcentaje_otro < 90:
+            color_otro = "#f0ad4e"
+        else:
+            color_otro = "#5cb85c"
+        
+        st.markdown(
+            f"""
+            <div style="width:100%; background-color:#262730; border-radius:8px; height:8px; margin:4px 0 10px 0;">
+                <div style="
+                    width:{progreso_porcentaje_otro}%;
+                    background-color:{color_otro};
+                    height:100%;
+                    border-radius:8px;
+                    transition: width 0.4s ease;
+                "></div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
         st.markdown(
             f"""
@@ -558,6 +580,7 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
 
