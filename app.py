@@ -1,4 +1,4 @@
-import json
+import json 
 from google.oauth2 import service_account
 import streamlit as st
 from googleapiclient.discovery import build
@@ -9,94 +9,9 @@ from zoneinfo import ZoneInfo
 # CONFIGURACIÓN STREAMLIT
 # -------------------------------------------------------------------
 st.set_page_config(
-    page_title="Control de Estudio - Dark",
+    page_title="Control de Estudio",
     page_icon="⏳",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-# -------------------------------------------------------------------
-# FORZAR MODO OSCURO (CSS)
-# -------------------------------------------------------------------
-st.markdown(
-    """
-    <style>
-    /* Forzar fondo oscuro y texto claro */
-    html, body, .main, .stApp {
-        background: #0b0d10 !important;
-        color: #e6eef8 !important;
-    }
-
-    /* Tarjetas */
-    .card {
-        background: #0f1720;
-        border: 1px solid rgba(255,255,255,0.03);
-        padding: 18px;
-        border-radius: 12px;
-        margin-bottom: 18px;
-        box-shadow: 0 4px 18px rgba(2,6,23,0.6);
-    }
-
-    /* Titulos y textos */
-    .big-number { font-size: 36px; font-weight: 700; color: #f1f5f9; }
-    .muted { color: #9aa4b2; }
-
-    /* Responsive: apilar columnas en pantallas pequeñas */
-    @media (max-width: 900px) {
-        .desktop-cols { display:block !important; }
-    }
-
-    /* Botones: mejorar contraste */
-
-/* Botones solo en filas de materias */
-.buttons-row {
-    display: flex !important;
-    flex-direction: row !important;
-    gap: 0.5rem !important;
-}
-
-@media (max-width: 600px) {
-    .buttons-row {
-        flex-direction: row !important;
-    }
-}
-
-/* --- FIX: mantener botones lado a lado incluso en móvil --- */
-.stColumns {
-    display: flex !important;
-    flex-direction: row !important;
-    gap: 0.5rem !important;
-}
-
-@media (max-width: 600px) {
-    .stColumns {
-        flex-direction: row !important;
-    }
-}
-
-/* Botón interno */
-    button.stButton>button {
-        background-color: #1f2937;
-        color: #e6eef8;
-        border-radius: 8px;
-        padding: 6px 12px;
-        border: 1px solid rgba(255,255,255,0.04);
-    }
-
-    /* Inputs */
-    .stTextInput>div>div>input {
-        background: #0b1220;
-        color: #e6eef8;
-        border: 1px solid rgba(255,255,255,0.04);
-        border-radius: 6px;
-    }
-
-    /* Progress bar container custom (for our HTML bars) */
-    .prog-track { background: #111827; height: 10px; border-radius: 8px; }
-    .prog-fill { height: 100%; border-radius: 8px; transition: width 0.35s ease; }
-    </style>
-    """,
-    unsafe_allow_html=True,
+    layout="wide"
 )
 
 # -------------------------------------------------------------------
@@ -128,7 +43,6 @@ TZ = ZoneInfo("America/Argentina/Cordoba")
 
 def ahora_str():
     return datetime.now(TZ).isoformat(sep=" ", timespec="seconds")
-
 
 def parse_datetime(s):
     if not s or str(s).strip() == "":
@@ -218,13 +132,11 @@ USERS = {
 # -------------------------------------------------------------------
 # FUNCIONES TIEMPO
 # -------------------------------------------------------------------
-
 def hms_a_segundos(hms):
     if not hms or str(hms).strip() == "":
         return 0
     h, m, s = map(int, hms.split(":"))
     return h*3600 + m*60 + s
-
 
 def segundos_a_hms(seg):
     h = seg // 3600
@@ -232,10 +144,8 @@ def segundos_a_hms(seg):
     s = seg % 60
     return f"{h:02d}:{m:02d}:{s:02d}"
 
-
 def hms_a_fraction(hms):
     return hms_a_segundos(hms) / 86400
-
 
 def hms_a_minutos(hms):
     return hms_a_segundos(hms) / 60
@@ -243,10 +153,8 @@ def hms_a_minutos(hms):
 # -------------------------------------------------------------------
 # UTILS
 # -------------------------------------------------------------------
-
 def enable_manual_input(materia_key):
     st.session_state[f"show_manual_{materia_key}"] = True
-
 
 def parse_float_or_zero(s):
     if s is None:
@@ -256,7 +164,6 @@ def parse_float_or_zero(s):
         return float(s)
     except:
         return 0.0
-
 
 def leer_marca_col(col):
     try:
@@ -272,7 +179,6 @@ def leer_marca_col(col):
 # -------------------------------------------------------------------
 # CARGA
 # -------------------------------------------------------------------
-
 def cargar_todo():
     sheet_id = st.secrets["sheet_id"]
     ranges = []
@@ -301,7 +207,6 @@ def cargar_todo():
             data[user]["estado"][materia] = est_val
             data[user]["tiempos"][materia] = time_val
     return data
-
 
 def cargar_resumen_marcas():
     sheet_id = st.secrets["sheet_id"]
@@ -335,7 +240,6 @@ def cargar_resumen_marcas():
 # -------------------------------------------------------------------
 # ESCRITURA
 # -------------------------------------------------------------------
-
 def batch_write(updates):
     sheet_id = st.secrets["sheet_id"]
     body = {
@@ -347,11 +251,9 @@ def batch_write(updates):
         body=body
     ).execute()
 
-
 def limpiar_estudiando(materias):
     updates = [(datos["est"], "") for materia, datos in materias.items()]
     batch_write(updates)
-
 
 def acumular_tiempo(usuario, materia, minutos_sumar):
     info = USERS[usuario][materia]
@@ -393,59 +295,8 @@ if st.sidebar.button("Cerrar sesión / Cambiar usuario"):
     st.rerun()
 
 # -------------------------------------------------------------------
-# FUNCIONES DE UI (acciones)
+# INTERFAZ PRINCIPAL
 # -------------------------------------------------------------------
-
-def iniciar_estudio(usuario, materia, info):
-    # limpia marcas de todos y pone la marca actual
-    limpiar_estudiando(USERS[usuario])
-    batch_write([(info["est"], ahora_str())])
-    st.rerun()
-
-
-def detener_estudio(usuario, materia, info, est_raw, tiempo_acum):
-    try:
-        diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
-    except:
-        diff_seg = 0
-    acumular_tiempo(usuario, materia, diff_seg / 60)
-    # escribir nuevo tiempo como fracción de día
-    nuevo_total_seg = diff_seg + hms_a_segundos(tiempo_acum)
-    batch_write([
-        (info["time"], hms_a_fraction(segundos_a_hms(nuevo_total_seg))),
-        (info["est"], "")
-    ])
-    st.rerun()
-
-
-def editar_manual(nuevo, info, materia):
-    try:
-        # nuevo en HH:MM:SS -> escribimos fracción
-        frac = hms_a_fraction(nuevo)
-        batch_write([(info["time"], frac)])
-        # ocultar input
-        st.session_state[f"show_manual_{materia}"] = False
-        st.rerun()
-    except Exception:
-        st.error("Formato inválido (usar HH:MM:SS)")
-
-
-def calcular_total_con_progreso(datos_local, usuario, materia):
-    tiempo = datos_local[usuario]["tiempos"][materia]
-    est_raw = datos_local[usuario]["estado"][materia]
-    tiempo_anad = 0
-    if str(est_raw).strip() != "":
-        try:
-            tiempo_anad = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
-        except:
-            tiempo_anad = 0
-    total_seg = hms_a_segundos(tiempo) + max(0, tiempo_anad)
-    return total_seg
-
-# -------------------------------------------------------------------
-# INTERFAZ PRINCIPAL (diseño dark y responsivo)
-# -------------------------------------------------------------------
-
 datos = cargar_todo()
 resumen_marcas = cargar_resumen_marcas()
 
@@ -453,162 +304,279 @@ if st.button("🔄 Actualizar tiempos"):
     st.rerun()
 
 otro = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
+colA, colB = st.columns(2)
 
-# calculos de usuario actual
-mis_materias = USERS[USUARIO_ACTUAL]
+# -------------------------------------------------------------------
+# PANEL USUARIO ACTUAL
+# -------------------------------------------------------------------
+with colA:
+    st.subheader(f"👤 {USUARIO_ACTUAL}")
 
-try:
-    per_min_str = resumen_marcas[USUARIO_ACTUAL].get("per_min", "")
-    per_min_val = parse_float_or_zero(per_min_str)
+    with st.expander(f"ℹ️ No pensar, actuar.", expanded=False):
+        st.markdown(MD_FACUNDO if USUARIO_ACTUAL == "Facundo" else MD_IVAN)
 
-    minutos_totales = 0.0
+    # -------- TOTAL ACTUAL --------
+    try:
+        per_min_str = resumen_marcas[USUARIO_ACTUAL].get("per_min", "")
+        per_min_val = parse_float_or_zero(per_min_str)
+
+        minutos_totales = 0.0
+        mis_materias = USERS[USUARIO_ACTUAL]
+
+        for materia, info in mis_materias.items():
+            base_hms = datos[USUARIO_ACTUAL]["tiempos"][materia]
+            minutos_base = hms_a_minutos(base_hms)
+
+            est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
+            minutos_progreso = 0
+            if str(est_raw).strip() != "":
+                try:
+                    inicio = parse_datetime(est_raw)
+                    minutos_progreso = (datetime.now(TZ) - inicio).total_seconds() / 60
+                except:
+                    minutos_progreso = 0
+
+            minutos_totales += minutos_base + minutos_progreso
+
+        total_calc = minutos_totales * per_min_val
+
+        # objetivo usuario actual
+        if USUARIO_ACTUAL == "Iván":
+            objetivo_actual = leer_marca_col("O")
+        else:
+            objetivo_actual = leer_marca_col("P")
+
+        pago_por_objetivo_actual = per_min_val * objetivo_actual
+        objetivo_actual_hms = segundos_a_hms(int(objetivo_actual * 60))
+
+        # -------- TOTAL DEL DÍA (estilo nuevo) --------
+        st.markdown(
+            f"<div style='font-size:32px; font-weight:bold; color:#333333; line-height:1; margin-bottom:4px;'>"
+            f"${total_calc:.2f}"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+        progreso = min(total_calc / max(1, pago_por_objetivo_actual), 1.0)
+        # ---- BARRA DE PROGRESO CON COLORES DINÁMICOS ----
+        # progreso = total_calc / pago_por_objetivo_actual
+        progreso_porcentaje = progreso * 100
+        
+        # Color según regla
+        if progreso_porcentaje < 50:
+            color = "#d9534f"    # rojo
+        elif progreso_porcentaje < 90:
+            color = "#f0ad4e"    # amarillo
+        else:
+            color = "#5cb85c"    # verde
+        
+        st.markdown(
+            f"""
+            <div style="width:100%; background-color:#262730; border-radius:8px; height:8px; margin:4px 0 10px 0;">
+                <div style="
+                    width:{progreso_porcentaje}%;
+                    background-color:{color};
+                    height:100%;
+                    border-radius:8px;
+                    transition: width 0.4s ease;
+                "></div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.markdown(
+            f"""
+            <div style="
+                color:#666;
+                font-size:13px;
+                margin-top:0px;
+                margin-bottom:12px;
+            ">
+                ${per_min_val:.2f} por minuto &nbsp; | &nbsp; ${pago_por_objetivo_actual:.2f} por {objetivo_actual_hms}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    except:
+        st.markdown("**— | —**")
+
+    # -------- MATERIAS USUARIO ACTUAL --------
+    materia_en_curso = None
+    for m, info in mis_materias.items():
+        if str(datos[USUARIO_ACTUAL]["estado"][m]).strip() != "":
+            materia_en_curso = m
+            break
+
     for materia, info in mis_materias.items():
-        base_hms = datos[USUARIO_ACTUAL]["tiempos"][materia]
-        minutos_base = hms_a_minutos(base_hms)
-
         est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
-        minutos_progreso = 0
+        tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
+
+        tiempo_anadido_seg = 0
         if str(est_raw).strip() != "":
             try:
                 inicio = parse_datetime(est_raw)
-                minutos_progreso = (datetime.now(TZ) - inicio).total_seconds() / 60
+                tiempo_anadido_seg = int((datetime.now(TZ) - inicio).total_seconds())
             except:
-                minutos_progreso = 0
+                tiempo_anadido_seg = 0
 
-        minutos_totales += minutos_base + minutos_progreso
+        tiempo_total_seg = hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido_seg)
+        tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
 
-    total_calc = minutos_totales * per_min_val
+        col_name, col_time, col_actions = st.columns([0.6, 0.2, 0.2], gap="small")
 
-    # objetivo usuario actual
-    if USUARIO_ACTUAL == "Iván":
-        objetivo_actual = leer_marca_col("O")
-    else:
-        objetivo_actual = leer_marca_col("P")
+        with col_name:
+            st.markdown(f"**{materia}**")
 
-    pago_por_objetivo_actual = per_min_val * objetivo_actual
-    objetivo_actual_hms = segundos_a_hms(int(objetivo_actual * 60))
+        with col_time:
+            st.markdown(f"🕒 {tiempo_total_hms}")
 
-    progreso = min(total_calc / max(1, pago_por_objetivo_actual), 1.0)
-except Exception:
-    total_calc = 0.0
-    per_min_val = 0.0
-    objetivo_actual_hms = "00:00:00"
-    progreso = 0.0
+        with col_actions:
+            btn_start, btn_edit = st.columns([1,1], gap="small")
 
-# calculos del otro
-try:
-    per_min_str_otro = resumen_marcas[otro].get("per_min", "")
-    per_min_val_otro = parse_float_or_zero(per_min_str_otro)
+            with btn_start:
+                if materia_en_curso == materia:
+                    if st.button("⛔", key=f"det_{materia}"):
+                        diff_seg = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
+                        acumular_tiempo(USUARIO_ACTUAL, materia, diff_seg/60)
+                        batch_write([
+                            (info["time"], hms_a_fraction(segundos_a_hms(diff_seg + hms_a_segundos(tiempo_acum)))),
+                            (info["est"], "")
+                        ])
+                        st.rerun()
+                else:
+                    if materia_en_curso is None:
+                        if st.button("▶", key=f"est_{materia}"):
+                            limpiar_estudiando(mis_materias)
+                            batch_write([(info["est"], ahora_str())])
+                            st.rerun()
 
-    mins_otro = 0.0
+            with btn_edit:
+                if st.button("✏️", key=f"edit_{materia}", on_click=enable_manual_input, args=[materia]):
+                    pass
+
+        if st.session_state.get(f"show_manual_{materia}", False):
+            nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{materia}")
+            if st.button("Guardar", key=f"save_{materia}"):
+                try:
+                    batch_write([(info["time"], hms_a_fraction(nuevo))])
+                    st.session_state[f"show_manual_{materia}"] = False
+                    st.rerun()
+                except:
+                    st.error("Formato inválido (usar HH:MM:SS)")
+
+# -------------------------------------------------------------------
+# PANEL OTRO USUARIO
+# -------------------------------------------------------------------
+with colB:
+    st.subheader(f"👤 {otro}")
+
+    with st.expander(f"ℹ️ No pensar, actuar.", expanded=False):
+        st.markdown(MD_FACUNDO if otro == "Facundo" else MD_IVAN)
+
+    # -------- TOTAL OTRO USUARIO --------
+    try:
+        per_min_str_otro = resumen_marcas[otro].get("per_min", "")
+        per_min_val_otro = parse_float_or_zero(per_min_str_otro)
+
+        mins_otro = 0.0
+        for materia, info in USERS[otro].items():
+            base_hms = datos[otro]["tiempos"][materia]
+            mins_base = hms_a_minutos(base_hms)
+
+            est_raw = datos[otro]["estado"][materia]
+            mins_prog = 0
+            if str(est_raw).strip() != "":
+                try:
+                    inicio = parse_datetime(est_raw)
+                    mins_prog = (datetime.now(TZ) - inicio).total_seconds() / 60
+                except:
+                    mins_prog = 0
+
+            mins_otro += mins_base + mins_prog
+
+        total_otro = mins_otro * per_min_val_otro
+
+        # objetivo OTRO
+        if otro == "Iván":
+            objetivo_otro = leer_marca_col("O")
+        else:
+            objetivo_otro = leer_marca_col("P")
+
+        pago_por_objetivo_otro = per_min_val_otro * objetivo_otro
+        objetivo_otro_hms = segundos_a_hms(int(objetivo_otro * 60))
+
+        # -------- TOTAL del otro (estilo nuevo) --------
+        st.markdown(
+            f"<div style='font-size:32px; font-weight:bold; color:#333333; line-height:1; margin-bottom:4px;'>"
+            f"${total_otro:.2f}"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+        progreso_otro = min(total_otro / max(1, pago_por_objetivo_otro), 1.0)
+        progreso_porcentaje_otro = progreso_otro * 100
+
+        if progreso_porcentaje_otro < 50:
+            color_otro = "#d9534f"
+        elif progreso_porcentaje_otro < 90:
+            color_otro = "#f0ad4e"
+        else:
+            color_otro = "#5cb85c"
+        
+        st.markdown(
+            f"""
+            <div style="width:100%; background-color:#262730; border-radius:8px; height:8px; margin:4px 0 10px 0;">
+                <div style="
+                    width:{progreso_porcentaje_otro}%;
+                    background-color:{color_otro};
+                    height:100%;
+                    border-radius:8px;
+                    transition: width 0.4s ease;
+                "></div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.markdown(
+            f"""
+            <div style="
+                color:#666;
+                font-size:13px;
+                margin-top:0px;
+                margin-bottom:12px;
+            ">
+                ${per_min_val_otro:.2f} por minuto &nbsp; | &nbsp; ${pago_por_objetivo_otro:.2f} por {objetivo_otro_hms}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    except:
+        st.markdown("**— | —**")
+
+    # -------- MATERIAS OTRO --------
     for materia, info in USERS[otro].items():
-        base_hms = datos[otro]["tiempos"][materia]
-        mins_base = hms_a_minutos(base_hms)
-
         est_raw = datos[otro]["estado"][materia]
-        mins_prog = 0
+        tiempo = datos[otro]["tiempos"][materia]
+
+        tiempo_anad = 0
         if str(est_raw).strip() != "":
             try:
-                inicio = parse_datetime(est_raw)
-                mins_prog = (datetime.now(TZ) - inicio).total_seconds() / 60
+                tiempo_anad = int((datetime.now(TZ) - parse_datetime(est_raw)).total_seconds())
             except:
-                mins_prog = 0
+                tiempo_anad = 0
 
-        mins_otro += mins_base + mins_prog
+        total_seg = hms_a_segundos(tiempo) + max(0, tiempo_anad)
 
-    total_otro = mins_otro * per_min_val_otro
-
-    if otro == "Iván":
-        objetivo_otro = leer_marca_col("O")
-    else:
-        objetivo_otro = leer_marca_col("P")
-
-    pago_por_objetivo_otro = per_min_val_otro * objetivo_otro
-    objetivo_otro_hms = segundos_a_hms(int(objetivo_otro * 60))
-
-    progreso_otro = min(total_otro / max(1, pago_por_objetivo_otro), 1.0)
-except Exception:
-    total_otro = 0.0
-    per_min_val_otro = 0.0
-    objetivo_otro_hms = "00:00:00"
-    progreso_otro = 0.0
-
-# ------------- Diseño: tarjeta usuario actual -------------
-st.markdown(f"<div class='card'>", unsafe_allow_html=True)
-st.markdown(f"### 👤 {USUARIO_ACTUAL}")
-
-with st.expander("ℹ️ No pensar, actuar."):
-    st.markdown(MD_FACUNDO if USUARIO_ACTUAL == "Facundo" else MD_IVAN)
-
-st.markdown(f"<div class='big-number'>${total_calc:.2f}</div>", unsafe_allow_html=True)
-
-# barra de progreso personalizada
-prog_pct = int(progreso * 100)
-if prog_pct < 50:
-    color = '#d9534f'
-elif prog_pct < 90:
-    color = '#f0ad4e'
-else:
-    color = '#5cb85c'
-
-st.markdown(
-    f"<div class='prog-track' style='width:100%;'><div class='prog-fill' style='width:{prog_pct}%; background:{color};'></div></div>",
-    unsafe_allow_html=True,
-)
-
-st.markdown(f"<div class='muted'>{per_min_val:.2f} por minuto — Objetivo: {objetivo_actual_hms}</div>", unsafe_allow_html=True)
-
-# estado actual
-materia_en_curso = None
-for m, info in mis_materias.items():
-    if str(datos[USUARIO_ACTUAL]["estado"][m]).strip() != "":
-        materia_en_curso = m
-        break
-
-if materia_en_curso:
-    st.success(f"🟢 Estudiando **{materia_en_curso}** ahora")
-else:
-    st.info("No estás estudiando ahora mismo.")
-
-st.markdown("---")
-st.markdown("**Materias**")
-
-for materia, info in mis_materias.items():
-    est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
-    tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
-
-    tiempo_anad_seg = 0
-    if str(est_raw).strip() != "":
-        try:
-            inicio = parse_datetime(est_raw)
-            tiempo_anad_seg = int((datetime.now(TZ) - inicio).total_seconds())
-        except:
-            tiempo_anad_seg = 0
-
-    tiempo_total_seg = hms_a_segundos(tiempo_acum) + max(0, tiempo_anad_seg)
-    tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
-
-    st.markdown(f"**{materia}** — 🕒 {tiempo_total_hms}")
-
-    st.markdown("<div class='buttons-row'>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([0.4, 0.3, 0.3])
-    with c1:
-        if materia_en_curso == materia:
-            if st.button("⛔ Detener", key=f"det_{USUARIO_ACTUAL}_{materia}"):
-                detener_estudio(USUARIO_ACTUAL, materia, info, est_raw, tiempo_acum)
-        else:
-            if materia_en_curso is None:
-                if st.button("▶ Iniciar", key=f"est_{USUARIO_ACTUAL}_{materia}"):
-                    iniciar_estudio(USUARIO_ACTUAL, materia, info)
-    with c2:
-        if st.button("✏️ Editar", key=f"edit_{USUARIO_ACTUAL}_{materia}", on_click=enable_manual_input, args=[materia]):
-            pass
-    with c3:
-        if str(est_raw).strip() != "":
-            st.markdown("🟢 En curso")
-        else:
-            st.markdown("⚪")
-
-    if st.session_state.get(f"show_manual_{materia}", False):
-        st.markdown("</div>", unsafe_allow_html=True)
-        nuevo = st.text_input("Nuevo tiempo (HH:MM:SS):", key=f"in_{USUARIO_ACTUAL}_{materia}")
+        box = st.container()
+        with box:
+            st.markdown(f"**{materia}**")
+            st.write(f"🕒 Total: **{segundos_a_hms(total_seg)}**")
+            if str(est_raw).strip() != "":
+                st.caption(f"Base: {tiempo} | En proceso: +{segundos_a_hms(tiempo_anad)}")
+                st.markdown("🟢 Estudiando")
+            else:
+                st.markdown("⚪")
