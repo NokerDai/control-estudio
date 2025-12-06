@@ -85,6 +85,30 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------------------------
+# BLOQUEO POR CONTRASEÑA
+# -------------------------------------------------------------------
+def check_password():
+    if "pw_correct" in st.session_state:
+        return st.session_state.pw_correct
+
+    st.title("🔒 Acceso protegido")
+    
+    # Intenta leer password de secrets, si no existe usa 'admin'
+    secret_pass = st.secrets.get("auth", {}).get("password", "admin")
+
+    password = st.text_input("Contraseña:", type="password")
+    if st.button("Entrar", use_container_width=True):
+        if password == secret_pass:
+            st.session_state.pw_correct = True
+            st.rerun()
+        else:
+            st.error("Contraseña incorrecta.")
+    return False
+
+if not check_password():
+    st.stop()
+
+# -------------------------------------------------------------------
 # ZONA HORARIA Y UTILS
 # -------------------------------------------------------------------
 def _argentina_now_global():
@@ -312,6 +336,9 @@ pago_objetivo = m_rate * m_obj
 progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
 color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
 
+# Calcular HMS del objetivo para mostrar
+objetivo_hms = segundos_a_hms(int(m_obj * 60))
+
 st.markdown(f"""
     <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
         <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Tu Ganancia Hoy</div>
@@ -319,7 +346,9 @@ st.markdown(f"""
         <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
             <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
         </div>
-        <div style="text-align: right; color: #888;">Meta: ${pago_objetivo:.2f}</div>
+        <div style="text-align: right; color: #888;">
+            Meta: ${pago_objetivo:.2f} ({objetivo_hms} hs a ${m_rate:.2f}/min)
+        </div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -409,4 +438,3 @@ if st.button("🔄 Actualizar Datos", use_container_width=True):
 with st.expander("ℹ️ Manifiesto"):
     md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
     st.markdown(md_content)
-
