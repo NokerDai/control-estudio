@@ -359,7 +359,7 @@ with colA:
 
         # mostrar línea con $ escapados para que Markdown no interprete LaTeX
         st.markdown(
-            f"**\\${total_calc:.2f} total | \\${per_min_val:.2f} por minuto | \\${pago_por_objetivo_actual:.2f}**"
+            f"**\\${total_calc:.2f} | \\${per_min_val:.2f} por minuto | \\${pago_por_objetivo_actual:.2f}**"
         )
     except Exception as e:
         # Para debugging podés descomentar: st.error(str(e))
@@ -472,7 +472,7 @@ with colB:
             pago_por_objetivo_otro = marca_C_otro * marca_P_otro
 
         st.markdown(
-            f"**\\${total_otro:.2f} total | \\${per_min_val_otro:.2f} por minuto | \\${pago_por_objetivo_otro:.2f}**"
+            f"**\\${total_otro:.2f} | \\${per_min_val_otro:.2f} por minuto | \\${pago_por_objetivo_otro:.2f}**"
         )
     except Exception as e:
         # Para debugging: st.error(str(e))
@@ -501,3 +501,4 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
