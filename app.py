@@ -1,8 +1,10 @@
-import streamlit as st 
+# control_estudio.py
+import re
 import json
+from datetime import datetime, date, timedelta, time as dt_time
+import streamlit as st
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from datetime import datetime, date
 from streamlit_autorefresh import st_autorefresh
 
 st_autorefresh(interval=10000, key="auto_refresh")
@@ -93,22 +95,28 @@ def _argentina_now_global():
     return datetime.now()
 
 def ahora_str():
-    return _argentina_now_global().isoformat(sep=" ", timespec="seconds")
+    # ISO con offset si hay TZ
+    dt = _argentina_now_global()
+    try:
+        return dt.isoformat(sep=" ", timespec="seconds")
+    except:
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 def parse_datetime(s):
     if not s or str(s).strip() == "":
         raise ValueError("Marca vacía")
     s = str(s).strip()
     TZ = _argentina_now_global().tzinfo
-    
+
     try:
+        # admitir Z -> +00:00
         dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
         if dt.tzinfo is None:
             return dt.replace(tzinfo=TZ)
         return dt.astimezone(TZ)
     except:
         pass
-        
+
     fmts = ["%Y-%m-%d %H:%M:%S%z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S"]
     for fmt in fmts:
         try:
@@ -119,6 +127,60 @@ def parse_datetime(s):
         except:
             continue
     raise ValueError(f"Formato inválido: {s}")
+
+def hms_a_segundos(hms):
+    if not hms: return 0
+    try:
+        h, m, s = map(int, hms.split(":"))
+        return h*3600 + m*60 + s
+    except:
+        return 0
+
+def segundos_a_hms(seg):
+    h = seg // 3600
+    m = (seg % 3600) // 60
+    s = seg % 60
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+def hms_a_fraction(hms): return hms_a_segundos(hms) / 86400
+def hms_a_minutos(hms): return hms_a_segundos(hms) / 60
+def parse_float_or_zero(s):
+    if s is None: return 0.0
+    try: return float(str(s).replace(",", ".").strip())
+    except: return 0.0
+
+# Nuevo helper: parsea lo que venga en la celda time y devuelve segundos int
+def parse_time_cell_to_seconds(val):
+    """Acepta 'HH:MM:SS' o fracción (0.5) o segundos como string y devuelve segundos int."""
+    if val is None: return 0
+    s = str(val).strip()
+    if s == "": return 0
+    # HH:MM:SS
+    if ":" in s:
+        try:
+            return hms_a_segundos(s)
+        except:
+            return 0
+    # fracción de día o número
+    try:
+        f = float(s.replace(",", "."))
+        # si está entre 0 y 1 lo tomamos como fracción de día
+        if 0 <= f <= 1:
+            return int(f * 86400)
+        # si es razonablemente grande, asumimos segundos
+        if f > 86400:
+            return int(f)
+        # si está en (1,86400) lo tomamos como segundos
+        return int(f)
+    except:
+        return 0
+
+# función auxiliar para reemplazar el número de fila en un rango tipo "'Hoja'!B123"
+def replace_row_in_range(range_str, new_row):
+    # reemplaza la última secuencia de dígitos en la string por new_row
+    if not isinstance(range_str, str):
+        return range_str
+    return re.sub(r'(\d+)(\s*$)', str(new_row), range_str)
 
 # -------------------------------------------------------------------
 # CONEXIÓN GOOGLE SHEETS
@@ -165,30 +227,11 @@ USERS = {
     }
 }
 
-def hms_a_segundos(hms):
-    if not hms: return 0
-    try:
-        h, m, s = map(int, hms.split(":"))
-        return h*3600 + m*60 + s
-    except: return 0
-
-def segundos_a_hms(seg):
-    h = seg // 3600
-    m = (seg % 3600) // 60
-    s = seg % 60
-    return f"{h:02d}:{m:02d}:{s:02d}"
-
-def hms_a_fraction(hms): return hms_a_segundos(hms) / 86400
-def hms_a_minutos(hms): return hms_a_segundos(hms) / 60
-def parse_float_or_zero(s):
-    if s is None: return 0.0
-    try: return float(str(s).replace(",", ".").strip())
-    except: return 0.0
-
 # -------------------------------------------------------------------
 # LÓGICA DATOS
 # -------------------------------------------------------------------
 def cargar_todo():
+    # Leemos todos los rangos (estados y tiempos)
     ranges = []
     for user, materias in USERS.items():
         for m, info in materias.items():
@@ -206,14 +249,19 @@ def cargar_todo():
     idx = 0
     for user, materias in USERS.items():
         for materia, info in materias.items():
+            # estado (marca de inicio)
             est_val = values[idx].get("values", [[]])
             est_val = est_val[0][0] if est_val and est_val[0] else ""
             idx += 1
+            # time (acumulado) - lo normalizamos a HH:MM:SS en memoria
             time_val = values[idx].get("values", [[]])
-            time_val = time_val[0][0] if time_val and time_val[0] else "00:00:00"
+            time_val_raw = time_val[0][0] if time_val and time_val[0] else ""
             idx += 1
+            # convertir a segundos y luego a HH:MM:SS para mostrar
+            secs = parse_time_cell_to_seconds(time_val_raw)
+            time_hms = segundos_a_hms(secs)
             data[user]["estado"][materia] = est_val
-            data[user]["tiempos"][materia] = time_val
+            data[user]["tiempos"][materia] = time_hms
     return data
 
 def cargar_resumen_marcas():
@@ -231,6 +279,10 @@ def cargar_resumen_marcas():
         return {"Facundo": {"per_min": 0}, "Iván": {"per_min": 0}}
 
 def batch_write(updates):
+    """
+    updates: list de (range, value)
+    Escribe exactamente lo que se indica. Las celdas time ahora recibirán HH:MM:SS strings.
+    """
     body = {"valueInputOption": "USER_ENTERED", "data": [{"range": r, "values": [[v]]} for r, v in updates]}
     sheet.values().batchUpdate(
         spreadsheetId=st.secrets["sheet_id"],
@@ -241,13 +293,24 @@ def limpiar_estudiando(materias):
     batch_write([(datos["est"], "") for materia, datos in materias.items()])
 
 def acumular_tiempo(usuario, materia, minutos_sumar):
+    """
+    Agrega minutos_sumar (puede ser float) al acumulado en la celda 'time' de la materia.
+    Guarda el resultado como HH:MM:SS.
+    """
     info = USERS[usuario][materia]
-    res = sheet.values().get(
-        spreadsheetId=st.secrets["sheet_id"],
-        range=info["est"]
-    ).execute()
-    valor_prev = parse_float_or_zero(res.get("values", [[0]])[0][0])
-    batch_write([(info["est"], valor_prev + minutos_sumar)])
+    # leer la celda time actual
+    try:
+        res = sheet.values().get(
+            spreadsheetId=st.secrets["sheet_id"],
+            range=info["time"]
+        ).execute()
+        prev_raw = res.get("values", [[ ""]])[0][0] if res.get("values") else ""
+    except:
+        prev_raw = ""
+    prev_secs = parse_time_cell_to_seconds(prev_raw)
+    add_secs = int(round(minutos_sumar * 60))
+    new_secs = prev_secs + add_secs
+    batch_write([(info["time"], segundos_a_hms(new_secs))])
 
 # -------------------------------------------------------------------
 # SELECCIÓN USUARIO
@@ -375,7 +438,7 @@ for m, info in mis_materias.items():
 
 for materia, info in mis_materias.items():
     est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
-    tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]
+    tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]  # ya en HH:MM:SS
     
     tiempo_anadido_seg = 0
     en_curso = False
@@ -404,18 +467,63 @@ for materia, info in mis_materias.items():
     c_actions = st.container()
     
     with c_actions:
+        # BOTÓN DETENER: ahora reparte en caso de cruzar medianoche
         if materia_en_curso == materia:
             if st.button(f"⛔ DETENER {materia[:10]}...", key=f"stop_{materia}", use_container_width=True, type="primary"):
-                diff_seg = int((_argentina_now_global() - parse_datetime(est_raw)).total_seconds())
-                acumular_tiempo(USUARIO_ACTUAL, materia, diff_seg/60)
-                batch_write([
-                    (info["time"], hms_a_fraction(segundos_a_hms(diff_seg + hms_a_segundos(tiempo_acum)))),
-                    (info["est"], "")
-                ])
+                try:
+                    inicio = parse_datetime(est_raw)  # marca de inicio (timezone aware)
+                except Exception as e:
+                    st.error("No se pudo parsear la marca de inicio.")
+                    st.rerun()
+
+                fin = _argentina_now_global()
+                if fin <= inicio:
+                    # caso raro: marca futura o igual
+                    st.error("La marca de inicio es igual o posterior a ahora. Ignorado.")
+                    # limpiar por seguridad
+                    batch_write([(info["est"], "")])
+                    st.rerun()
+
+                # frontera de medianoche (primer segundo del día siguiente al inicio)
+                midnight = datetime.combine(inicio.date() + timedelta(days=1), dt_time(0,0)).replace(tzinfo=inicio.tzinfo)
+
+                partes = []
+                if inicio.date() == fin.date():
+                    # todo en un mismo día
+                    partes.append((inicio, fin))
+                else:
+                    # parte 1: inicio -> midnight (día de inicio)
+                    partes.append((inicio, midnight))
+                    # parte 2: midnight -> fin (día de fin)
+                    partes.append((midnight, fin))
+
+                updates = []
+                for (p_inicio, p_fin) in partes:
+                    segs = int((p_fin - p_inicio).total_seconds())
+                    # target row correspondiente a p_inicio.date()
+                    target_row = FILA_BASE + (p_inicio.date() - FECHA_BASE).days
+                    time_cell_for_row = replace_row_in_range(info["time"], target_row)
+                    # leer valor previo
+                    try:
+                        res = sheet.values().get(spreadsheetId=st.secrets["sheet_id"], range=time_cell_for_row).execute()
+                        prev_raw = res.get("values", [[ ""]])[0][0] if res.get("values") else ""
+                    except:
+                        prev_raw = ""
+                    prev_secs = parse_time_cell_to_seconds(prev_raw)
+                    new_secs = prev_secs + segs
+                    # escribir como HH:MM:SS
+                    updates.append((time_cell_for_row, segundos_a_hms(new_secs)))
+
+                # limpiar marca de inicio
+                updates.append((info["est"], ""))
+
+                # ejecutar escritura
+                batch_write(updates)
                 st.rerun()
         else:
             if materia_en_curso is None:
                 if st.button(f"▶ INICIAR", key=f"start_{materia}", use_container_width=True):
+                    # limpiar marcas y poner marca actual en esta materia
                     limpiar_estudiando(mis_materias)
                     batch_write([(info["est"], ahora_str())])
                     st.rerun()
@@ -426,11 +534,13 @@ for materia, info in mis_materias.items():
         new_val = st.text_input("Tiempo (HH:MM:SS)", value=tiempo_acum, key=f"input_{materia}")
         if st.button("Guardar Corrección", key=f"save_{materia}"):
             try:
-                batch_write([(info["time"], hms_a_fraction(new_val))])
+                # validar formato HH:MM:SS simple
+                if ":" not in new_val:
+                    raise ValueError("Formato inválido, usar HH:MM:SS")
+                # escribir como HH:MM:SS
+                batch_write([(info["time"], new_val)])
                 st.rerun()
-            except:
+            except Exception as e:
                 st.error("Formato inválido")
-    
+
     st.write("")
-
-
