@@ -312,7 +312,7 @@ colA, colB = st.columns(2)
 with colA:
     st.subheader(f"👤 {USUARIO_ACTUAL}")
 
-    with st.expander(f"ℹ️ Fe", expanded=False):
+    with st.expander(f"ℹ️ No pensar, actuar.", expanded=False):
         st.markdown(MD_FACUNDO if USUARIO_ACTUAL == "Facundo" else MD_IVAN)
 
     # -------- TOTAL ACTUAL --------
@@ -472,7 +472,7 @@ with colA:
 with colB:
     st.subheader(f"👤 {otro}")
 
-    with st.expander(f"ℹ️ Fe", expanded=False):
+    with st.expander(f"ℹ️ No pensar, actuar.", expanded=False):
         st.markdown(MD_FACUNDO if otro == "Facundo" else MD_IVAN)
 
     # -------- TOTAL OTRO USUARIO --------
@@ -580,6 +580,7 @@ with colB:
                 st.markdown("🟢 Estudiando")
             else:
                 st.markdown("⚪")
+
 
 
 
