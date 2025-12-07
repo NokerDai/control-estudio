@@ -498,15 +498,6 @@ with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
             <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
                 <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
             </div>
-    
-            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#aaa; margin-top:5px;">
-                <div style="display:flex; align-items:center;">
-                    {circle_otro}
-                    <span style="color:#00e676; margin-left:6px;">{materia_otro}</span>
-                </div>
-    
-                <div>Objetivo tiempo: {o_obj_hms} hs</div>
-            </div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -634,4 +625,5 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
