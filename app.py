@@ -480,44 +480,33 @@ st.markdown(f"""
 
 # ---- PROGRESO DEL OTRO USUARIO (ahora expandido=True) ----
 with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
-
     o_tot, o_rate, o_obj, total_min_otro = calcular_metricas(OTRO_USUARIO)
     o_pago_obj = o_rate * o_obj
     o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
     o_color_bar = "#00e676" if o_progreso_pct >= 90 else "#ffeb3b" if o_progreso_pct >= 50 else "#ff1744"
     o_obj_hms = segundos_a_hms(int(o_obj * 60))
     o_total_hms = segundos_a_hms(int(total_min_otro * 60))
-
-    # --- Bloque visual ---
-    st.markdown(
-        f"""
-<div style="margin-bottom: 10px;">
-
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-size: 1.1rem; color: #ddd;"><b>{o_total_hms}  |  ${o_tot:.2f}</b></span>
-        <span style="font-size: 0.9rem; color: #888;">Meta: ${o_pago_obj:.2f}</span>
-    </div>
-
-    <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
-        <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
-    </div>
-
-    <!-- Círculo + materia a la izquierda | Objetivo tiempo a la derecha -->
-    <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#aaa; margin-top:5px;">
-
-        <div style="display:flex; align-items:center;">
-            {circle_otro}
-            <span style="color:#00e676; margin-left:6px;">{materia_otro}</span>
+    
+    st.markdown(f"""
+        <div style="margin-bottom: 10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size: 1.1rem; color: #ddd;"><b>{o_total_hms}  |  ${o_tot:.2f}</b></span>
+                <span style="font-size: 0.9rem; color: #888;">Meta: ${o_pago_obj:.2f}</span>
+            </div>
+            <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
+                <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#aaa; margin-top:5px;">
+                <div style="display:flex; align-items:center;">
+                    {circle_otro}
+                    <span style="color:#00e676; margin-left:6px;">
+                        {materia_otro}
+                    </span>
+                </div>
+                <div>Objetivo tiempo: {o_obj_hms} hs</div>
+            </div>
         </div>
-
-        <div>Objetivo tiempo: {o_obj_hms} hs</div>
-
-    </div>
-
-</div>
-""",
-        unsafe_allow_html=True
-    )
+        """, unsafe_allow_html=True)
 
 # ---- MANIFIESTO ----
 with st.expander("ℹ️ No pensar, actuar."):
@@ -643,5 +632,3 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
-
-
