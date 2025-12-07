@@ -405,9 +405,6 @@ with st.sidebar:
     if st.button("Cerrar Sesión", use_container_width=True):
         del st.session_state["usuario_seleccionado"]
         st.rerun()
-    # Debug: mostrar variables de proxy (puedes comentar esto en producción)
-    if st.checkbox("🔍 Mostrar variables de proxy (debug)", value=False):
-        st.write({k: os.environ.get(k) for k in ["HTTP_PROXY","HTTPS_PROXY","ALL_PROXY","http_proxy","https_proxy","all_proxy"]})
 
 st.title("⏳ Control Estudio")
 
@@ -630,6 +627,7 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
 
 
