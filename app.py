@@ -1,14 +1,10 @@
 import re
 import json
 from datetime import datetime, date, timedelta, time as dt_time
+import os
 import streamlit as st
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from streamlit_autorefresh import st_autorefresh
 
-st_autorefresh(interval=30000, key="auto_refresh")
-
-# Intentar importar manejo de zonas horarias de forma robusta
+# timezone helpers
 try:
     from zoneinfo import ZoneInfo
     _HAS_ZONEINFO = True
@@ -19,6 +15,15 @@ except Exception:
         import pytz
     except Exception:
         pytz = None
+
+# Google auth + requests session (evita httplib2)
+from google.oauth2 import service_account
+from google.auth.transport.requests import AuthorizedSession
+from requests.exceptions import RequestException
+
+# auto refresh
+from streamlit_autorefresh import st_autorefresh
+st_autorefresh(interval=30000, key="auto_refresh")
 
 # -------------------------------------------------------------------
 # CONFIGURACIÓN DE PÁGINA Y ESTILOS CSS (MOBILE FIRST)
@@ -94,7 +99,6 @@ def _argentina_now_global():
     return datetime.now()
 
 def ahora_str():
-    # ISO con offset si hay TZ
     dt = _argentina_now_global()
     try:
         return dt.isoformat(sep=" ", timespec="seconds")
@@ -148,7 +152,6 @@ def parse_float_or_zero(s):
     try: return float(str(s).replace(",", ".").strip())
     except: return 0.0
 
-# Nuevo helper: parsea lo que venga en la celda time y devuelve segundos int
 def parse_time_cell_to_seconds(val):
     """Acepta 'HH:MM:SS' o fracción (0.5) o segundos como string y devuelve segundos int."""
     if val is None: return 0
@@ -174,31 +177,89 @@ def parse_time_cell_to_seconds(val):
     except:
         return 0
 
-# función auxiliar para reemplazar el número de fila en un rango tipo "'Hoja'!B123"
 def replace_row_in_range(range_str, new_row):
-    # reemplaza la última secuencia de dígitos en la string por new_row
     if not isinstance(range_str, str):
         return range_str
     return re.sub(r'(\d+)(\s*$)', str(new_row), range_str)
 
 # -------------------------------------------------------------------
-# CONEXIÓN GOOGLE SHEETS
+# SESIÓN AUTORIZADA (AuthorizedSession) - reemplaza googleapiclient
 # -------------------------------------------------------------------
 @st.cache_resource
-def get_service():
+def get_sheets_session():
     try:
         key_dict = json.loads(st.secrets["textkey"])
+    except Exception as e:
+        st.error(f"Error leyendo st.secrets['textkey']: {e}")
+        st.stop()
+    try:
         creds = service_account.Credentials.from_service_account_info(
             key_dict,
             scopes=["https://www.googleapis.com/auth/spreadsheets"]
         )
-        return build("sheets", "v4", credentials=creds).spreadsheets()
+        return AuthorizedSession(creds)
     except Exception as e:
-        st.error(f"Error config secrets: {e}")
+        st.error(f"Error creando credenciales: {e}")
         st.stop()
 
-sheet = get_service()
+session = get_sheets_session()
 
+def sheets_batch_get(spreadsheet_id, ranges):
+    """
+    Llama a sheets.values:batchGet y devuelve el JSON (o lanza excepción con detalle).
+    """
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values:batchGet"
+    params = []
+    for r in ranges:
+        params.append(("ranges", r))
+    params.append(("valueRenderOption", "FORMATTED_VALUE"))
+    try:
+        resp = session.get(url, params=params, timeout=30)
+        resp.raise_for_status()
+        return resp.json()
+    except RequestException as e:
+        # mostrar detalle para debug
+        raise RuntimeError(f"Error HTTP en batchGet: {e}\nRespuesta: {getattr(e.response,'text',None)}")
+
+def sheets_get_single(spreadsheet_id, range_str):
+    """
+    Llama a sheets.values.get de forma directa (single range).
+    """
+    # encode range in URL path (API accept range as URL query param)
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/{range_str}"
+    params = {"valueRenderOption": "FORMATTED_VALUE"}
+    try:
+        resp = session.get(url, params=params, timeout=30)
+        if resp.status_code == 404:
+            # tal vez range tiene caracteres; fallback a batchGet
+            res = sheets_batch_get(spreadsheet_id, [range_str])
+            # normalizar
+            return res
+        resp.raise_for_status()
+        return resp.json()
+    except RequestException as e:
+        raise RuntimeError(f"Error HTTP en get single range '{range_str}': {e}\nRespuesta: {getattr(e.response,'text',None)}")
+
+def sheets_batch_update(spreadsheet_id, updates):
+    """
+    updates: list de (range, value)
+    Ejecuta values:batchUpdate con valueInputOption USER_ENTERED
+    """
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values:batchUpdate"
+    data = {
+        "valueInputOption": "USER_ENTERED",
+        "data": [{"range": r, "values": [[v]]} for r, v in updates]
+    }
+    try:
+        resp = session.post(url, json=data, timeout=30)
+        resp.raise_for_status()
+        return resp.json()
+    except RequestException as e:
+        raise RuntimeError(f"Error HTTP en batchUpdate: {e}\nRespuesta: {getattr(e.response,'text',None)}")
+
+# -------------------------------------------------------------------
+# CONSTANTES Y ESTRUCTURAS
+# -------------------------------------------------------------------
 FILA_BASE = 170
 FECHA_BASE = date(2025, 12, 2)
 SHEET_FACUNDO = "F. Economía"
@@ -227,7 +288,7 @@ USERS = {
 }
 
 # -------------------------------------------------------------------
-# LÓGICA DATOS
+# LÓGICA DATOS (usando REST)
 # -------------------------------------------------------------------
 def cargar_todo():
     # Leemos todos los rangos (estados y tiempos)
@@ -237,11 +298,11 @@ def cargar_todo():
             ranges.append(info["est"])
             ranges.append(info["time"])
 
-    res = sheet.values().batchGet(
-        spreadsheetId=st.secrets["sheet_id"],
-        ranges=ranges,
-        valueRenderOption="FORMATTED_VALUE"
-    ).execute()
+    try:
+        res = sheets_batch_get(st.secrets["sheet_id"], ranges)
+    except Exception as e:
+        st.error(f"Error leyendo Google Sheets (batchGet): {e}")
+        st.stop()
 
     values = res.get("valueRanges", [])
     data = {u: {"estado": {}, "tiempos": {}} for u in USERS}
@@ -249,14 +310,25 @@ def cargar_todo():
     for user, materias in USERS.items():
         for materia, info in materias.items():
             # estado (marca de inicio)
-            est_val = values[idx].get("values", [[]])
-            est_val = est_val[0][0] if est_val and est_val[0] else ""
+            vr_est = values[idx] if idx < len(values) else {}
+            est_val = ""
+            try:
+                est_values = vr_est.get("values", [[]])
+                est_val = est_values[0][0] if est_values and est_values[0] else ""
+            except:
+                est_val = ""
             idx += 1
-            # time (acumulado) - lo normalizamos a HH:MM:SS en memoria
-            time_val = values[idx].get("values", [[]])
-            time_val_raw = time_val[0][0] if time_val and time_val[0] else ""
+
+            # time (acumulado)
+            vr_time = values[idx] if idx < len(values) else {}
+            time_val_raw = ""
+            try:
+                time_values = vr_time.get("values", [[]])
+                time_val_raw = time_values[0][0] if time_values and time_values[0] else ""
+            except:
+                time_val_raw = ""
             idx += 1
-            # convertir a segundos y luego a HH:MM:SS para mostrar
+
             secs = parse_time_cell_to_seconds(time_val_raw)
             time_hms = segundos_a_hms(secs)
             data[user]["estado"][materia] = est_val
@@ -266,15 +338,13 @@ def cargar_todo():
 def cargar_resumen_marcas():
     ranges = [f"'{SHEET_MARCAS}'!C{TIME_ROW}", f"'{SHEET_MARCAS}'!B{TIME_ROW}"]
     try:
-        res = sheet.values().batchGet(
-            spreadsheetId=st.secrets["sheet_id"],
-            ranges=ranges,
-            valueRenderOption="FORMATTED_VALUE"
-        ).execute()
+        res = sheets_batch_get(st.secrets["sheet_id"], ranges)
         vr = res.get("valueRanges", [])
-        return {"Facundo": {"per_min": vr[0].get("values",[[0]])[0][0]}, 
-                "Iván": {"per_min": vr[1].get("values",[[0]])[0][0]}}
-    except:
+        fac = vr[0].get("values",[[0]])[0][0] if len(vr) > 0 else 0
+        iv = vr[1].get("values",[[0]])[0][0] if len(vr) > 1 else 0
+        return {"Facundo": {"per_min": fac}, "Iván": {"per_min": iv}}
+    except Exception as e:
+        st.error(f"Error cargando resumen marcas: {e}")
         return {"Facundo": {"per_min": 0}, "Iván": {"per_min": 0}}
 
 def batch_write(updates):
@@ -282,29 +352,25 @@ def batch_write(updates):
     updates: list de (range, value)
     Escribe exactamente lo que se indica. Las celdas time ahora recibirán HH:MM:SS strings.
     """
-    body = {"valueInputOption": "USER_ENTERED", "data": [{"range": r, "values": [[v]]} for r, v in updates]}
-    sheet.values().batchUpdate(
-        spreadsheetId=st.secrets["sheet_id"],
-        body=body
-    ).execute()
+    try:
+        sheets_batch_update(st.secrets["sheet_id"], updates)
+    except Exception as e:
+        st.error(f"Error escribiendo Google Sheets (batchUpdate): {e}")
+        st.stop()
 
 def limpiar_estudiando(materias):
     batch_write([(datos["est"], "") for materia, datos in materias.items()])
 
 def acumular_tiempo(usuario, materia, minutos_sumar):
-    """
-    Agrega minutos_sumar (puede ser float) al acumulado en la celda 'time' de la materia.
-    Guarda el resultado como HH:MM:SS.
-    """
     info = USERS[usuario][materia]
-    # leer la celda time actual
+    # leer la celda time actual (usamos sheets_get_single para mayor robustez)
     try:
-        res = sheet.values().get(
-            spreadsheetId=st.secrets["sheet_id"],
-            range=info["time"]
-        ).execute()
-        prev_raw = res.get("values", [[ ""]])[0][0] if res.get("values") else ""
-    except:
+        # quitar las comillas al range para la URL si es necesario (Sheets acepta 'Hoja'!A1 pero en path las comillas molestan)
+        target = info["time"]
+        res = sheets_batch_get(st.secrets["sheet_id"], [target])
+        vr = res.get("valueRanges", [{}])[0]
+        prev_raw = vr.get("values", [[""]])[0][0] if vr.get("values") else ""
+    except Exception:
         prev_raw = ""
     prev_secs = parse_time_cell_to_seconds(prev_raw)
     add_secs = int(round(minutos_sumar * 60))
@@ -339,6 +405,9 @@ with st.sidebar:
     if st.button("Cerrar Sesión", use_container_width=True):
         del st.session_state["usuario_seleccionado"]
         st.rerun()
+    # Debug: mostrar variables de proxy (puedes comentar esto en producción)
+    if st.checkbox("🔍 Mostrar variables de proxy (debug)", value=False):
+        st.write({k: os.environ.get(k) for k in ["HTTP_PROXY","HTTPS_PROXY","ALL_PROXY","http_proxy","https_proxy","all_proxy"]})
 
 st.title("⏳ Control Estudio")
 
@@ -364,13 +433,11 @@ def calcular_metricas(usuario):
     col_obj = "O" if usuario == "Iván" else "P"
     objetivo = 0.0
     try:
-        res = sheet.values().get(
-            spreadsheetId=st.secrets["sheet_id"],
-            range=f"'{SHEET_MARCAS}'!{col_obj}{TIME_ROW}"
-        ).execute()
-        objetivo = parse_float_or_zero(res.get("values", [[0]])[0][0])
-    except:
-        pass
+        res = sheets_batch_get(st.secrets["sheet_id"], [f"'{SHEET_MARCAS}'!{col_obj}{TIME_ROW}"])
+        vr = res.get("valueRanges", [{}])[0]
+        objetivo = parse_float_or_zero(vr.get("values", [[0]])[0][0]) if vr.get("values") else 0.0
+    except Exception:
+        objetivo = 0.0
     
     return total_min * per_min, per_min, objetivo, total_min
 
@@ -386,7 +453,7 @@ total_hms = segundos_a_hms(int(total_min * 60))
 st.markdown(f"""
     <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
         <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
-        <div style="width: 100%; text-align: center; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms}  |  ${m_tot:.2f}</div>
+        <div style="width: 100%; text-align: center; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms}  |  ${m_tot:.2f}</div>
         <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
             <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
         </div>
@@ -398,12 +465,12 @@ st.markdown(f"""
 
 # ---- PROGRESO DEL OTRO USUARIO (ahora expandido=True) ----
 with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
-    o_tot, o_rate, o_obj, total_min = calcular_metricas(OTRO_USUARIO)
+    o_tot, o_rate, o_obj, total_min_otro = calcular_metricas(OTRO_USUARIO)
     o_pago_obj = o_rate * o_obj
     o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
     o_color_bar = "#00e676" if o_progreso_pct >= 90 else "#ffeb3b" if o_progreso_pct >= 50 else "#ff1744"
     o_obj_hms = segundos_a_hms(int(o_obj * 60))
-    o_total_hms = segundos_a_hms(int(total_min * 60))
+    o_total_hms = segundos_a_hms(int(total_min_otro * 60))
     
     st.markdown(f"""
     <div style="margin-bottom: 10px;">
@@ -506,9 +573,10 @@ for materia, info in mis_materias.items():
                     time_cell_for_row = replace_row_in_range(info["time"], target_row)
                     # leer valor previo
                     try:
-                        res = sheet.values().get(spreadsheetId=st.secrets["sheet_id"], range=time_cell_for_row).execute()
-                        prev_raw = res.get("values", [[ ""]])[0][0] if res.get("values") else ""
-                    except:
+                        res = sheets_batch_get(st.secrets["sheet_id"], [time_cell_for_row])
+                        vr = res.get("valueRanges", [{}])[0]
+                        prev_raw = vr.get("values", [[""]])[0][0] if vr.get("values") else ""
+                    except Exception:
                         prev_raw = ""
                     prev_secs = parse_time_cell_to_seconds(prev_raw)
                     new_secs = prev_secs + segs
@@ -543,5 +611,3 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
-
-    st.write("")
