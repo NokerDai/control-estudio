@@ -474,7 +474,7 @@ st.markdown(f"""
             <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
         </div>
         <div style="display:flex; justify-content:flex-end; color:#888;">
-            <div>Meta: ${pago_objetivo:.2f} ({objetivo_hms} hs)</div>
+            <div>Meta: ${objetivo_hms} | {pago_objetivo:.2f}</div>
         </div>
     </div>
 """, unsafe_allow_html=True)
@@ -492,7 +492,7 @@ with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
         <div style="margin-bottom: 10px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size: 1.1rem; color: #ddd;"><b>{o_total_hms} | ${o_tot:.2f}</b></span>
-                <span style="font-size: 0.9rem; color: #888;">Meta: ${o_pago_obj:.2f} | {o_obj_hms}</span>
+                <span style="font-size: 0.9rem; color: #888;">Meta: {o_obj_hms} | ${o_pago_obj:.2f}</span>
             </div>
             <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
                 <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
@@ -632,6 +632,7 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
 
 
