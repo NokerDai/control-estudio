@@ -426,28 +426,21 @@ with st.expander("ℹ️ No pensar, actuar."):
     st.markdown(md_content)
 
 # -------------------------------------------------------------------
-# LISTA DE MATERIAS (2 por fila en pantallas anchas, 1 por fila en móviles)
+# LISTA DE MATERIAS
 # -------------------------------------------------------------------
 st.subheader("Tus Materias")
 
-# convertir a lista de tuples para indexación estable
-mis_materias = list(USERS[USUARIO_ACTUAL].items())
-
-# detectar si hay materia en curso (igual que antes)
+mis_materias = USERS[USUARIO_ACTUAL]
 materia_en_curso = None
-for m, info in mis_materias:
+for m, info in mis_materias.items():
     if str(datos[USUARIO_ACTUAL]["estado"][m]).strip() != "":
         materia_en_curso = m
         break
 
-# creamos 2 columnas: en pantallas grandes se verán lado a lado,
-# en móviles Streamlit las apila automáticamente (no se modifica nada en celular)
-cols = st.columns(2)
-
-for idx, (materia, info) in enumerate(mis_materias):
+for materia, info in mis_materias.items():
     est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
     tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]  # ya en HH:MM:SS
-
+    
     tiempo_anadido_seg = 0
     en_curso = False
     if str(est_raw).strip() != "":
@@ -461,97 +454,94 @@ for idx, (materia, info) in enumerate(mis_materias):
     tiempo_total_hms = segundos_a_hms(
         hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido_seg)
     )
-
+    
     badge_html = f'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''
-
+    
     html_card = f"""<div class="materia-card">
 <div class="materia-title">{materia}</div>
 {badge_html}
 <div class="materia-time">{tiempo_total_hms}</div>
 </div>"""
+    
+    st.markdown(html_card, unsafe_allow_html=True)
 
-    # asignamos la tarjeta a una de las dos columnas (0 o 1)
-    col = cols[idx % 2]
-    with col:
-        st.markdown(html_card, unsafe_allow_html=True)
+    c_actions = st.container()
+    
+    with c_actions:
+        # BOTÓN DETENER: ahora reparte en caso de cruzar medianoche
+        if materia_en_curso == materia:
+            if st.button(f"⛔ DETENER {materia[:10]}...", key=f"stop_{materia}", use_container_width=True, type="primary"):
+                try:
+                    inicio = parse_datetime(est_raw)  # marca de inicio (timezone aware)
+                except Exception as e:
+                    st.error("No se pudo parsear la marca de inicio.")
+                    st.rerun()
 
-        c_actions = st.container()
+                fin = _argentina_now_global()
+                if fin <= inicio:
+                    # caso raro: marca futura o igual
+                    st.error("La marca de inicio es igual o posterior a ahora. Ignorado.")
+                    # limpiar por seguridad
+                    batch_write([(info["est"], "")])
+                    st.rerun()
 
-        with c_actions:
-            # BOTÓN DETENER: ahora reparte en caso de cruzar medianoche
-            if materia_en_curso == materia:
-                if st.button(f"⛔ DETENER {materia[:10]}...", key=f"stop_{materia}", use_container_width=True, type="primary"):
+                # frontera de medianoche (primer segundo del día siguiente al inicio)
+                midnight = datetime.combine(inicio.date() + timedelta(days=1), dt_time(0,0)).replace(tzinfo=inicio.tzinfo)
+
+                partes = []
+                if inicio.date() == fin.date():
+                    # todo en un mismo día
+                    partes.append((inicio, fin))
+                else:
+                    # parte 1: inicio -> midnight (día de inicio)
+                    partes.append((inicio, midnight))
+                    # parte 2: midnight -> fin (día de fin)
+                    partes.append((midnight, fin))
+
+                updates = []
+                for (p_inicio, p_fin) in partes:
+                    segs = int((p_fin - p_inicio).total_seconds())
+                    # target row correspondiente a p_inicio.date()
+                    target_row = FILA_BASE + (p_inicio.date() - FECHA_BASE).days
+                    time_cell_for_row = replace_row_in_range(info["time"], target_row)
+                    # leer valor previo
                     try:
-                        inicio = parse_datetime(est_raw)  # marca de inicio (timezone aware)
-                    except Exception as e:
-                        st.error("No se pudo parsear la marca de inicio.")
-                        st.rerun()
+                        res = sheet.values().get(spreadsheetId=st.secrets["sheet_id"], range=time_cell_for_row).execute()
+                        prev_raw = res.get("values", [[ ""]])[0][0] if res.get("values") else ""
+                    except:
+                        prev_raw = ""
+                    prev_secs = parse_time_cell_to_seconds(prev_raw)
+                    new_secs = prev_secs + segs
+                    # escribir como HH:MM:SS
+                    updates.append((time_cell_for_row, segundos_a_hms(new_secs)))
 
-                    fin = _argentina_now_global()
-                    if fin <= inicio:
-                        # caso raro: marca futura o igual
-                        st.error("La marca de inicio es igual o posterior a ahora. Ignorado.")
-                        # limpiar por seguridad
-                        batch_write([(info["est"], "")])
-                        st.rerun()
+                # limpiar marca de inicio
+                updates.append((info["est"], ""))
 
-                    # frontera de medianoche (primer segundo del día siguiente al inicio)
-                    midnight = datetime.combine(inicio.date() + timedelta(days=1), dt_time(0,0)).replace(tzinfo=inicio.tzinfo)
-
-                    partes = []
-                    if inicio.date() == fin.date():
-                        # todo en un mismo día
-                        partes.append((inicio, fin))
-                    else:
-                        # parte 1: inicio -> midnight (día de inicio)
-                        partes.append((inicio, midnight))
-                        # parte 2: midnight -> fin (día de fin)
-                        partes.append((midnight, fin))
-
-                    updates = []
-                    for (p_inicio, p_fin) in partes:
-                        segs = int((p_fin - p_inicio).total_seconds())
-                        # target row correspondiente a p_inicio.date()
-                        target_row = FILA_BASE + (p_inicio.date() - FECHA_BASE).days
-                        time_cell_for_row = replace_row_in_range(info["time"], target_row)
-                        # leer valor previo
-                        try:
-                            res = sheet.values().get(spreadsheetId=st.secrets["sheet_id"], range=time_cell_for_row).execute()
-                            prev_raw = res.get("values", [[ ""]])[0][0] if res.get("values") else ""
-                        except:
-                            prev_raw = ""
-                        prev_secs = parse_time_cell_to_seconds(prev_raw)
-                        new_secs = prev_secs + segs
-                        # escribir como HH:MM:SS
-                        updates.append((time_cell_for_row, segundos_a_hms(new_secs)))
-
-                    # limpiar marca de inicio
-                    updates.append((info["est"], ""))
-
-                    # ejecutar escritura
-                    batch_write(updates)
+                # ejecutar escritura
+                batch_write(updates)
+                st.rerun()
+        else:
+            if materia_en_curso is None:
+                if st.button(f"▶ INICIAR", key=f"start_{materia}", use_container_width=True):
+                    # limpiar marcas y poner marca actual en esta materia
+                    limpiar_estudiando(mis_materias)
+                    batch_write([(info["est"], ahora_str())])
                     st.rerun()
             else:
-                if materia_en_curso is None:
-                    if st.button(f"▶ INICIAR", key=f"start_{materia}", use_container_width=True):
-                        # limpiar marcas y poner marca actual en esta materia
-                        limpiar_estudiando(dict(mis_materias))
-                        batch_write([(info["est"], ahora_str())])
-                        st.rerun()
-                else:
-                    st.button("...", disabled=True, key=f"dis_{materia}", use_container_width=True)
+                st.button("...", disabled=True, key=f"dis_{materia}", use_container_width=True)
 
-        with st.expander("🛠️ Corregir tiempo manualmente"):
-            new_val = st.text_input("Tiempo (HH:MM:SS)", value=tiempo_acum, key=f"input_{materia}")
-            if st.button("Guardar Corrección", key=f"save_{materia}"):
-                try:
-                    # validar formato HH:MM:SS simple
-                    if ":" not in new_val:
-                        raise ValueError("Formato inválido, usar HH:MM:SS")
-                    # escribir como HH:MM:SS
-                    batch_write([(info["time"], new_val)])
-                    st.rerun()
-                except Exception as e:
-                    st.error("Formato inválido")
+    with st.expander("🛠️ Corregir tiempo manualmente"):
+        new_val = st.text_input("Tiempo (HH:MM:SS)", value=tiempo_acum, key=f"input_{materia}")
+        if st.button("Guardar Corrección", key=f"save_{materia}"):
+            try:
+                # validar formato HH:MM:SS simple
+                if ":" not in new_val:
+                    raise ValueError("Formato inválido, usar HH:MM:SS")
+                # escribir como HH:MM:SS
+                batch_write([(info["time"], new_val)])
+                st.rerun()
+            except Exception as e:
+                st.error("Formato inválido")
 
-        st.write("")
+    st.write("")
