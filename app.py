@@ -417,7 +417,7 @@ otro_estudiando = any(str(v).strip() != "" for v in datos[OTRO_USUARIO]["estado"
 
 # --- Círculos ---
 def circle(color):
-    return f'<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:{color}; margin-right:6px; vertical-align:middle; margin-top:10px;"></span>'
+    return f'<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:{color}; margin-right:6px; margin-top:10px;"></span>'
 
 circle_usuario  = circle("#00e676" if usuario_estudiando else "#ffffff")
 circle_otro     = circle("#00e676" if otro_estudiando else "#ffffff")
@@ -626,5 +626,3 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
-
-
