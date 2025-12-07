@@ -418,12 +418,15 @@ resumen_marcas = cargar_resumen_marcas()
 usuario_estudiando = any(str(v).strip() != "" for v in datos[USUARIO_ACTUAL]["estado"].values())
 otro_estudiando = any(str(v).strip() != "" for v in datos[OTRO_USUARIO]["estado"].values())
 
-# --- Círculos: verde si estudia, blanco si no ---
+# --- Círculos ---
 def circle(color):
-    return f'<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:{color}; margin-right:8px; vertical-align:middle;"></span>'
+    return f'<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:{color}; margin-right:6px; vertical-align:middle;"></span>'
 
 circle_usuario  = circle("#00e676" if usuario_estudiando else "#ffffff")
 circle_otro     = circle("#00e676" if otro_estudiando else "#ffffff")
+
+# --- Materia actual del otro usuario ---
+materia_otro = next((m for m, v in datos[OTRO_USUARIO]["estado"].items() if str(v).strip() != ""), "")
 
 # Métricas
 def calcular_metricas(usuario):
@@ -494,7 +497,12 @@ with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
                 <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#aaa; margin-top:5px;">
-                <div>{circle_otro}</div>
+                <div style="display:flex; align-items:center;">
+                    {circle_otro}
+                    <span style="color:#00e676; margin-left:6px;">
+                        {materia_otro}
+                    </span>
+                </div>
                 <div>Objetivo tiempo: {o_obj_hms} hs</div>
             </div>
         </div>
@@ -624,6 +632,7 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
 
 
