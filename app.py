@@ -29,7 +29,7 @@ st_autorefresh(interval=30000, key="auto_refresh")
 # CONFIGURACIÓN DE PÁGINA Y ESTILOS CSS (MOBILE FIRST)
 # -------------------------------------------------------------------
 st.set_page_config(
-    page_title="Control de Estudio",
+    page_title="Tiempo de Estudio",
     page_icon="⏳",
     layout="centered"
 )
@@ -406,7 +406,7 @@ with st.sidebar:
         del st.session_state["usuario_seleccionado"]
         st.rerun()
 
-st.title("⏳ Control Estudio")
+st.title("⏳ Estudio")
 
 datos = cargar_todo()
 resumen_marcas = cargar_resumen_marcas()
@@ -632,6 +632,7 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
 
 
