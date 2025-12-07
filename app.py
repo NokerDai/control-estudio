@@ -501,7 +501,7 @@ else:
 if semana_val == 0:
     semana_str = f"{semana_val:.2f}"
 else:
-    semana_str = f"{semana_val:+$.2f}"
+    semana_str = f"{semana_val:+.2f}"
 
 st.markdown(f"""
     <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
@@ -670,6 +670,7 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
 
 
