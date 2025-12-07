@@ -501,7 +501,9 @@ with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
             <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#aaa; margin-top:5px;">
                 <div style="display:flex; align-items:center;">
                     {circle_otro}
-                    <span style="color:#00e676; margin-left:6px;">{materia_otro}</span>
+                    <span style="color:#00e676; margin-left:6px; visibility:{ 'visible' if materia_otro else 'hidden' };">
+                        {materia_otro if materia_otro else 'Placeholder'}
+                    </span>
                 </div>
             </div>
         </div>
@@ -631,4 +633,3 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
-
