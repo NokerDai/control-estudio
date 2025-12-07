@@ -317,13 +317,13 @@ def acumular_tiempo(usuario, materia, minutos_sumar):
 if "usuario_seleccionado" not in st.session_state:
     st.markdown("<h1 style='text-align: center; margin-bottom: 30px;'>¿Quién sos?</h1>", unsafe_allow_html=True)
     
-    if st.button("👤 Soy Facundo", use_container_width=True):
+    if st.button("👤 Facundo", use_container_width=True):
         st.session_state["usuario_seleccionado"] = "Facundo"
         st.rerun()
     
     st.write("")
     
-    if st.button("👤 Soy Iván", use_container_width=True):
+    if st.button("👤 Iván", use_container_width=True):
         st.session_state["usuario_seleccionado"] = "Iván"
         st.rerun()
     st.stop()
@@ -545,6 +545,7 @@ for materia, info in mis_materias.items():
                 st.error("Formato inválido")
 
     st.write("")
+
 
 
 
