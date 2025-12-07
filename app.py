@@ -488,31 +488,31 @@ with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
     o_total_hms = segundos_a_hms(int(total_min_otro * 60))
     
     st.markdown(f"""
-    <div style="margin-bottom: 10px;">
-    
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size: 1.1rem; color: #ddd;"><b>{o_total_hms} | ${o_tot:.2f}</b></span>
-            <span style="font-size: 0.9rem; color: #888;">Meta: ${o_pago_obj:.2f}</span>
-        </div>
-    
-        <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
-            <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
-        </div>
-    
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#aaa; margin-top:5px;">
-    
-            <!-- Círculo + materia del otro -->
-            <div style="display:flex; align-items:center;">
-                {circle_otro}
-                <span style="color:#00e676; margin-left:6px;">{materia_otro}</span>
+        <div style="margin-bottom: 10px;">
+        
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size: 1.1rem; color: #ddd;"><b>{o_total_hms} | ${o_tot:.2f}</b></span>
+                <span style="font-size: 0.9rem; color: #888;">Meta: ${o_pago_obj:.2f}</span>
             </div>
-    
-            <!-- Objetivo tiempo a la derecha -->
-            <div>Objetivo tiempo: {o_obj_hms} hs</div>
-    
+        
+            <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
+                <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
+            </div>
+        
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#aaa; margin-top:5px;">
+        
+                <!-- Círculo + materia del otro -->
+                <div style="display:flex; align-items:center;">
+                    {circle_otro}
+                    <span style="color:#00e676; margin-left:6px;">{materia_otro}</span>
+                </div>
+        
+                <!-- Objetivo tiempo a la derecha -->
+                <div>Objetivo tiempo: {o_obj_hms} hs</div>
+        
+            </div>
+        
         </div>
-    
-    </div>
     """, unsafe_allow_html=True)
 
 # ---- MANIFIESTO ----
@@ -639,5 +639,6 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
 
