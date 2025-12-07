@@ -482,8 +482,13 @@ color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50
 objetivo_hms = segundos_a_hms(int(m_obj * 60))
 total_hms = segundos_a_hms(int(total_min * 60))
 
-# obtener valor de semana
+# obtener valor de semana desde la hoja
 semana_val = cargar_semana()
+
+# si el usuario es Iván, el valor debe tomarse con el signo invertido
+if USUARIO_ACTUAL == "Facundo":
+    semana_val = -semana_val
+
 # decidir color: positivo -> verde, negativo -> rojo, cero -> color por defecto (gris claro)
 if semana_val > 0:
     semana_color = "#00e676"
@@ -502,9 +507,12 @@ st.markdown(f"""
     <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
         <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
         <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${m_tot:.2f}</div>
+
+        <!-- Línea de Semana -->
         <div style="margin-top:6px; font-size:0.95rem; color:#bbb;">
             Semana: <span style="color:{semana_color}; font-weight:bold;">{semana_str}</span>
         </div>
+
         <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
             <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
         </div>
@@ -667,3 +675,4 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
