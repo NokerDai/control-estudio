@@ -414,6 +414,13 @@ st.title("⏳ Control Estudio")
 datos = cargar_todo()
 resumen_marcas = cargar_resumen_marcas()
 
+# --- Banderas: ¿están estudiando cada usuario? ---
+usuario_estudiando = any(str(v).strip() != "" for v in datos[USUARIO_ACTUAL]["estado"].values())
+otro_estudiando = any(str(v).strip() != "" for v in datos[OTRO_USUARIO]["estado"].values())
+
+# HTML del círculo verde (pequeño, alineado con el texto)
+circle_html = '<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#00e676; margin-right:8px; vertical-align:middle;"></span>'
+
 # Métricas
 def calcular_metricas(usuario):
     per_min = parse_float_or_zero(resumen_marcas[usuario].get("per_min", ""))
@@ -458,7 +465,7 @@ st.markdown(f"""
             <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
         </div>
         <div style="text-align: right; color: #888;">
-            Meta: ${pago_objetivo:.2f} ({objetivo_hms} hs)
+            { (circle_html if usuario_estudiando else "") }Meta: ${pago_objetivo:.2f} ({objetivo_hms} hs)
         </div>
     </div>
 """, unsafe_allow_html=True)
@@ -473,19 +480,19 @@ with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
     o_total_hms = segundos_a_hms(int(total_min_otro * 60))
     
     st.markdown(f"""
-    <div style="margin-bottom: 10px;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size: 1.1rem; color: #ddd;"><b>{o_total_hms}  |  ${o_tot:.2f}</b></span>
-            <span style="font-size: 0.9rem; color: #888;">Meta: ${o_pago_obj:.2f}</span>
+        <div style="margin-bottom: 10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size: 1.1rem; color: #ddd;"><b>{o_total_hms}  |  ${o_tot:.2f}</b></span>
+                <span style="font-size: 0.9rem; color: #888;">Meta: ${o_pago_obj:.2f}</span>
+            </div>
+            <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
+                <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
+            </div>
+            <div style="text-align:right; font-size:0.8rem; color:#aaa; margin-top:5px;">
+                 { (circle_html if otro_estudiando else "") }Objetivo tiempo: {o_obj_hms} hs
+            </div>
         </div>
-        <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
-            <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
-        </div>
-        <div style="text-align:right; font-size:0.8rem; color:#aaa; margin-top:5px;">
-             Objetivo tiempo: {o_obj_hms} hs
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
 # ---- MANIFIESTO ----
 with st.expander("ℹ️ No pensar, actuar."):
@@ -611,3 +618,4 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
