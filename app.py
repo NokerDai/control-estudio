@@ -516,7 +516,7 @@ with st.expander("ℹ️ No pensar, actuar."):
 # -------------------------------------------------------------------
 # LISTA DE MATERIAS
 # -------------------------------------------------------------------
-st.subheader("Tus Materias")
+st.subheader("Materias")
 
 mis_materias = USERS[USUARIO_ACTUAL]
 materia_en_curso = None
@@ -632,6 +632,7 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
 
 
