@@ -88,6 +88,18 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+st.markdown("""
+<style>
+.estado-circulo {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # -------------------------------------------------------------------
 # ZONA HORARIA Y UTILS
 # -------------------------------------------------------------------
@@ -465,6 +477,17 @@ st.markdown(f"""
 
 # ---- PROGRESO DEL OTRO USUARIO (ahora expandido=True) ----
 with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
+    # Detectar materia en curso del otro usuario
+    materia_otro = None
+    for m, info in USERS[OTRO_USUARIO].items():
+        if str(datos[OTRO_USUARIO]["estado"][m]).strip() != "":
+            materia_otro = m
+            break
+    
+    color_otro = "#00e676" if materia_otro else "white"
+    circulo_otro_html = f'<span class="estado-circulo" style="background:{color_otro};"></span>'
+    materia_otro_texto = materia_otro if materia_otro else "Ninguna"
+
     o_tot, o_rate, o_obj, total_min_otro = calcular_metricas(OTRO_USUARIO)
     o_pago_obj = o_rate * o_obj
     o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
@@ -483,6 +506,9 @@ with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
         </div>
         <div style="text-align:right; font-size:0.8rem; color:#aaa; margin-top:5px;">
              Objetivo tiempo: {o_obj_hms} hs
+        </div>
+        <div style="font-size:1rem; margin-bottom:10px;">
+            {circulo_otro_html} <b>Estudiando ahora:</b> {materia_otro_texto}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -523,9 +549,12 @@ for materia, info in mis_materias.items():
     )
     
     badge_html = f'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''
+
+    color_circulo = "#00e676" if en_curso else "white"
+    circulo_html = f'<span class="estado-circulo" style="background:{color_circulo};"></span>'
     
     html_card = f"""<div class="materia-card">
-<div class="materia-title">{materia}</div>
+<div class="materia-title">{circulo_html}{materia}</div>
 {badge_html}
 <div class="materia-time">{tiempo_total_hms}</div>
 </div>"""
@@ -611,3 +640,4 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
