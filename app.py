@@ -184,6 +184,7 @@ def replace_row_in_range(range_str, new_row):
 # -------------------------------------------------------------------
 # CONEXIÓN GOOGLE SHEETS
 # -------------------------------------------------------------------
+@st.cache_resource
 def get_service():
     try:
         key_dict = json.loads(st.secrets["textkey"])
@@ -544,4 +545,3 @@ for materia, info in mis_materias.items():
                 st.error("Formato inválido")
 
     st.write("")
-
