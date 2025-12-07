@@ -424,6 +424,7 @@ def circle(color):
 
 circle_usuario  = circle("#00e676" if usuario_estudiando else "#ffffff")
 circle_otro     = circle("#00e676" if otro_estudiando else "#ffffff")
+st.write(circle_otro)
 
 # --- Materia actual del otro usuario ---
 materia_otro = next((m for m, v in datos[OTRO_USUARIO]["estado"].items() if str(v).strip() != ""), "")
@@ -633,3 +634,4 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
