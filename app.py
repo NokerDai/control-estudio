@@ -490,12 +490,12 @@ if USUARIO_ACTUAL == "Facundo":
     semana_val = -semana_val
 
 # decidir color: positivo -> verde, negativo -> rojo, cero -> color por defecto (gris claro)
-if semana_val > 0:
-    semana_color = "#00e676"
-elif semana_val < 0:
-    semana_color = "#ff1744"
+if semana_val < 0:
+    semana_str = f"-${abs(semana_val):.2f}"
+elif semana_val > 0:
+    semana_str = f"+${semana_val:.2f}"
 else:
-    semana_color = "#aaa"  # "igual que el resto" (ajustá si preferís #fff)
+    semana_str = "$0.00"
 
 # formateo: mostrar con signo si no es 0
 if semana_val == 0:
@@ -670,6 +670,7 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
 
 
