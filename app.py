@@ -273,6 +273,7 @@ def get_time_row():
 
 TIME_ROW = get_time_row()
 MARCAS_ROW = 2
+WEEK_RANGE = f"'{SHEET_MARCAS}'!R{TIME_ROW}"
 
 USERS = {
     "Facundo": {
@@ -346,6 +347,21 @@ def cargar_resumen_marcas():
     except Exception as e:
         st.error(f"Error cargando resumen marcas: {e}")
         return {"Facundo": {"per_min": 0}, "Iván": {"per_min": 0}}
+
+def cargar_semana(range_str=None):
+    """
+    Lee un solo rango y devuelve el valor como float (0.0 si no existe / error).
+    """
+    rng = range_str or WEEK_RANGE
+    try:
+        res = sheets_batch_get(st.secrets["sheet_id"], [rng])
+        vr = res.get("valueRanges", [{}])[0]
+        raw = vr.get("values", [["0"]])[0][0] if vr.get("values") else "0"
+        return parse_float_or_zero(raw)
+    except Exception as e:
+        # No abortamos la app por un fallo menor: devolvemos 0 y mostramos error leve.
+        st.error(f"Error cargando 'Semana' desde {rng}: {e}")
+        return 0.0
 
 def batch_write(updates):
     """
@@ -466,10 +482,29 @@ color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50
 objetivo_hms = segundos_a_hms(int(m_obj * 60))
 total_hms = segundos_a_hms(int(total_min * 60))
 
+# obtener valor de semana
+semana_val = cargar_semana()
+# decidir color: positivo -> verde, negativo -> rojo, cero -> color por defecto (gris claro)
+if semana_val > 0:
+    semana_color = "#00e676"
+elif semana_val < 0:
+    semana_color = "#ff1744"
+else:
+    semana_color = "#aaa"  # "igual que el resto" (ajustá si preferís #fff)
+
+# formateo: mostrar con signo si no es 0
+if semana_val == 0:
+    semana_str = f"{semana_val:.2f}"
+else:
+    semana_str = f"{semana_val:+.2f}"
+
 st.markdown(f"""
     <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
         <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
         <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${m_tot:.2f}</div>
+        <div style="margin-top:6px; font-size:0.95rem; color:#bbb;">
+            Semana: <span style="color:{semana_color}; font-weight:bold;">{semana_str}</span>
+        </div>
         <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
             <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
         </div>
@@ -632,8 +667,3 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
-
-
-
-
-
