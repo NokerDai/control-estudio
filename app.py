@@ -473,7 +473,7 @@ st.markdown(f"""
         <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
             <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
         </div>
-        <div style="display:flex; align-items:right; color:#888;">
+        <div style="display:flex; justify-content:flex-end; color:#888;">
             <div>Meta: ${pago_objetivo:.2f} ({objetivo_hms} hs)</div>
         </div>
     </div>
@@ -632,6 +632,7 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
 
 
