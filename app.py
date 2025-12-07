@@ -273,7 +273,7 @@ def get_time_row():
 
 TIME_ROW = get_time_row()
 MARCAS_ROW = 2
-WEEK_RANGE = f"'{SHEET_MARCAS}'!R{TIME_ROW-1}"
+WEEK_RANGE = f"'{SHEET_MARCAS}'!R{MARCAS_ROW}"
 
 USERS = {
     "Facundo": {
@@ -670,6 +670,7 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
 
 
