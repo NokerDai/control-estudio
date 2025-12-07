@@ -474,7 +474,7 @@ st.markdown(f"""
             <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
         </div>
         <div style="display:flex; justify-content:flex-end; color:#888;">
-            <div>${objetivo_hms} | {pago_objetivo:.2f}</div>
+            <div>{objetivo_hms} | ${pago_objetivo:.2f}</div>
         </div>
     </div>
 """, unsafe_allow_html=True)
@@ -632,5 +632,6 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
 
