@@ -329,7 +329,7 @@ if "usuario_seleccionado" not in st.session_state:
     st.stop()
 
 # -------------------------------------------------------------------
-# INTERFAZ PRINCIPAL
+# INTERFAZ PRINCIPAL (cerca de aquí)
 # -------------------------------------------------------------------
 USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
 OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
@@ -338,7 +338,7 @@ OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
 # CONFIGURACIÓN CONDICIONAL DE FONDO (FACUNDO + MOBILE)
 # -------------------------------------------------------------------
 try:
-    # 1. Obtener la URL del secreto
+    # 1. Obtener la URL del secreto (la URL directa)
     FACUNDO_MOBILE_BG_URL = st.secrets["facundo_mobile_bg_url"]
 except KeyError:
     FACUNDO_MOBILE_BG_URL = "" # Fallback en caso de que la clave no exista
@@ -352,18 +352,18 @@ if USUARIO_ACTUAL == "Facundo" and FACUNDO_MOBILE_BG_URL:
     /* CSS Condicional para Facundo en Dispositivos Móviles */
     /* ------------------------------------------- */
     
-    /* La regla @media aplica los estilos solo a pantallas pequeñas (móviles) */
+    /* La regla @media aplica los estilos solo a pantallas pequeñas (móviles <= 768px) */
     @media (max-width: 768px) {{
         .stApp {{
             background-image: url('{FACUNDO_MOBILE_BG_URL}');
             background-attachment: fixed; /* Mantiene la imagen quieta al hacer scroll */
-            background-size: cover; /* Asegura que la imagen cubra todo el viewport */
+            background-size: cover; /* Cubre todo el viewport */
             background-position: center; /* Centra la imagen */
             background-repeat: no-repeat;
         }}
         
         /* Ajustes de Transparencia para Legibilidad */
-        /* Hace que el encabezado, barra lateral y tarjetas sean semi-transparentes */
+        /* Hace que la barra lateral y las tarjetas sean semi-transparentes sobre el fondo */
         [data-testid="stSidebar"], [data-testid="stHeader"] {{
             background-color: rgba(30, 30, 30, 0.85) !important; /* Negro semi-transparente */
         }}
@@ -586,6 +586,7 @@ for materia, info in mis_materias.items():
                 st.error("Formato inválido")
 
     st.write("")
+
 
 
 
