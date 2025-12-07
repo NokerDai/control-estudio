@@ -474,7 +474,7 @@ st.markdown(f"""
             <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
         </div>
         <div style="display:flex; justify-content:flex-end; color:#888;">
-            <div>Meta: ${objetivo_hms} | {pago_objetivo:.2f}</div>
+            <div>${objetivo_hms} | {pago_objetivo:.2f}</div>
         </div>
     </div>
 """, unsafe_allow_html=True)
@@ -503,7 +503,7 @@ with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
                         {materia_otro if materia_otro else 'Placeholder'}
                     </span>
                 </div>
-                <span style="font-size: 0.9rem; color: #888;">Meta: {o_obj_hms} | ${o_pago_obj:.2f}</span>
+                <span style="font-size: 0.9rem; color: #888;">{o_obj_hms} | ${o_pago_obj:.2f}</span>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -632,4 +632,5 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
