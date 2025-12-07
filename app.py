@@ -468,8 +468,9 @@ st.markdown(f"""
         <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
             <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
         </div>
-        <div style="text-align: right; color: #888;">
-            {circle_usuario} Meta: ${pago_objetivo:.2f} ({objetivo_hms} hs)
+        <div style="text-align: left; color: #888; display:flex; align-items:center;">
+            {circle_usuario}
+            <span>Meta: ${pago_objetivo:.2f} ({objetivo_hms} hs)</span>
         </div>
     </div>
 """, unsafe_allow_html=True)
@@ -492,8 +493,9 @@ with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
             <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
                 <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
             </div>
-            <div style="text-align:right; font-size:0.8rem; color:#aaa; margin-top:5px;">
-                {circle_otro} Objetivo tiempo: {o_obj_hms} hs
+            <div style="text-align:left; font-size:0.8rem; color:#aaa; margin-top:5px; display:flex; align-items:center;">
+                {circle_otro}
+                <span>Objetivo tiempo: {o_obj_hms} hs</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -622,5 +624,6 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
 
