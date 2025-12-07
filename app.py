@@ -6,6 +6,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from streamlit_autorefresh import st_autorefresh
 
+# Llama a la recarga automática cada 30 segundos
 st_autorefresh(interval=30000, key="auto_refresh")
 
 # Intentar importar manejo de zonas horarias de forma robusta
@@ -21,7 +22,7 @@ except Exception:
         pytz = None
 
 # -------------------------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA Y ESTILOS CSS (MOBILE FIRST)
+# CONFIGURACIÓN DE PÁGINA Y ESTILOS CSS BASE
 # -------------------------------------------------------------------
 st.set_page_config(
     page_title="Control de Estudio",
@@ -29,9 +30,11 @@ st.set_page_config(
     layout="centered"
 )
 
-# CSS actualizado: tiempo más chico (1.6rem)
+# CSS actualizado: tiempo más chico (1.6rem) y estilos base.
+# Nota: La configuración de fondo para móvil/Facundo se añade después
 st.markdown("""
     <style>
+    /* Estilos base */
     html, body, [class*="css"] {
         font-size: 18px !important; 
     }
@@ -130,7 +133,15 @@ def parse_datetime(s):
 def hms_a_segundos(hms):
     if not hms: return 0
     try:
-        h, m, s = map(int, hms.split(":"))
+        # Permite parsear solo "H:M" o "H:M:S"
+        parts = list(map(int, hms.split(":")))
+        if len(parts) == 3:
+            h, m, s = parts
+        elif len(parts) == 2:
+            h, m = parts
+            s = 0
+        else:
+            raise ValueError("Formato de tiempo no reconocido")
         return h*3600 + m*60 + s
     except:
         return 0
@@ -141,7 +152,6 @@ def segundos_a_hms(seg):
     s = seg % 60
     return f"{h:02d}:{m:02d}:{s:02d}"
 
-def hms_a_fraction(hms): return hms_a_segundos(hms) / 86400
 def hms_a_minutos(hms): return hms_a_segundos(hms) / 60
 def parse_float_or_zero(s):
     if s is None: return 0.0
@@ -217,8 +227,8 @@ USERS = {
     "Facundo": {
         "Matemática para Economistas 1": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"},
         "Matemática para Economistas 2": {"time": f"'{SHEET_FACUNDO}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!C{MARCAS_ROW}"},
-        "Macroeconomía 1":               {"time": f"'{SHEET_FACUNDO}'!D{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!D{MARCAS_ROW}"},
-        "Historia":                      {"time": f"'{SHEET_FACUNDO}'!E{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!E{MARCAS_ROW}"},
+        "Macroeconomía 1":              {"time": f"'{SHEET_FACUNDO}'!D{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!D{MARCAS_ROW}"},
+        "Historia":                     {"time": f"'{SHEET_FACUNDO}'!E{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!E{MARCAS_ROW}"},
     },
     "Iván": {
         "Física":   {"time": f"'{SHEET_IVAN}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!F{MARCAS_ROW}"},
@@ -291,25 +301,7 @@ def batch_write(updates):
 def limpiar_estudiando(materias):
     batch_write([(datos["est"], "") for materia, datos in materias.items()])
 
-def acumular_tiempo(usuario, materia, minutos_sumar):
-    """
-    Agrega minutos_sumar (puede ser float) al acumulado en la celda 'time' de la materia.
-    Guarda el resultado como HH:MM:SS.
-    """
-    info = USERS[usuario][materia]
-    # leer la celda time actual
-    try:
-        res = sheet.values().get(
-            spreadsheetId=st.secrets["sheet_id"],
-            range=info["time"]
-        ).execute()
-        prev_raw = res.get("values", [[ ""]])[0][0] if res.get("values") else ""
-    except:
-        prev_raw = ""
-    prev_secs = parse_time_cell_to_seconds(prev_raw)
-    add_secs = int(round(minutos_sumar * 60))
-    new_secs = prev_secs + add_secs
-    batch_write([(info["time"], segundos_a_hms(new_secs))])
+# (La función acumular_tiempo fue reemplazada por la lógica de 'Detener' con medianoche)
 
 # -------------------------------------------------------------------
 # SELECCIÓN USUARIO
@@ -329,7 +321,7 @@ if "usuario_seleccionado" not in st.session_state:
     st.stop()
 
 # -------------------------------------------------------------------
-# INTERFAZ PRINCIPAL (cerca de aquí)
+# INTERFAZ PRINCIPAL
 # -------------------------------------------------------------------
 USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
 OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
@@ -346,13 +338,12 @@ except KeyError:
 # 2. Aplicar CSS condicional
 if USUARIO_ACTUAL == "Facundo" and FACUNDO_MOBILE_BG_URL:
     
+    # URL directa de Drive con el ID: 13SOKAe9kaVLEqlHS6y5pUWTsoGyasget
+    # Ya corregida para ser de contenido raw: https://drive.google.com/uc?export=view&id=...
+    
     conditional_bg_css = f"""
     <style>
-    /* ------------------------------------------- */
-    /* CSS Condicional para Facundo en Dispositivos Móviles */
-    /* ------------------------------------------- */
-    
-    /* La regla @media aplica los estilos solo a pantallas pequeñas (móviles <= 768px) */
+    /* Aplicar solo si el ancho de la pantalla es menor o igual a 768px (móvil) */
     @media (max-width: 768px) {{
         .stApp {{
             background-image: url('{FACUNDO_MOBILE_BG_URL}');
@@ -363,7 +354,6 @@ if USUARIO_ACTUAL == "Facundo" and FACUNDO_MOBILE_BG_URL:
         }}
         
         /* Ajustes de Transparencia para Legibilidad */
-        /* Hace que la barra lateral y las tarjetas sean semi-transparentes sobre el fondo */
         [data-testid="stSidebar"], [data-testid="stHeader"] {{
             background-color: rgba(30, 30, 30, 0.85) !important; /* Negro semi-transparente */
         }}
@@ -375,6 +365,9 @@ if USUARIO_ACTUAL == "Facundo" and FACUNDO_MOBILE_BG_URL:
     """
     st.markdown(conditional_bg_css, unsafe_allow_html=True)
 
+# -------------------------------------------------------------------
+# BARRA LATERAL
+# -------------------------------------------------------------------
 with st.sidebar:
     st.header(f"Hola, {USUARIO_ACTUAL}")
     if st.button("Cerrar Sesión", use_container_width=True):
@@ -427,7 +420,7 @@ total_hms = segundos_a_hms(int(total_min * 60))
 st.markdown(f"""
     <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
         <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
-        <div style="width: 100%; text-align: center; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms}  |  ${m_tot:.2f}</div>
+        <div style="width: 100%; text-align: center; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms}  |  ${m_tot:.2f}</div>
         <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
             <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
         </div>
@@ -439,12 +432,12 @@ st.markdown(f"""
 
 # ---- PROGRESO DEL OTRO USUARIO (ahora expandido=True) ----
 with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
-    o_tot, o_rate, o_obj, total_min = calcular_metricas(OTRO_USUARIO)
+    o_tot, o_rate, o_obj, o_total_min = calcular_metricas(OTRO_USUARIO)
     o_pago_obj = o_rate * o_obj
     o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
     o_color_bar = "#00e676" if o_progreso_pct >= 90 else "#ffeb3b" if o_progreso_pct >= 50 else "#ff1744"
     o_obj_hms = segundos_a_hms(int(o_obj * 60))
-    o_total_hms = segundos_a_hms(int(total_min * 60))
+    o_total_hms = segundos_a_hms(int(o_total_min * 60))
     
     st.markdown(f"""
     <div style="margin-bottom: 10px;">
@@ -577,17 +570,11 @@ for materia, info in mis_materias.items():
         if st.button("Guardar Corrección", key=f"save_{materia}"):
             try:
                 # validar formato HH:MM:SS simple
-                if ":" not in new_val:
-                    raise ValueError("Formato inválido, usar HH:MM:SS")
+                hms_a_segundos(new_val)
                 # escribir como HH:MM:SS
                 batch_write([(info["time"], new_val)])
                 st.rerun()
             except Exception as e:
-                st.error("Formato inválido")
+                st.error("Formato inválido. Usar HH:MM:SS")
 
     st.write("")
-
-
-
-
-
