@@ -424,7 +424,6 @@ def circle(color):
 
 circle_usuario  = circle("#00e676" if usuario_estudiando else "#ffffff")
 circle_otro     = circle("#00e676" if otro_estudiando else "#ffffff")
-st.write(circle_otro)
 
 # --- Materia actual del otro usuario ---
 materia_otro = next((m for m, v in datos[OTRO_USUARIO]["estado"].items() if str(v).strip() != ""), "")
@@ -494,7 +493,6 @@ with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
                 <span style="font-size: 1.1rem; color: #ddd;"><b>{o_total_hms} | ${o_tot:.2f}</b></span>
                 <span style="font-size: 0.9rem; color: #888;">Meta: ${o_pago_obj:.2f}</span>
             </div>
-    
             <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
                 <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
             </div>
@@ -625,5 +623,6 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
 
