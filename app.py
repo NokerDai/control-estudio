@@ -334,6 +334,47 @@ if "usuario_seleccionado" not in st.session_state:
 USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
 OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
 
+# -------------------------------------------------------------------
+# CONFIGURACIÓN CONDICIONAL DE FONDO (FACUNDO + MOBILE)
+# -------------------------------------------------------------------
+try:
+    # 1. Obtener la URL del secreto
+    FACUNDO_MOBILE_BG_URL = st.secrets["facundo_mobile_bg_url"]
+except KeyError:
+    FACUNDO_MOBILE_BG_URL = "" # Fallback en caso de que la clave no exista
+
+# 2. Aplicar CSS condicional
+if USUARIO_ACTUAL == "Facundo" and FACUNDO_MOBILE_BG_URL:
+    
+    conditional_bg_css = f"""
+    <style>
+    /* ------------------------------------------- */
+    /* CSS Condicional para Facundo en Dispositivos Móviles */
+    /* ------------------------------------------- */
+    
+    /* La regla @media aplica los estilos solo a pantallas pequeñas (móviles) */
+    @media (max-width: 768px) {{
+        .stApp {{
+            background-image: url('{FACUNDO_MOBILE_BG_URL}');
+            background-attachment: fixed; /* Mantiene la imagen quieta al hacer scroll */
+            background-size: cover; /* Asegura que la imagen cubra todo el viewport */
+            background-position: center; /* Centra la imagen */
+            background-repeat: no-repeat;
+        }}
+        
+        /* Ajustes de Transparencia para Legibilidad */
+        /* Hace que el encabezado, barra lateral y tarjetas sean semi-transparentes */
+        [data-testid="stSidebar"], [data-testid="stHeader"] {{
+            background-color: rgba(30, 30, 30, 0.85) !important; /* Negro semi-transparente */
+        }}
+        .materia-card {{
+            background-color: rgba(38, 39, 48, 0.85) !important; /* Semi-transparente sobre la imagen */
+        }}
+    }}
+    </style>
+    """
+    st.markdown(conditional_bg_css, unsafe_allow_html=True)
+
 with st.sidebar:
     st.header(f"Hola, {USUARIO_ACTUAL}")
     if st.button("Cerrar Sesión", use_container_width=True):
@@ -545,5 +586,6 @@ for materia, info in mis_materias.items():
                 st.error("Formato inválido")
 
     st.write("")
+
 
 
