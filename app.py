@@ -507,14 +507,14 @@ st.markdown(f"""
     <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
         <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
         <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${m_tot:.2f}</div>
-        <div style="margin-top:6px; font-size:0.95rem; color:#bbb;">
-            Semana: <span style="color:{semana_color}; font-weight:bold;">{semana_str}</span>
-        </div>
         <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
             <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
         </div>
-        <div style="display:flex; justify-content:flex-end; color:#888;">
+        <div style="display:flex; justify-content:space-between; color:#888;">
             <div>{objetivo_hms} | ${pago_objetivo:.2f}</div>
+            <div style="margin-top:6px; font-size:0.95rem; color:#bbb;">
+                Semana: <span style="color:{semana_color}; font-weight:bold;">{semana_str}</span>
+            </div>
         </div>
     </div>
 """, unsafe_allow_html=True)
@@ -672,5 +672,6 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
 
 
