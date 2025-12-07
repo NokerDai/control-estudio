@@ -423,7 +423,7 @@ circle_usuario  = circle("#00e676" if usuario_estudiando else "#ffffff")
 circle_otro     = circle("#00e676" if otro_estudiando else "#ffffff")
 
 # --- Materia actual del otro usuario ---
-materia_otro = next((m for m, v in datos[OTRO_USUARIO]["estado"].items() if str(v).strip() != ""), "")
+materia_otro = next((m for m, v in datos[OTRO_USUARIO]["estado"].items() if str(v).strip() != ""), " ")
 
 # Métricas
 def calcular_metricas(usuario):
@@ -626,3 +626,4 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
