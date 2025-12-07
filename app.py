@@ -502,8 +502,8 @@ with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
                     <span style="color:#00e676; margin-left:6px; visibility:{ 'visible' if materia_otro else 'hidden' };">
                         {materia_otro if materia_otro else 'Placeholder'}
                     </span>
-                    <span style="font-size: 0.9rem; color: #888;">Meta: {o_obj_hms} | ${o_pago_obj:.2f}</span>
                 </div>
+                <span style="font-size: 0.9rem; color: #888;">Meta: {o_obj_hms} | ${o_pago_obj:.2f}</span>
             </div>
         </div>
     """, unsafe_allow_html=True)
@@ -632,3 +632,4 @@ for materia, info in mis_materias.items():
                 st.rerun()
             except Exception as e:
                 st.error("Formato inválido")
+
