@@ -645,56 +645,40 @@ def main():
             </div>
         </div>
     """, unsafe_allow_html=True)
-    def preparar_payload_usuario(usuario):
-        """Prepara todas las métricas que el widget necesita para un usuario."""
-        tot, rate, obj, total_min = calcular_metricas(usuario)
-        pago_obj = rate * obj
-        progreso_pct = int(min(tot / max(1, pago_obj), 1.0) * 100)
-        hms_total = segundos_a_hms(int(total_min * 60))
-        hms_objetivo = segundos_a_hms(int(obj * 60))
+    # --- INICIO DEL BLOQUE PARA ACTUALIZAR EL WIDGET ---
+
+    # 1. Reunir todas las variables que necesita el widget
+    # (Asegúrate de que estas variables ya se han calculado antes en tu código)
+    w_total_hms = total_hms                  # String "HH:MM:SS"
+    w_money = m_tot                          # float, ej: 15.75
+    w_progress = int(progreso_pct)           # int, ej: 60
+    w_week_value = semana_val                # float, ej: 12.50 o -5.20
+    w_goal = f"{objetivo_hms} | ${pago_objetivo:.2f}" # String "HH:MM:SS | $XX.XX"
     
-        return {
-            "total_hms":       hms_total,
-            "money":           tot,
-            "progress_pct":    progreso_pct,
-            "goal_hms_money":  f"{hms_objetivo} | ${pago_obj:.2f}"
-        }
-    
-    # Datos usuario actual
-    payload_user = preparar_payload_usuario(USUARIO_REAL)
-    
-    # Datos otro usuario
-    payload_other = preparar_payload_usuario(OTRO_USUARIO)
-    
-    # Semana
-    week_value = semana_val  # ya calculado previamente
-    
-    # Construcción segura del paquete JS
-    widget_data = {
-        "user": payload_user,
-        "other": payload_other,
-        "week": week_value
-    }
-    
+    # 2. Crear el código JavaScript que llama al puente
     js_code = f"""
     <script>
+        // Comprueba si el puente 'AndroidBridge' existe
         if (window.AndroidBridge) {{
-            const data = {json.dumps(widget_data)};
+            // Llama a la función en tu clase WebAppInterface
             window.AndroidBridge.updateWidgetData(
-                data.user.total_hms,
-                data.user.money,
-                data.user.progress_pct,
-                data.week,
-                data.user.goal_hms_money,
-                data.other.total_hms,
-                data.other.money,
-                data.other.progress_pct
+                "{w_total_hms}",
+                {w_money},
+                {w_progress},
+                {w_week_value},
+                "{w_goal}"
             );
         }}
     </script>
     """
     
+    # 3. Ejecutar el JavaScript en Streamlit
+    # Usamos st.components.v1.html para inyectar el script.
+    # No te preocupes, esto no mostrará nada visible en la pantalla.
+    import streamlit.components.v1 as components
     components.html(js_code, height=0)
+    
+    # --- FIN DEL BLOQUE PARA ACTUALIZAR EL WIDGET ---
 
     # ---- PROGRESO DEL OTRO USUARIO (ahora expandido=True) ----
     with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
