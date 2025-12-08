@@ -1,4 +1,4 @@
-import re
+import re 
 import json
 from datetime import datetime, date, timedelta, time as dt_time
 import os
@@ -548,15 +548,20 @@ def main():
     js_code = f"""
     <script>
         if (window.AndroidBridge) {{
-            window.AndroidBridge.updateWidgetData(
-                "{w_total_hms}", {w_money}, {w_progress}, {w_week_value}, "{w_goal}",
-                "{w_other_user_total_hms}", {w_other_user_money}, {w_other_user_progress}
-            );
+            try {{
+                window.AndroidBridge.updateWidgetData(
+                    "{w_total_hms}", {w_money}, {w_progress}, {w_week_value}, "{w_goal}",
+                    "{w_other_user_total_hms}", {w_other_user_money}, {w_other_user_progress}
+                );
+            }} catch(e) {{
+                console.warn("AndroidBridge update failed:", e);
+            }}
         }}
     </script>
     """
     import streamlit.components.v1 as components
-    components.html(js_code, height=0)
+    # Height=1 y scrolling=True para evitar crear un iframe que intercepte eventos táctiles en algunos navegadores
+    components.html(js_code, height=1, scrolling=True)
     
     # ---- PROGRESO DEL OTRO USUARIO ----
     with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
@@ -631,7 +636,8 @@ def main():
 
         with c_actions:
             if materia_en_curso == materia:
-                if st.button(f"⛔ DETENER {materia[:10]}...", key=f"stop_{materia}", use_container_width=True, type="primary"):
+                # REMARCA: eliminé `type="primary"` porque provoca errores en algunas versiones de streamlit
+                if st.button(f"⛔ DETENER {materia[:10]}...", key=f"stop_{materia}", use_container_width=True):
                     try:
                         inicio = parse_datetime(est_raw)
                     except Exception as e:
@@ -695,7 +701,10 @@ def main():
 try:
     main()
 except Exception as e:
+    # Evitamos limpiar automáticamente toda la sesión para romper loops infinitos.
     st.error(f"Error crítico: {e}")
-    st.session_state.clear()
-    st.markdown('<meta http-equiv="refresh" content="0">', unsafe_allow_html=True)
-    st.rerun()
+    st.write("Si querés reiniciar la sesión y limpiar `session_state`, presioná el botón abajo.")
+    if st.button("🔄 Reiniciar sesión (limpiar estado)"):
+        st.session_state.clear()
+        # rerun es más amigable que st.rerun() tras limpiar
+        st.rerun()
