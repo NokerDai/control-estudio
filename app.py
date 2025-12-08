@@ -8,6 +8,8 @@ from google.auth.transport.requests import AuthorizedSession
 from requests.exceptions import RequestException
 from streamlit_autorefresh import st_autorefresh
 
+st_autorefresh(interval=120000, key="auto_refresh")
+
 def main():
     # timezone helpers
     try:
@@ -20,9 +22,6 @@ def main():
             import pytz
         except Exception:
             pytz = None
-
-    # auto refresh
-    st_autorefresh(interval=120000, key="auto_refresh")
 
     # -------------------------------------------------------------------
     # CONFIGURACIÓN DE PÁGINA Y ESTILOS CSS (MOBILE FIRST)
@@ -817,4 +816,5 @@ except Exception as e:
 
     # 3. Fallback por si el browser refresh falla
     st.rerun()
+
 
