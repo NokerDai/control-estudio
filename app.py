@@ -507,11 +507,11 @@ def ui_principal():
         with col1:
             if st.button("👤 Facundo", use_container_width=True):
                 st.session_state["usuario_seleccionado"] = "Facundo"
-                st.experimental_rerun()
+                st.rerun()
         with col2:
             if st.button("👤 Iván", use_container_width=True):
                 st.session_state["usuario_seleccionado"] = "Iván"
-                st.experimental_rerun()
+                st.rerun()
         st.stop()
 
     usuario = st.session_state["usuario_seleccionado"]
@@ -540,11 +540,11 @@ def ui_principal():
             if en_curso:
                 if st.button(f"⛔ Detener", key=f"stop_{usuario}_{m}"):
                     stop_materia(usuario, m)
-                    st.experimental_rerun()
+                    st.rerun()
             else:
                 if st.button(f"▶ Start", key=f"start_{usuario}_{m}"):
                     start_materia(usuario, m)
-                    st.experimental_rerun()
+                    st.rerun()
 
         # Expander corrección manual
         with st.expander(f"Corregir tiempo — {m}"):
@@ -560,7 +560,7 @@ def ui_principal():
                     st.cache_data.clear()
                 except:
                     pass
-                st.experimental_rerun()
+                st.rerun()
 
 # -------------------------
 # Helpers pequenos
@@ -719,4 +719,5 @@ if __name__ == "__main__":
             st.session_state.clear()
         except:
             pass
-        st.experimental_rerun()
+        st.rerun()
+
