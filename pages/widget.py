@@ -1,6 +1,6 @@
 import streamlit as st
 from datetime import datetime
-from estudio_streamlit_app import (
+from app import (
     _argentina_now_global,
     hms_a_segundos, segundos_a_hms, parse_float_or_zero,
     cargar_todo, cargar_resumen_marcas, cargar_semana, calcular_metricas,
