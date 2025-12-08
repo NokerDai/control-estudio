@@ -715,9 +715,8 @@ if __name__ == "__main__":
     except Exception as e:
         st.error(f"Error crítico: {e}")
         # limpiar estado sensible y forzar recarga suave
-        try:
-            st.session_state.clear()
-        except:
-            pass
-        st.rerun()
-
+        #try:
+            #st.session_state.clear()
+        #except:
+            #pass
+        #st.rerun()
