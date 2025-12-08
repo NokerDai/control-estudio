@@ -472,7 +472,7 @@ def main():
 
     # --- Materia actual del otro usuario ---
     materia_otro = next((m for m, v in datos[OTRO_USUARIO]["estado"].items() if str(v).strip() != ""), "")
-
+    
     # Métricas
     def calcular_metricas(usuario):
         per_min = parse_float_or_zero(resumen_marcas[usuario].get("per_min", ""))
@@ -498,10 +498,10 @@ def main():
         except Exception:
             objetivo = 0.0
 
-        return total_min * per_min, per_min, objetivo, total_min
+        return total_min * per_min, per_min, objetivo, total_min, progreso
 
     # ---- MÉTRICAS PROPIAS ----
-    m_tot, m_rate, m_obj, total_min = calcular_metricas(USUARIO_ACTUAL)
+    m_tot, m_rate, m_obj, total_min, progreso = calcular_metricas(USUARIO_ACTUAL)
     pago_objetivo = m_rate * m_obj
     progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
     color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
@@ -516,7 +516,7 @@ def main():
     if USUARIO_ACTUAL == "Facundo":
         semana_val = -semana_val
 
-    semana_val += m_tot
+    semana_val += progreso
 
     if semana_val > 0:
         semana_color = "#00e676"
@@ -591,7 +591,7 @@ def main():
 
     # ---- PROGRESO DEL OTRO USUARIO (ahora expandido=True) ----
     with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
-        o_tot, o_rate, o_obj, total_min_otro = calcular_metricas(OTRO_USUARIO)
+        o_tot, o_rate, o_obj, total_min_otro, progreso = calcular_metricas(OTRO_USUARIO)
         o_pago_obj = o_rate * o_obj
         o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
         o_color_bar = "#00e676" if o_progreso_pct >= 90 else "#ffeb3b" if o_progreso_pct >= 50 else "#ff1744"
@@ -759,6 +759,7 @@ except Exception as e:
 
     # 3. Fallback por si el browser refresh falla
     st.rerun()
+
 
 
 
