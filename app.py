@@ -391,6 +391,15 @@ def main():
         add_secs = int(round(minutos_sumar * 60))
         new_secs = prev_secs + add_secs
         batch_write([(info["time"], segundos_a_hms(new_secs))])
+
+    # --- SELECCIÓN AUTOMÁTICA POR URL ---
+    params = st.query_params
+    if "user" in params:
+        u = params["user"].lower()
+        if u == "facu":
+            st.session_state["usuario_seleccionado"] = "Facundo"
+        elif u == "ivan":
+            st.session_state["usuario_seleccionado"] = "Iván"
     
     # -------------------------------------------------------------------
     # SELECCIÓN USUARIO
@@ -687,6 +696,7 @@ except Exception as e:
 
     # 3. Fallback por si el browser refresh falla
     st.rerun()
+
 
 
 
