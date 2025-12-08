@@ -20,10 +20,10 @@ def main():
             import pytz
         except Exception:
             pytz = None
-    
+
     # auto refresh
     st_autorefresh(interval=30000, key="auto_refresh")
-    
+
     # -------------------------------------------------------------------
     # CONFIGURACIÓN DE PÁGINA Y ESTILOS CSS (MOBILE FIRST)
     # -------------------------------------------------------------------
@@ -32,17 +32,17 @@ def main():
         page_icon="⏳",
         layout="centered"
     )
-    
+
     # CSS actualizado: tiempo más chico (1.6rem)
     st.markdown("""
         <style>
         html, body, [class*="css"] {
-            font-size: 18px !important; 
+            font-size: 18px !important;
         }
         h1 { font-size: 2.5rem !important; }
         h2 { font-size: 2rem !important; }
         h3 { font-size: 1.5rem !important; }
-        
+
         .materia-card {
             background-color: #262730;
             border: 1px solid #464b5c;
@@ -77,7 +77,7 @@ def main():
             color: #00e676;
             border: 1px solid #00e676;
         }
-        
+
         div.stButton > button {
             height: 3.5rem;
             font-size: 1.2rem !important;
@@ -86,7 +86,7 @@ def main():
         }
         </style>
     """, unsafe_allow_html=True)
-    
+
     # -------------------------------------------------------------------
     # ZONA HORARIA Y UTILS
     # -------------------------------------------------------------------
@@ -96,20 +96,20 @@ def main():
         if 'pytz' in globals() and pytz is not None:
             return datetime.now(pytz.timezone('America/Argentina/Cordoba'))
         return datetime.now()
-    
+
     def ahora_str():
         dt = _argentina_now_global()
         try:
             return dt.isoformat(sep=" ", timespec="seconds")
         except:
             return dt.strftime("%Y-%m-%d %H:%M:%S")
-    
+
     def parse_datetime(s):
         if not s or str(s).strip() == "":
             raise ValueError("Marca vacía")
         s = str(s).strip()
         TZ = _argentina_now_global().tzinfo
-    
+
         try:
             # admitir Z -> +00:00
             dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
@@ -118,7 +118,7 @@ def main():
             return dt.astimezone(TZ)
         except:
             pass
-    
+
         fmts = ["%Y-%m-%d %H:%M:%S%z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S"]
         for fmt in fmts:
             try:
@@ -129,7 +129,7 @@ def main():
             except:
                 continue
         raise ValueError(f"Formato inválido: {s}")
-    
+
     def hms_a_segundos(hms):
         if not hms: return 0
         try:
@@ -137,20 +137,20 @@ def main():
             return h*3600 + m*60 + s
         except:
             return 0
-    
+
     def segundos_a_hms(seg):
         h = seg // 3600
         m = (seg % 3600) // 60
         s = seg % 60
         return f"{h:02d}:{m:02d}:{s:02d}"
-    
+
     def hms_a_fraction(hms): return hms_a_segundos(hms) / 86400
     def hms_a_minutos(hms): return hms_a_segundos(hms) / 60
     def parse_float_or_zero(s):
         if s is None: return 0.0
         try: return float(str(s).replace(",", ".").strip())
         except: return 0.0
-    
+
     def parse_time_cell_to_seconds(val):
         """Acepta 'HH:MM:SS' o fracción (0.5) o segundos como string y devuelve segundos int."""
         if val is None: return 0
@@ -175,12 +175,12 @@ def main():
             return int(f)
         except:
             return 0
-    
+
     def replace_row_in_range(range_str, new_row):
         if not isinstance(range_str, str):
             return range_str
         return re.sub(r'(\d+)(\s*$)', str(new_row), range_str)
-    
+
     # -------------------------------------------------------------------
     # SESIÓN AUTORIZADA (AuthorizedSession) - reemplaza googleapiclient
     # -------------------------------------------------------------------
@@ -200,9 +200,9 @@ def main():
         except Exception as e:
             st.error(f"Error creando credenciales: {e}")
             st.stop()
-    
+
     session = get_sheets_session()
-    
+
     def sheets_batch_get(spreadsheet_id, ranges):
         """
         Llama a sheets.values:batchGet y devuelve el JSON (o lanza excepción con detalle).
@@ -219,7 +219,7 @@ def main():
         except RequestException as e:
             # mostrar detalle para debug
             raise RuntimeError(f"Error HTTP en batchGet: {e}\nRespuesta: {getattr(e.response,'text',None)}")
-    
+
     def sheets_get_single(spreadsheet_id, range_str):
         """
         Llama a sheets.values.get de forma directa (single range).
@@ -238,7 +238,7 @@ def main():
             return resp.json()
         except RequestException as e:
             raise RuntimeError(f"Error HTTP en get single range '{range_str}': {e}\nRespuesta: {getattr(e.response,'text',None)}")
-    
+
     def sheets_batch_update(spreadsheet_id, updates):
         """
         updates: list de (range, value)
@@ -255,7 +255,7 @@ def main():
             return resp.json()
         except RequestException as e:
             raise RuntimeError(f"Error HTTP en batchUpdate: {e}\nRespuesta: {getattr(e.response,'text',None)}")
-    
+
     # -------------------------------------------------------------------
     # CONSTANTES Y ESTRUCTURAS
     # -------------------------------------------------------------------
@@ -264,16 +264,16 @@ def main():
     SHEET_FACUNDO = "F. Economía"
     SHEET_IVAN = "I. Física"
     SHEET_MARCAS = "marcas"
-    
+
     def get_time_row():
         hoy = _argentina_now_global().date()
         delta = (hoy - FECHA_BASE).days
         return FILA_BASE + delta
-    
+
     TIME_ROW = get_time_row()
     MARCAS_ROW = 2
     WEEK_RANGE = f"'{SHEET_MARCAS}'!R{TIME_ROW}"
-    
+
     USERS = {
         "Facundo": {
             "Matemática 2": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"},
@@ -286,7 +286,7 @@ def main():
             "Análisis": {"time": f"'{SHEET_IVAN}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!G{MARCAS_ROW}"},
         }
     }
-    
+
     # -------------------------------------------------------------------
     # LÓGICA DATOS (usando REST)
     # -------------------------------------------------------------------
@@ -297,13 +297,13 @@ def main():
             for m, info in materias.items():
                 ranges.append(info["est"])
                 ranges.append(info["time"])
-    
+
         try:
             res = sheets_batch_get(st.secrets["sheet_id"], ranges)
         except Exception as e:
             st.error(f"Error leyendo Google Sheets (batchGet): {e}")
             st.stop()
-    
+
         values = res.get("valueRanges", [])
         data = {u: {"estado": {}, "tiempos": {}} for u in USERS}
         idx = 0
@@ -318,7 +318,7 @@ def main():
                 except:
                     est_val = ""
                 idx += 1
-    
+
                 # time (acumulado)
                 vr_time = values[idx] if idx < len(values) else {}
                 time_val_raw = ""
@@ -328,13 +328,13 @@ def main():
                 except:
                     time_val_raw = ""
                 idx += 1
-    
+
                 secs = parse_time_cell_to_seconds(time_val_raw)
                 time_hms = segundos_a_hms(secs)
                 data[user]["estado"][materia] = est_val
                 data[user]["tiempos"][materia] = time_hms
         return data
-    
+
     def cargar_resumen_marcas():
         ranges = [f"'{SHEET_MARCAS}'!C{TIME_ROW}", f"'{SHEET_MARCAS}'!B{TIME_ROW}"]
         try:
@@ -346,7 +346,7 @@ def main():
         except Exception as e:
             st.error(f"Error cargando resumen marcas: {e}")
             return {"Facundo": {"per_min": 0}, "Iván": {"per_min": 0}}
-    
+
     def cargar_semana(range_str=None):
         """
         Lee un solo rango y devuelve el valor como float (0.0 si no existe / error).
@@ -361,7 +361,7 @@ def main():
             # No abortamos la app por un fallo menor: devolvemos 0 y mostramos error leve.
             st.error(f"Error cargando 'Semana' desde {rng}: {e}")
             return 0.0
-    
+
     def batch_write(updates):
         """
         updates: list de (range, value)
@@ -372,10 +372,10 @@ def main():
         except Exception as e:
             st.error(f"Error escribiendo Google Sheets (batchUpdate): {e}")
             st.stop()
-    
+
     def limpiar_estudiando(materias):
         batch_write([(datos["est"], "") for materia, datos in materias.items()])
-    
+
     def acumular_tiempo(usuario, materia, minutos_sumar):
         info = USERS[usuario][materia]
         # leer la celda time actual (usamos sheets_get_single para mayor robustez)
@@ -392,60 +392,174 @@ def main():
         new_secs = prev_secs + add_secs
         batch_write([(info["time"], segundos_a_hms(new_secs))])
 
-    try:
-        params = st.query_params      # Streamlit 1.33+
-    except:
-        params = st.experimental_get_query_params()   # versiones anteriores
-    
-    if "user" in params and "usuario_seleccionado" not in st.session_state:
-        u = params["user"].lower()
-    
-        if u in ["facu", "facundo"]:
-            st.session_state["usuario_seleccionado"] = "Facundo"
-            st.rerun()
-    
-        if u in ["ivan", "iván", "iva"]:
-            st.session_state["usuario_seleccionado"] = "Iván"
-            st.rerun()
-    
     # -------------------------------------------------------------------
-    # SELECCIÓN USUARIO
+    # SELECCIÓN AUTOMÁTICA POR URL (incluye códigos cortos f/i/fw/iw)
+    # -------------------------------------------------------------------
+    try:
+        params = st.query_params
+    except Exception:
+        params = st.experimental_get_query_params()
+
+    def set_user_and_rerun(u):
+        st.session_state["usuario_seleccionado"] = u
+        st.rerun()
+
+    # Solo intentamos setear si no hay usuario en session_state
+    if "usuario_seleccionado" not in st.session_state:
+        # 1) Códigos cortos por clave (ej. ?f  ?fw ?i ?iw)
+        if "f" in params:
+            set_user_and_rerun("Facundo")
+        if "i" in params:
+            set_user_and_rerun("Iván")
+        if "fw" in params:
+            set_user_and_rerun("WIDGET_F")
+        if "iw" in params:
+            set_user_and_rerun("WIDGET_I")
+
+        # 2) Param user con valores largos o cortos (ej. ?user=facu, ?user=ivan, ?user=widget_f)
+        if "user" in params:
+            # params["user"] es lista en st.query_params; tomar el primero
+            try:
+                uval = params["user"][0].lower() if isinstance(params["user"], (list, tuple)) else str(params["user"]).lower()
+            except Exception:
+                uval = str(params["user"]).lower()
+
+            if uval in ["facu", "facundo"]:
+                set_user_and_rerun("Facundo")
+            if uval in ["ivan", "iván", "iva"]:
+                set_user_and_rerun("Iván")
+            if uval in ["widget_f", "widget-f", "widgetf"]:
+                set_user_and_rerun("WIDGET_F")
+            if uval in ["widget_i", "widget-i", "widgeti"]:
+                set_user_and_rerun("WIDGET_I")
+
+    # -------------------------------------------------------------------
+    # SELECCIÓN MANUAL (fallback si no vino por URL)
     # -------------------------------------------------------------------
     if "usuario_seleccionado" not in st.session_state:
         st.markdown("<h1 style='text-align: center; margin-bottom: 30px;'>¿Quién sos?</h1>", unsafe_allow_html=True)
-        
+
         if st.button("👤 Facundo", use_container_width=True):
             st.session_state["usuario_seleccionado"] = "Facundo"
             st.rerun()
-        
+
         st.write("")
-        
+
         if st.button("👤 Iván", use_container_width=True):
             st.session_state["usuario_seleccionado"] = "Iván"
             st.rerun()
         st.stop()
-    
+
     # -------------------------------------------------------------------
-    # INTERFAZ PRINCIPAL
+    # INTERFAZ PRINCIPAL (ajustada para manejar modos WIDGET)
     # -------------------------------------------------------------------
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
-    OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
-    
-    with st.sidebar:
-        st.header(f"Hola, {USUARIO_ACTUAL}")
-        if st.button("Cerrar Sesión", use_container_width=True):
-            del st.session_state["usuario_seleccionado"]
-            st.rerun()
-    
-    st.title("⏳ Estudio")
-    
+
+    # Modo widget?
+    MODO_WIDGET = USUARIO_ACTUAL in ["WIDGET_F", "WIDGET_I"]
+
+    # Usuario real (para cálculos) — en modo widget mapeamos a Facundo/Iván
+    if USUARIO_ACTUAL == "WIDGET_F":
+        USUARIO_REAL = "Facundo"
+    elif USUARIO_ACTUAL == "WIDGET_I":
+        USUARIO_REAL = "Iván"
+    else:
+        USUARIO_REAL = USUARIO_ACTUAL
+
+    # OTRO_USUARIO usado en la UI normal (si corresponde)
+    OTRO_USUARIO = "Iván" if USUARIO_REAL == "Facundo" else "Facundo"
+
+    # Sidebar solo en modo normal (no widget)
+    if not MODO_WIDGET:
+        with st.sidebar:
+            st.header(f"Hola, {USUARIO_REAL}")
+            if st.button("Cerrar Sesión", use_container_width=True):
+                del st.session_state["usuario_seleccionado"]
+                st.rerun()
+
+        st.title("⏳ Estudio")
+    else:
+        # En modo widget no mostramos título ni sidebar.
+        pass
+
+    # Cargar datos (necesario tanto para widget como para modo normal)
     datos = cargar_todo()
     resumen_marcas = cargar_resumen_marcas()
-    
+
+    # Si estamos en modo widget → mostramos solo el bloque "Hoy" para USUARIO_REAL y terminamos.
+    if MODO_WIDGET:
+        # calcular métricas para el usuario real (Facundo o Iván)
+        def calcular_metricas_widget(usuario):
+            per_min = parse_float_or_zero(resumen_marcas[usuario].get("per_min", ""))
+            total_min = 0.0
+            for materia, info in USERS[usuario].items():
+                base = hms_a_minutos(datos[usuario]["tiempos"][materia])
+                progreso = 0
+                est_raw = datos[usuario]["estado"][materia]
+                if str(est_raw).strip() != "":
+                    try:
+                        inicio = parse_datetime(est_raw)
+                        progreso = (_argentina_now_global() - inicio).total_seconds() / 60
+                    except:
+                        pass
+                total_min += base + progreso
+
+            col_obj = "O" if usuario == "Iván" else "P"
+            objetivo = 0.0
+            try:
+                res = sheets_batch_get(st.secrets["sheet_id"], [f"'{SHEET_MARCAS}'!{col_obj}{TIME_ROW}"])
+                vr = res.get("valueRanges", [{}])[0]
+                objetivo = parse_float_or_zero(vr.get("values", [[0]])[0][0]) if vr.get("values") else 0.0
+            except Exception:
+                objetivo = 0.0
+
+            return total_min * per_min, per_min, objetivo, total_min
+
+        m_tot, m_rate, m_obj, total_min = calcular_metricas_widget(USUARIO_REAL)
+        pago_objetivo = m_rate * m_obj
+        progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
+        color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
+
+        objetivo_hms = segundos_a_hms(int(m_obj * 60))
+        total_hms = segundos_a_hms(int(total_min * 60))
+
+        semana_val = cargar_semana()
+        # si el usuario real es Facundo (en tu sheet estaba invertido)
+        if USUARIO_REAL == "Facundo":
+            semana_val = -semana_val
+
+        if semana_val > 0:
+            semana_color = "#00e676"
+            semana_str = f"+${semana_val:.2f}"
+        elif semana_val < 0:
+            semana_color = "#ff1744"
+            semana_str = f"-${abs(semana_val):.2f}"
+        else:
+            semana_color = "#aaa"
+            semana_str = "$0.00"
+
+        st.markdown(f"""
+            <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
+                <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${m_tot:.2f}</div>
+                <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
+                    <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; color:#888;">
+                    <div>Semana: <span style="color:{semana_color};">{semana_str}</span></div>
+                    <div>{objetivo_hms} | ${pago_objetivo:.2f}</div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Muy importante: detener render del resto para que el widget sea solo esto
+        st.stop()
+
+    # --- Si llegamos acá, es el modo normal (no widget) ---
     # --- Banderas ---
-    usuario_estudiando = any(str(v).strip() != "" for v in datos[USUARIO_ACTUAL]["estado"].values())
+    usuario_estudiando = any(str(v).strip() != "" for v in datos[USUARIO_REAL]["estado"].values())
     otro_estudiando = any(str(v).strip() != "" for v in datos[OTRO_USUARIO]["estado"].values())
-    
+
     # --- Círculos ---
     def circle(color):
         return (
@@ -454,13 +568,13 @@ def main():
             f'width:10px; height:10px; border-radius:50%; background:{color}; '
             f'margin-right:6px; flex-shrink:0;"></span>'
         )
-    
+
     circle_usuario  = circle("#00e676" if usuario_estudiando else "#ffffff")
     circle_otro     = circle("#00e676" if otro_estudiando else "#ffffff")
-    
+
     # --- Materia actual del otro usuario ---
     materia_otro = next((m for m, v in datos[OTRO_USUARIO]["estado"].items() if str(v).strip() != ""), "")
-    
+
     # Métricas
     def calcular_metricas(usuario):
         per_min = parse_float_or_zero(resumen_marcas[usuario].get("per_min", ""))
@@ -476,7 +590,7 @@ def main():
                 except:
                     pass
             total_min += base + progreso
-        
+
         col_obj = "O" if usuario == "Iván" else "P"
         objetivo = 0.0
         try:
@@ -485,32 +599,32 @@ def main():
             objetivo = parse_float_or_zero(vr.get("values", [[0]])[0][0]) if vr.get("values") else 0.0
         except Exception:
             objetivo = 0.0
-        
+
         return total_min * per_min, per_min, objetivo, total_min
-    
+
     # ---- MÉTRICAS PROPIAS ----
-    m_tot, m_rate, m_obj, total_min = calcular_metricas(USUARIO_ACTUAL)
+    m_tot, m_rate, m_obj, total_min = calcular_metricas(USUARIO_REAL)
     pago_objetivo = m_rate * m_obj
     progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
     color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
-    
+
     objetivo_hms = segundos_a_hms(int(m_obj * 60))
     total_hms = segundos_a_hms(int(total_min * 60))
-    
+
     # obtener valor de semana desde la hoja
     semana_val = cargar_semana()
-    
-    # si el usuario es Iván, el valor debe tomarse con el signo invertido
-    if USUARIO_ACTUAL == "Facundo":
+
+    # si el usuario es Facundo, el valor debe tomarse con el signo invertido
+    if USUARIO_REAL == "Facundo":
         semana_val = -semana_val
-    
+
     if semana_val > 0:
         semana_color = "#00e676"
     elif semana_val < 0:
         semana_color = "#ff1744"
     else:
         semana_color = "#aaa"
-    
+
     # decidir color: positivo -> verde, negativo -> rojo, cero -> color por defecto (gris claro)
     if semana_val < 0:
         semana_str = f"-${abs(semana_val):.2f}"
@@ -518,7 +632,7 @@ def main():
         semana_str = f"+${semana_val:.2f}"
     else:
         semana_str = "$0.00"
-    
+
     st.markdown(f"""
         <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
             <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
@@ -532,7 +646,7 @@ def main():
             </div>
         </div>
     """, unsafe_allow_html=True)
-    
+
     # ---- PROGRESO DEL OTRO USUARIO (ahora expandido=True) ----
     with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
         o_tot, o_rate, o_obj, total_min_otro = calcular_metricas(OTRO_USUARIO)
@@ -541,7 +655,7 @@ def main():
         o_color_bar = "#00e676" if o_progreso_pct >= 90 else "#ffeb3b" if o_progreso_pct >= 50 else "#ff1744"
         o_obj_hms = segundos_a_hms(int(o_obj * 60))
         o_total_hms = segundos_a_hms(int(total_min_otro * 60))
-        
+
         st.markdown(f"""
             <div style="margin-bottom: 10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -561,28 +675,28 @@ def main():
                 </div>
             </div>
         """, unsafe_allow_html=True)
-    
+
     # ---- MANIFIESTO ----
     with st.expander("ℹ️ No pensar, actuar."):
-        md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
+        md_content = st.secrets["md"]["facundo"] if USUARIO_REAL == "Facundo" else st.secrets["md"]["ivan"]
         st.markdown(md_content)
-    
+
     # -------------------------------------------------------------------
     # LISTA DE MATERIAS
     # -------------------------------------------------------------------
     st.subheader("Materias")
-    
-    mis_materias = USERS[USUARIO_ACTUAL]
+
+    mis_materias = USERS[USUARIO_REAL]
     materia_en_curso = None
     for m, info in mis_materias.items():
-        if str(datos[USUARIO_ACTUAL]["estado"][m]).strip() != "":
+        if str(datos[USUARIO_REAL]["estado"][m]).strip() != "":
             materia_en_curso = m
             break
-    
+
     for materia, info in mis_materias.items():
-        est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
-        tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]  # ya en HH:MM:SS
-        
+        est_raw = datos[USUARIO_REAL]["estado"][materia]
+        tiempo_acum = datos[USUARIO_REAL]["tiempos"][materia]  # ya en HH:MM:SS
+
         tiempo_anadido_seg = 0
         en_curso = False
         if str(est_raw).strip() != "":
@@ -592,23 +706,23 @@ def main():
                 en_curso = True
             except:
                 pass
-    
+
         tiempo_total_hms = segundos_a_hms(
             hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido_seg)
         )
-        
+
         badge_html = f'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''
-        
+
         html_card = f"""<div class="materia-card">
 <div class="materia-title">{materia}</div>
 {badge_html}
 <div class="materia-time">{tiempo_total_hms}</div>
 </div>"""
-        
+
         st.markdown(html_card, unsafe_allow_html=True)
-    
+
         c_actions = st.container()
-        
+
         with c_actions:
             # BOTÓN DETENER: ahora reparte en caso de cruzar medianoche
             if materia_en_curso == materia:
@@ -618,7 +732,7 @@ def main():
                     except Exception as e:
                         st.error("No se pudo parsear la marca de inicio.")
                         st.rerun()
-    
+
                     fin = _argentina_now_global()
                     if fin <= inicio:
                         # caso raro: marca futura o igual
@@ -626,10 +740,10 @@ def main():
                         # limpiar por seguridad
                         batch_write([(info["est"], "")])
                         st.rerun()
-    
+
                     # frontera de medianoche (primer segundo del día siguiente al inicio)
                     midnight = datetime.combine(inicio.date() + timedelta(days=1), dt_time(0,0)).replace(tzinfo=inicio.tzinfo)
-    
+
                     partes = []
                     if inicio.date() == fin.date():
                         # todo en un mismo día
@@ -639,7 +753,7 @@ def main():
                         partes.append((inicio, midnight))
                         # parte 2: midnight -> fin (día de fin)
                         partes.append((midnight, fin))
-    
+
                     updates = []
                     for (p_inicio, p_fin) in partes:
                         segs = int((p_fin - p_inicio).total_seconds())
@@ -657,10 +771,10 @@ def main():
                         new_secs = prev_secs + segs
                         # escribir como HH:MM:SS
                         updates.append((time_cell_for_row, segundos_a_hms(new_secs)))
-    
+
                     # limpiar marca de inicio
                     updates.append((info["est"], ""))
-    
+
                     # ejecutar escritura
                     batch_write(updates)
                     st.rerun()
@@ -673,7 +787,7 @@ def main():
                         st.rerun()
                 else:
                     st.button("...", disabled=True, key=f"dis_{materia}", use_container_width=True)
-    
+
         with st.expander("🛠️ Corregir tiempo manualmente"):
             new_val = st.text_input("Tiempo (HH:MM:SS)", value=tiempo_acum, key=f"input_{materia}")
             if st.button("Guardar Corrección", key=f"save_{materia}"):
@@ -697,15 +811,9 @@ except Exception as e:
 
     # 2. Forzar recarga de la página (equivalente a F5)
     st.markdown(
-        '<meta http-equiv="refresh" content="0">', 
+        '<meta http-equiv="refresh" content="0">',
         unsafe_allow_html=True
     )
 
     # 3. Fallback por si el browser refresh falla
     st.rerun()
-
-
-
-
-
-
