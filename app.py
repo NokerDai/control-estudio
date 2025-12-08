@@ -285,7 +285,7 @@ def start_materia_callback(usuario, materia):
         st.error(f"start_materia error: {e}")
     finally:
         # rerun para refrescar UI
-        st.experimental_rerun()
+        st.rerun()
 
 def stop_materia_callback(usuario, materia):
     """Callback para detener: lee la marca, calcula duración, suma al día correcto y limpia 'est'."""
@@ -300,7 +300,7 @@ def stop_materia_callback(usuario, materia):
             prev_est = ""
         if not prev_est or str(prev_est).strip() == "":
             st.error("No hay marca de inicio registrada (no se puede detener).")
-            st.experimental_rerun()
+            st.rerun()
             return
 
         try:
@@ -309,14 +309,14 @@ def stop_materia_callback(usuario, materia):
             st.error("Formato de fecha inválido en la marca de inicio.")
             # limpiar para evitar ciclos
             batch_write([(info["est"], "")])
-            st.experimental_rerun()
+            st.rerun()
             return
 
         fin = _argentina_now_global()
         if fin <= inicio:
             st.error("Tiempo inválido. La hora de fin es anterior a la de inicio.")
             batch_write([(info["est"], "")])
-            st.experimental_rerun()
+            st.rerun()
             return
 
         midnight = datetime.combine(inicio.date() + timedelta(days=1), dt_time(0,0)).replace(tzinfo=inicio.tzinfo)
@@ -347,7 +347,7 @@ def stop_materia_callback(usuario, materia):
     except Exception as e:
         st.error(f"stop_materia error: {e}")
     finally:
-        st.experimental_rerun()
+        st.rerun()
 
 # ------------------ UI PRINCIPAL ------------------
 def main():
@@ -376,7 +376,7 @@ def main():
 
     def set_user_and_rerun(u):
         st.session_state["usuario_seleccionado"] = u
-        st.experimental_rerun()
+        st.rerun()
 
     if "usuario_seleccionado" not in st.session_state:
         if "f" in params: set_user_and_rerun("Facundo")
@@ -393,11 +393,11 @@ def main():
         st.markdown("<h1 style='text-align: center; margin-bottom: 30px;'>¿Quién sos?</h1>", unsafe_allow_html=True)
         if st.button("👤 Facundo", use_container_width=True):
             st.session_state["usuario_seleccionado"] = "Facundo"
-            st.experimental_rerun()
+            st.rerun()
         st.write("")
         if st.button("👤 Iván", use_container_width=True):
             st.session_state["usuario_seleccionado"] = "Iván"
-            st.experimental_rerun()
+            st.rerun()
         st.stop()
 
     datos_globales = cargar_datos_unificados()
@@ -552,7 +552,7 @@ def main():
                 if st.button("Guardar Corrección", key=f"save_{sanitize_key(materia)}"):
                     if ":" in new_val:
                         batch_write([(info["time"], new_val)])
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.error("Formato inválido")
 
@@ -560,7 +560,7 @@ def main():
     st.write("")  # espacio
     if st.sidebar.button("🔄 Forzar limpieza session_state"):
         st.session_state.clear()
-        st.experimental_rerun()
+        st.rerun()
 
 if __name__ == "__main__":
     try:
@@ -571,4 +571,5 @@ if __name__ == "__main__":
         # NO limpie automáticamente session_state para evitar loops infinitos
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
-            st.experimental_rerun()
+            st.rerun()
+
