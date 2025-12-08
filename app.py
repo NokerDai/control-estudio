@@ -1,4 +1,3 @@
-# archivo: app_tiempo_estudio.py (reemplazar archivo existente)
 import re
 import json
 from datetime import datetime, date, timedelta, time as dt_time
@@ -127,6 +126,11 @@ def replace_row_in_range(range_str, new_row):
 
 def sanitize_key(s):
     return re.sub(r'[^a-zA-Z0-9_]', '_', s)
+
+# ------------------ RERUN HELPER (recomendado para callbacks) ------------------
+def pedir_rerun():
+    """Establece un flag en session_state para que el rerun se haga fuera del callback."""
+    st.session_state["_do_rerun"] = True
 
 # ------------------ GOOGLE SHEETS SESSION ------------------
 @st.cache_resource
@@ -282,10 +286,10 @@ def start_materia_callback(usuario, materia):
         info = USERS[usuario][materia]
         batch_write([(info["est"], ahora_str())] + [(m_datos["est"], "") for m_datos in USERS[usuario].values() if m_datos is not None and m_datos is not info])
     except Exception as e:
+        # Evitar llamar st.error en callbacks excesivamente, pero lo dejamos por compatibilidad
         st.error(f"start_materia error: {e}")
     finally:
-        # rerun para refrescar UI
-        st.rerun()
+        pedir_rerun()
 
 def stop_materia_callback(usuario, materia):
     """Callback para detener: lee la marca, calcula duración, suma al día correcto y limpia 'est'."""
@@ -300,7 +304,7 @@ def stop_materia_callback(usuario, materia):
             prev_est = ""
         if not prev_est or str(prev_est).strip() == "":
             st.error("No hay marca de inicio registrada (no se puede detener).")
-            st.rerun()
+            pedir_rerun()
             return
 
         try:
@@ -309,14 +313,14 @@ def stop_materia_callback(usuario, materia):
             st.error("Formato de fecha inválido en la marca de inicio.")
             # limpiar para evitar ciclos
             batch_write([(info["est"], "")])
-            st.rerun()
+            pedir_rerun()
             return
 
         fin = _argentina_now_global()
         if fin <= inicio:
             st.error("Tiempo inválido. La hora de fin es anterior a la de inicio.")
             batch_write([(info["est"], "")])
-            st.rerun()
+            pedir_rerun()
             return
 
         midnight = datetime.combine(inicio.date() + timedelta(days=1), dt_time(0,0)).replace(tzinfo=inicio.tzinfo)
@@ -347,10 +351,15 @@ def stop_materia_callback(usuario, materia):
     except Exception as e:
         st.error(f"stop_materia error: {e}")
     finally:
-        st.rerun()
+        pedir_rerun()
 
 # ------------------ UI PRINCIPAL ------------------
 def main():
+    # Si un callback pidió un rerun, hacerlo aquí (fuera del callback)
+    if st.session_state.get("_do_rerun", False):
+        st.session_state["_do_rerun"] = False
+        st.rerun()
+
     # Sidebar debug
     st.sidebar.header("🔧 Debug & Controls")
     if "debug_autorefresh" not in st.session_state:
@@ -572,4 +581,3 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
-
