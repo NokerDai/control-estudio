@@ -22,7 +22,7 @@ def main():
             pytz = None
 
     # auto refresh
-    st_autorefresh(interval=30000, key="auto_refresh")
+    st_autorefresh(interval=120000, key="auto_refresh")
 
     # -------------------------------------------------------------------
     # CONFIGURACIÓN DE PÁGINA Y ESTILOS CSS (MOBILE FIRST)
@@ -817,3 +817,4 @@ except Exception as e:
 
     # 3. Fallback por si el browser refresh falla
     st.rerun()
+
