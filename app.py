@@ -1,769 +1,722 @@
-import re
-import json
-from datetime import datetime, date, timedelta, time as dt_time
-import os
+# -------------------------------------------------------------
+#   STREAMLIT - SISTEMA OPTIMIZADO DE LECTURA/ESCRITURA GOOGLE SHEETS
+#   PARTE 1/?? — IMPORTS, CONFIG, HELPERS Y LECTURA OPTIMIZADA
+# -------------------------------------------------------------
+
 import streamlit as st
-from google.oauth2 import service_account
-from google.auth.transport.requests import AuthorizedSession
-from requests.exceptions import RequestException
-from streamlit_autorefresh import st_autorefresh
+import requests
+import json
+from datetime import datetime, timedelta, timezone
+import pytz
 
-st_autorefresh(interval=60000, key="auto_refresh")
+# -------------------------------------------------------------
+# CONFIG STREAMLIT
+# -------------------------------------------------------------
+st.set_page_config(page_title="Seguimiento de Tiempos", layout="wide")
 
-# timezone helpers
-try:
-    from zoneinfo import ZoneInfo
-    _HAS_ZONEINFO = True
-except Exception:
-    ZoneInfo = None
-    _HAS_ZONEINFO = False
-    try:
-        import pytz
-    except Exception:
-        pytz = None
-
-# -------------------------------------------------------------------
-# CONFIGURACIÓN DE PÁGINA Y ESTILOS CSS (MOBILE FIRST)
-# -------------------------------------------------------------------
-st.set_page_config(
-    page_title="Tiempo de Estudio",
-    page_icon="⏳",
-    layout="centered"
-)
-
-# CSS actualizado: tiempo más chico (1.6rem)
-st.markdown("""
-    <style>
-    html, body, [class*="css"] {
-        font-size: 18px !important;
-    }
-    h1 { font-size: 2.5rem !important; }
-    h2 { font-size: 2rem !important; }
-    h3 { font-size: 1.5rem !important; }
-
-    .materia-card {
-        background-color: #262730;
-        border: 1px solid #464b5c;
-        padding: 20px;
-        border-radius: 15px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    }
-    .materia-title {
-        font-size: 1.4rem;
-        font-weight: bold;
-        color: #ffffff;
-        margin-bottom: 5px;
-    }
-    .materia-time {
-        font-size: 1.6rem; /* Más chico */
-        font-weight: bold;
-        color: #00e676;
-        font-family: 'Courier New', monospace;
-        margin-bottom: 15px;
-    }
-    .status-badge {
-        display: inline-block;
-        padding: 5px 10px;
-        border-radius: 12px;
-        font-size: 0.9rem;
-        font-weight: bold;
-        margin-bottom: 10px;
-    }
-    .status-active {
-        background-color: rgba(0, 230, 118, 0.2);
-        color: #00e676;
-        border: 1px solid #00e676;
-    }
-
-    div.stButton > button {
-        height: 3.5rem;
-        font-size: 1.2rem !important;
-        font-weight: bold !important;
-        border-radius: 12px !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# -------------------------------------------------------------------
-# ZONA HORARIA Y UTILS
-# -------------------------------------------------------------------
-def _argentina_now_global():
-    if ZoneInfo is not None:
-        return datetime.now(ZoneInfo('America/Argentina/Cordoba'))
-    if 'pytz' in globals() and pytz is not None:
-        return datetime.now(pytz.timezone('America/Argentina/Cordoba'))
-    return datetime.now()
-
-def ahora_str():
-    dt = _argentina_now_global()
-    try:
-        return dt.isoformat(sep=" ", timespec="seconds")
-    except:
-        return dt.strftime("%Y-%m-%d %H:%M:%S")
-
-def parse_datetime(s):
-    if not s or str(s).strip() == "":
-        raise ValueError("Marca vacía")
-    s = str(s).strip()
-    TZ = _argentina_now_global().tzinfo
-
-    try:
-        # admitir Z -> +00:00
-        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            return dt.replace(tzinfo=TZ)
-        return dt.astimezone(TZ)
-    except:
-        pass
-
-    fmts = ["%Y-%m-%d %H:%M:%S%z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S"]
-    for fmt in fmts:
-        try:
-            dt = datetime.strptime(s, fmt)
-            if dt.tzinfo is None:
-                return dt.replace(tzinfo=TZ)
-            return dt.astimezone(TZ)
-        except:
-            continue
-    raise ValueError(f"Formato inválido: {s}")
-
-def hms_a_segundos(hms):
-    if not hms: return 0
-    try:
-        h, m, s = map(int, hms.split(":"))
-        return h*3600 + m*60 + s
-    except:
-        return 0
-
-def segundos_a_hms(seg):
-    h = seg // 3600
-    m = (seg % 3600) // 60
-    s = seg % 60
-    return f"{h:02d}:{m:02d}:{s:02d}"
-
-def hms_a_fraction(hms): return hms_a_segundos(hms) / 86400
-def hms_a_minutos(hms): return hms_a_segundos(hms) / 60
-def parse_float_or_zero(s):
-    if s is None: return 0.0
-    try: return float(str(s).replace(",", ".").strip())
-    except: return 0.0
-
-def parse_time_cell_to_seconds(val):
-    """Acepta 'HH:MM:SS' o fracción (0.5) o segundos como string y devuelve segundos int."""
-    if val is None: return 0
-    s = str(val).strip()
-    if s == "": return 0
-    # HH:MM:SS
-    if ":" in s:
-        try:
-            return hms_a_segundos(s)
-        except:
-            return 0
-    # fracción de día o número
-    try:
-        f = float(s.replace(",", "."))
-        # si está entre 0 y 1 lo tomamos como fracción de día
-        if 0 <= f <= 1:
-            return int(f * 86400)
-        # si es razonablemente grande, asumimos segundos
-        if f > 86400:
-            return int(f)
-        # si está en (1,86400) lo tomamos como segundos
-        return int(f)
-    except:
-        return 0
-
-def replace_row_in_range(range_str, new_row):
-    if not isinstance(range_str, str):
-        return range_str
-    return re.sub(r'(\d+)(\s*$)', str(new_row), range_str)
-
-# -------------------------------------------------------------------
-# SESIÓN AUTORIZADA (AuthorizedSession) - reemplaza googleapiclient
-# -------------------------------------------------------------------
-@st.cache_resource
-def get_sheets_session():
-    try:
-        key_dict = json.loads(st.secrets["textkey"])
-    except Exception as e:
-        st.error(f"Error leyendo st.secrets['textkey']: {e}")
-        st.stop()
-    try:
-        creds = service_account.Credentials.from_service_account_info(
-            key_dict,
-            scopes=["https://www.googleapis.com/auth/spreadsheets"]
-        )
-        return AuthorizedSession(creds)
-    except Exception as e:
-        st.error(f"Error creando credenciales: {e}")
-        st.stop()
-
-session = get_sheets_session()
-
-def sheets_batch_get(spreadsheet_id, ranges):
-    """
-    Llama a sheets.values:batchGet y devuelve el JSON (o lanza excepción con detalle).
-    """
-    url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values:batchGet"
-    params = []
-    for r in ranges:
-        params.append(("ranges", r))
-    params.append(("valueRenderOption", "FORMATTED_VALUE"))
-    try:
-        resp = session.get(url, params=params, timeout=30)
-        resp.raise_for_status()
-        return resp.json()
-    except RequestException as e:
-        # mostrar detalle para debug
-        raise RuntimeError(f"Error HTTP en batchGet: {e}\nRespuesta: {getattr(e.response,'text',None)}")
-
-def sheets_get_single(spreadsheet_id, range_str):
-    """
-    Llama a sheets.values.get de forma directa (single range).
-    """
-    # encode range in URL path (API accept range as URL query param)
-    url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/{range_str}"
-    params = {"valueRenderOption": "FORMATTED_VALUE"}
-    try:
-        resp = session.get(url, params=params, timeout=30)
-        if resp.status_code == 404:
-            # tal vez range tiene caracteres; fallback a batchGet
-            res = sheets_batch_get(spreadsheet_id, [range_str])
-            # normalizar
-            return res
-        resp.raise_for_status()
-        return resp.json()
-    except RequestException as e:
-        raise RuntimeError(f"Error HTTP en get single range '{range_str}': {e}\nRespuesta: {getattr(e.response,'text',None)}")
-
-def sheets_batch_update(spreadsheet_id, updates):
-    """
-    updates: list de (range, value)
-    Ejecuta values:batchUpdate con valueInputOption USER_ENTERED
-    """
-    url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values:batchUpdate"
-    data = {
-        "valueInputOption": "USER_ENTERED",
-        "data": [{"range": r, "values": [[v]]} for r, v in updates]
-    }
-    try:
-        resp = session.post(url, json=data, timeout=30)
-        resp.raise_for_status()
-        return resp.json()
-    except RequestException as e:
-        raise RuntimeError(f"Error HTTP en batchUpdate: {e}\nRespuesta: {getattr(e.response,'text',None)}")
-
-# -------------------------------------------------------------------
-# CONSTANTES Y ESTRUCTURAS
-# -------------------------------------------------------------------
-FILA_BASE = 170
-FECHA_BASE = date(2025, 12, 2)
-SHEET_FACUNDO = "F. Economía"
-SHEET_IVAN = "I. Física"
+# -------------------------------------------------------------
+# CONSTANTES
+# -------------------------------------------------------------
+TIME_ROW = 170   # fila base
+SHEET_FACUNDO = "Facundo"
+SHEET_IVAN = "Iván"
 SHEET_MARCAS = "marcas"
 
-def get_time_row():
-    hoy = _argentina_now_global().date()
-    delta = (hoy - FECHA_BASE).days
-    return FILA_BASE + delta
-
-TIME_ROW = get_time_row()
-MARCAS_ROW = 2
-WEEK_RANGE = f"'{SHEET_MARCAS}'!R{TIME_ROW}"
-
+# -------------------------------------------------------------
+# USUARIOS (estructura original conservada)
+# -------------------------------------------------------------
 USERS = {
     "Facundo": {
-        "Matemática 2": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"},
-        "Matemática 3": {"time": f"'{SHEET_FACUNDO}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!C{MARCAS_ROW}"},
-        "Macroeconomía 1":               {"time": f"'{SHEET_FACUNDO}'!D{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!D{MARCAS_ROW}"},
-        "Historia":                      {"time": f"'{SHEET_FACUNDO}'!E{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!E{MARCAS_ROW}"},
+        "Tecnología": {"est_col": "B", "time_col": "C"},
+        "Historia":   {"est_col": "D", "time_col": "E"},
+        "Economía":   {"est_col": "F", "time_col": "G"},
+        "Física":     {"est_col": "H", "time_col": "I"},
     },
     "Iván": {
-        "Física":   {"time": f"'{SHEET_IVAN}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!F{MARCAS_ROW}"},
-        "Análisis": {"time": f"'{SHEET_IVAN}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!G{MARCAS_ROW}"},
+        "Biología":   {"est_col": "B", "time_col": "C"},
+        "Filosofía":  {"est_col": "D", "time_col": "E"},
     }
 }
 
-# -------------------------------------------------------------------
-# LÓGICA DATOS (usando REST)
-# -------------------------------------------------------------------
-def cargar_todo():
-    # Leemos todos los rangos (estados y tiempos)
-    ranges = []
-    for user, materias in USERS.items():
-        for m, info in materias.items():
-            ranges.append(info["est"])
-            ranges.append(info["time"])
+# -------------------------------------------------------------
+# SESIÓN HTTP REUTILIZADA (cacheada)
+# -------------------------------------------------------------
+@st.cache_resource(show_spinner=False)
+def get_sheets_session():
+    s = requests.Session()
+    return s
 
+# -------------------------------------------------------------
+# AUTENTICACIÓN
+# -------------------------------------------------------------
+def get_access_token():
     try:
-        res = sheets_batch_get(st.secrets["sheet_id"], ranges)
+        token_data = st.secrets["gcloud_service_account"]
     except Exception as e:
-        st.error(f"Error leyendo Google Sheets (batchGet): {e}")
+        st.error("❌ No se encontró la clave de servicio en st.secrets.")
         st.stop()
 
-    values = res.get("valueRanges", [])
-    data = {u: {"estado": {}, "tiempos": {}} for u in USERS}
-    idx = 0
-    for user, materias in USERS.items():
-        for materia, info in materias.items():
-            # estado (marca de inicio)
-            vr_est = values[idx] if idx < len(values) else {}
-            est_val = ""
-            try:
-                est_values = vr_est.get("values", [[]])
-                est_val = est_values[0][0] if est_values and est_values[0] else ""
-            except:
-                est_val = ""
-            idx += 1
+    auth_url = "https://oauth2.googleapis.com/token"
+    auth_payload = {
+        "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        "assertion": token_data["assertion"]
+    }
 
-            # time (acumulado)
-            vr_time = values[idx] if idx < len(values) else {}
-            time_val_raw = ""
-            try:
-                time_values = vr_time.get("values", [[]])
-                time_val_raw = time_values[0][0] if time_values and time_values[0] else ""
-            except:
-                time_val_raw = ""
-            idx += 1
+    r = requests.post(auth_url, data=auth_payload)
+    if r.status_code != 200:
+        st.error("❌ Error autenticando con Google: " + r.text)
+        st.stop()
+    return r.json()["access_token"]
 
-            secs = parse_time_cell_to_seconds(time_val_raw)
-            time_hms = segundos_a_hms(secs)
-            data[user]["estado"][materia] = est_val
-            data[user]["tiempos"][materia] = time_hms
-    return data
+# -------------------------------------------------------------
+# HELPERS PARA RANGES
+# -------------------------------------------------------------
+def col_letter_to_index(col):
+    n = 0
+    for ch in col:
+        n = n * 26 + (ord(ch.upper()) - ord('A')) + 1
+    return n
 
-def cargar_resumen_marcas():
-    ranges = [f"'{SHEET_MARCAS}'!C{TIME_ROW}", f"'{SHEET_MARCAS}'!B{TIME_ROW}"]
-    try:
-        res = sheets_batch_get(st.secrets["sheet_id"], ranges)
-        vr = res.get("valueRanges", [])
-        fac = vr[0].get("values",[[0]])[0][0] if len(vr) > 0 else 0
-        iv = vr[1].get("values",[[0]])[0][0] if len(vr) > 1 else 0
-        return {"Facundo": {"per_min": fac}, "Iván": {"per_min": iv}}
-    except Exception as e:
-        st.error(f"Error cargando resumen marcas: {e}")
-        return {"Facundo": {"per_min": 0}, "Iván": {"per_min": 0}}
+def col_index_to_letter(idx):
+    result = ""
+    while idx > 0:
+        idx, rem = divmod(idx - 1, 26)
+        result = chr(rem + 65) + result
+    return result
 
-def cargar_semana(range_str=None):
+def next_col(col):
+    return col_index_to_letter(col_letter_to_index(col) + 1)
+
+# -------------------------------------------------------------
+# HELPERS DE TIEMPO
+# -------------------------------------------------------------
+def parse_time_cell_to_seconds(val):
     """
-    Lee un solo rango y devuelve el valor como float (0.0 si no existe / error).
+    Acepta formatos: "H:MM:SS", "MM:SS", número, vacío, etc.
     """
-    rng = range_str or WEEK_RANGE
+    if not val:
+        return 0
+    v = str(val).strip()
+
+    # ¿ya número?
     try:
-        res = sheets_batch_get(st.secrets["sheet_id"], [rng])
-        vr = res.get("valueRanges", [{}])[0]
-        raw = vr.get("values", [["0"]])[0][0] if vr.get("values") else "0"
-        return parse_float_or_zero(raw)
-    except Exception as e:
-        # No abortamos la app por un fallo menor: devolvemos 0 y mostramos error leve.
-        st.error(f"Error cargando 'Semana' desde {rng}: {e}")
+        if ":" not in v:
+            return int(float(v))
+    except:
+        pass
+
+    # Parse H:M:S
+    parts = v.split(":")
+    if len(parts) == 3:
+        try:
+            h, m, s = parts
+            return int(h) * 3600 + int(m) * 60 + int(s)
+        except:
+            return 0
+    if len(parts) == 2:
+        try:
+            m, s = parts
+            return int(m) * 60 + int(s)
+        except:
+            return 0
+
+    return 0
+
+def segundos_a_hms(seg):
+    seg = int(seg)
+    h = seg // 3600
+    seg %= 3600
+    m = seg // 60
+    s = seg % 60
+    return f"{h}:{m:02d}:{s:02d}"
+
+def hms_a_minutos(hms_str):
+    if not hms_str:
         return 0.0
+    try:
+        parts = hms_str.split(":")
+        if len(parts) != 3:
+            return 0.0
+        h, m, s = map(int, parts)
+        return h * 60 + m + (s / 60.0)
+    except:
+        return 0.0
+
+# -------------------------------------------------------------
+# PARSER DE DATETIME PARA ESTADOS
+# -------------------------------------------------------------
+def parse_datetime(dt_str):
+    if not dt_str:
+        raise ValueError("empty dt_str")
+    from dateutil import parser
+    dt = parser.parse(dt_str)
+    if not dt.tzinfo:
+        dt = dt.replace(tzinfo=timezone.utc).astimezone(pytz.timezone("America/Argentina/Buenos_Aires"))
+    else:
+        dt = dt.astimezone(pytz.timezone("America/Argentina/Buenos_Aires"))
+    return dt
+
+def _argentina_now_global():
+    return datetime.now(pytz.timezone("America/Argentina/Buenos_Aires"))
+
+# -------------------------------------------------------------
+# GOOGLE SHEETS CALLS (batchGet / batchUpdate)
+# -------------------------------------------------------------
+def sheets_batch_get(spreadsheet_id, ranges):
+    access_token = get_access_token()
+    session = get_sheets_session()
+
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values:batchGet"
+
+    # armar query string
+    params = "&".join([f"ranges={r}" for r in ranges])
+    full_url = f"{url}?{params}"
+
+    r = session.get(full_url, headers={"Authorization": f"Bearer {access_token}"})
+    if r.status_code != 200:
+        raise RuntimeError(f"batchGet error: {r.text}")
+    return r.json()
+
+def sheets_batch_update(spreadsheet_id, data):
+    access_token = get_access_token()
+    session = get_sheets_session()
+
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}:batchUpdate"
+    r = session.post(url, headers={
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }, data=json.dumps(data))
+
+    if r.status_code != 200:
+        raise RuntimeError(f"batchUpdate error: {r.text}")
+    return r.json()
+
+# -------------------------------------------------------------
+# NUEVA LECTURA OPTIMIZADA (UNA SOLA VEZ POR RERUN - CACHE)
+# -------------------------------------------------------------
+@st.cache_data(ttl=30, show_spinner=False)
+def cargar_todo_cached(sheet_id, time_row):
+    """
+    Lee datos en **3 batchGet** (una por hoja), en lugar de decenas de llamadas individuales.
+    Devuelve:
+      - data: estructura con estado/tiempos por usuario/materia
+      - resumen_marcas: per_min y objetivos
+    """
+
+    # 3 lecturas grandes
+    ranges = [
+        f"'{SHEET_FACUNDO}'!B{time_row}:Z{time_row}",
+        f"'{SHEET_IVAN}'!B{time_row}:Z{time_row}",
+        f"'{SHEET_MARCAS}'!B{time_row}:Z{time_row}",
+    ]
+
+    try:
+        res = sheets_batch_get(sheet_id, ranges)
+    except Exception as e:
+        raise RuntimeError(f"❌ Error leyendo Google Sheets (batchGet): {e}")
+
+    # valueRanges alineados con "ranges"
+    vr = res.get("valueRanges", [])
+
+    fac_vals   = vr[0].get("values", [[""]])[0] if len(vr) > 0 else [""]
+    iv_vals    = vr[1].get("values", [[""]])[0] if len(vr) > 1 else [""]
+    marcas_vals = vr[2].get("values", [[""]])[0] if len(vr) > 2 else [""]
+
+    data = {u: {"estado": {}, "tiempos": {}} for u in USERS}
+
+    # -------------------------
+    # MAPEO FACUNDO
+    # -------------------------
+    # Usamos los offsets de la definición original de las columnas
+    for materia, info in USERS["Facundo"].items():
+        est_col = info["est_col"]
+        time_col = info["time_col"]
+        idx_est = col_letter_to_index(est_col) - 2  # restamos 2 porque B=col2 → index 0
+        idx_time = col_letter_to_index(time_col) - 2
+
+        est_val = fac_vals[idx_est] if idx_est < len(fac_vals) else ""
+        time_raw = fac_vals[idx_time] if idx_time < len(fac_vals) else ""
+
+        data["Facundo"]["estado"][materia] = est_val or ""
+        data["Facundo"]["tiempos"][materia] = segundos_a_hms(parse_time_cell_to_seconds(time_raw))
+
+    # -------------------------
+    # MAPEO IVÁN
+    # -------------------------
+    for materia, info in USERS["Iván"].items():
+        est_col = info["est_col"]
+        time_col = info["time_col"]
+        idx_est = col_letter_to_index(est_col) - 2
+        idx_time = col_letter_to_index(time_col) - 2
+
+        est_val = iv_vals[idx_est] if idx_est < len(iv_vals) else ""
+        time_raw = iv_vals[idx_time] if idx_time < len(iv_vals) else ""
+
+        data["Iván"]["estado"][materia] = est_val or ""
+        data["Iván"]["tiempos"][materia] = segundos_a_hms(parse_time_cell_to_seconds(time_raw))
+
+    # -------------------------
+    # MARCAS Y OBJETIVOS
+    # -------------------------
+    # Ajusta aquí según columnas reales:
+    resumen_marcas = {
+        "Facundo": {"per_min": 0},
+        "Iván": {"per_min": 0},
+        "objetivos": {"Facundo": 0, "Iván": 0},
+    }
+
+    try: resumen_marcas["Facundo"]["per_min"] = float(marcas_vals[1])
+    except: pass
+    try: resumen_marcas["Iván"]["per_min"] = float(marcas_vals[2])
+    except: pass
+    try: resumen_marcas["objetivos"]["Facundo"] = float(marcas_vals[3])
+    except: pass
+    try: resumen_marcas["objetivos"]["Iván"] = float(marcas_vals[4])
+    except: pass
+
+    return data, resumen_marcas
+
+# -------------------------------------------------------------
+# WRAPPER PARA USAR EN EL RESTO DEL CÓDIGO
+# -------------------------------------------------------------
+def cargar_todo():
+    try:
+        data, resumen = cargar_todo_cached(st.secrets["sheet_id"], TIME_ROW)
+        st.session_state["last_cargar_todo"] = {"data": data, "resumen": resumen, "time_row": TIME_ROW}
+        return data
+    except Exception as e:
+        st.error(f"❌ Error en cargar_todo optimizado: {e}")
+        st.stop()
+
+# -------------------------
+# Escritura en Google Sheets (values:batchUpdate)
+# -------------------------
+def sheets_values_batch_update(spreadsheet_id, payload):
+    """
+    payload = {
+      "valueInputOption": "USER_ENTERED",
+      "data": [{"range": "Hoja!A1", "values": [["valor"]]}, ...]
+    }
+    """
+    access_token = get_access_token()
+    session = get_sheets_session()
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values:batchUpdate"
+    r = session.post(url, headers={
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }, data=json.dumps(payload))
+
+    if r.status_code not in (200, 201):
+        raise RuntimeError(f"values:batchUpdate error: {r.status_code} {r.text}")
+    return r.json()
 
 def batch_write(updates):
     """
-    updates: list de (range, value)
-    Escribe exactamente lo que se indica. Las celdas time ahora recibirán HH:MM:SS strings.
+    updates: list of (range_str, value)
+    Escribe todos los updates en UNA llamada a values:batchUpdate.
     """
-    try:
-        sheets_batch_update(st.secrets["sheet_id"], updates)
-    except Exception as e:
-        st.error(f"Error escribiendo Google Sheets (batchUpdate): {e}")
-        st.stop()
+    if not updates:
+        return None
+    data = {
+        "valueInputOption": "USER_ENTERED",
+        "data": []
+    }
+    for rng, val in updates:
+        # mantener valor como string dentro de una celda
+        data["data"].append({"range": rng, "values": [[val]]})
+    return sheets_values_batch_update(st.secrets["sheet_id"], data)
 
+# -------------------------
+# Utiles para construir ranges (mantener compatibilidad con layout)
+# -------------------------
+def cell_range(sheet_name, col, row):
+    return f"'{sheet_name}'!{col}{row}"
+
+def replace_row_in_range(range_str, new_row):
+    # si range_str es como 'Hoja'!B170 -> reemplaza el número final
+    import re
+    return re.sub(r'(\d+)(\s*$)', str(new_row), range_str)
+
+# -------------------------
+# Limpiar marcas de "estudiando" para un diccionario de materias
+# -------------------------
 def limpiar_estudiando(materias):
-    batch_write([(datos["est"], "") for materia, datos in materias.items()])
+    updates = []
+    for materia, info in materias.items():
+        # info debe contener 'est_range' o 'est_col'
+        est_col = info.get("est_col")
+        if not est_col:
+            continue
+        rng = cell_range(SHEET_MARCAS, est_col, TIME_ROW) if info.get("sheet") == SHEET_MARCAS else cell_range(info.get("sheet", SHEET_FACUNDO), est_col, TIME_ROW)
+        updates.append((rng, ""))
+    if updates:
+        batch_write(updates)
 
-def acumular_tiempo(usuario, materia, minutos_sumar):
-    info = USERS[usuario][materia]
-    # leer la celda time actual (usamos sheets_get_single para mayor robustez)
+# -------------------------
+# Calcular métricas (usa datos ya cargados por cargar_todo_cached)
+# -------------------------
+def calcular_metricas(usuario, datos_local=None, resumen_local=None):
+    """
+    Devuelve:
+      total_money, per_min, objetivo_minutos, total_minutos, progreso_money_actual
+    """
+    datos_local = datos_local or st.session_state.get("last_cargar_todo", {}).get("data", {})
+    resumen_local = resumen_local or st.session_state.get("last_cargar_todo", {}).get("resumen", {})
+
+    per_min = parse_float_or_zero(resumen_local.get(usuario, {}).get("per_min", 0))
+    objetivo_min = resumen_local.get("objetivos", {}).get(usuario, 0.0)
+
+    total_min = 0.0
+    progreso_money_actual = 0.0
+    last_progreso_minutes = 0.0
+
+    for materia, meta in USERS[usuario].items():
+        base_min = hms_a_minutos(datos_local[usuario]["tiempos"].get(materia, "00:00:00"))
+        est_raw = datos_local[usuario]["estado"].get(materia, "")
+        progreso_min = 0.0
+        if str(est_raw).strip() != "":
+            try:
+                inicio = parse_datetime(est_raw)
+                progreso_min = max(0.0, (_argentina_now_global() - inicio).total_seconds() / 60.0)
+                last_progreso_minutes = progreso_min
+            except Exception:
+                progreso_min = 0.0
+        total_min += base_min + progreso_min
+
+    total_money = total_min * per_min
+    progreso_money_actual = last_progreso_minutes * per_min
+
+    return total_money, per_min, objetivo_min, total_min, progreso_money_actual
+
+# -------------------------
+# Función que acumula tiempo manual (usada por corrección o procesos)
+# -------------------------
+def acumular_tiempo_por_segmento(info, p_inicio, p_fin):
+    """
+    info: dict con keys 'time_col' y 'sheet' (opcional)
+    p_inicio, p_fin: datetime timezone-aware
+    """
+    segs = int((p_fin - p_inicio).total_seconds())
+    # target row según p_inicio
+    target_row = TIME_ROW + (p_inicio.date() - datetime.now(pytz.timezone("America/Argentina/Buenos_Aires")).date()).days
+    # construir range para la celda time de ese día usando columna de la materia
+    time_col = info.get("time_col")
+    sheet = info.get("sheet", SHEET_FACUNDO)
+    time_cell = cell_range(sheet, time_col, target_row)
+    # leer valor previo (intentamos evitar lectura adicional: obtener desde session_state si está)
+    prev_raw = ""
+    # intentamos encontrar en cache: last_cargar_todo no tiene filas por día distintas, así que leemos la celda
     try:
-        # quitar las comillas al range para la URL si es necesario (Sheets acepta 'Hoja'!A1 pero en path las comillas molestan)
-        target = info["time"]
-        res = sheets_batch_get(st.secrets["sheet_id"], [target])
-        vr = res.get("valueRanges", [{}])[0]
+        resp = sheets_batch_get(st.secrets["sheet_id"], [time_cell])
+        vr = resp.get("valueRanges", [{}])[0]
         prev_raw = vr.get("values", [[""]])[0][0] if vr.get("values") else ""
     except Exception:
         prev_raw = ""
     prev_secs = parse_time_cell_to_seconds(prev_raw)
-    add_secs = int(round(minutos_sumar * 60))
-    new_secs = prev_secs + add_secs
-    batch_write([(info["time"], segundos_a_hms(new_secs))])
+    new_secs = prev_secs + segs
+    return time_cell, segundos_a_hms(new_secs)
 
-def main():
-    # -------------------------------------------------------------------
-    # SELECCIÓN AUTOMÁTICA POR URL (incluye códigos cortos f/i/fw/iw)
-    # -------------------------------------------------------------------
+# -------------------------
+# Manejo de START / STOP (UI actions)
+# -------------------------
+def start_materia(usuario, materia):
+    info = USERS[usuario][materia]
+    # limpiar otras marcas del usuario
+    # construir ranges para limpiar: asumimos que est_col apunta a la columna de est en TIME_ROW
+    updates = []
+    for m, inf in USERS[usuario].items():
+        est_col = inf.get("est_col")
+        sheet = inf.get("sheet", SHEET_FACUNDO)
+        if est_col:
+            updates.append((cell_range(sheet, est_col, TIME_ROW), ""))
+    # poner marca actual en la materia seleccionada
+    est_col_sel = info.get("est_col")
+    sheet_sel = info.get("sheet", SHEET_FACUNDO)
+    updates.append((cell_range(sheet_sel, est_col_sel, TIME_ROW), _argentina_now_global().isoformat(sep=" ", timespec="seconds")))
+    batch_write(updates)
+    # invalidar cache para forzar recarga la próxima render (si quieres mantener cache por ttl, puedes omitirl)
     try:
-        params = st.query_params
+        st.cache_data.clear()
     except Exception:
-        params = st.experimental_get_query_params()
+        pass
 
-    def set_user_and_rerun(u):
-        st.session_state["usuario_seleccionado"] = u
-        st.rerun()
+def stop_materia(usuario, materia):
+    info = USERS[usuario][materia]
+    # leer marca de inicio desde la celda correspondiente en sheets (o desde cache si lo tienes)
+    est_col = info.get("est_col")
+    sheet = info.get("sheet", SHEET_FACUNDO)
+    est_cell = cell_range(sheet, est_col, TIME_ROW)
+    try:
+        resp = sheets_batch_get(st.secrets["sheet_id"], [est_cell])
+        vr = resp.get("valueRanges", [{}])[0]
+        est_raw = vr.get("values", [[""]])[0][0] if vr.get("values") else ""
+    except Exception:
+        est_raw = ""
 
-    # Solo intentamos setear si no hay usuario en session_state
+    if not est_raw or str(est_raw).strip() == "":
+        # nada que hacer
+        return
+
+    try:
+        inicio = parse_datetime(est_raw)
+    except Exception:
+        # limpiar por seguridad
+        batch_write([(est_cell, "")])
+        return
+
+    fin = _argentina_now_global()
+    if fin <= inicio:
+        # limpiar marca y salir
+        batch_write([(est_cell, "")])
+        return
+
+    # manejar cruzar medianoche: dividir en segmentos
+    midnight = datetime.combine(inicio.date() + timedelta(days=1), datetime.min.time())
+    midnight = pytz.timezone("America/Argentina/Buenos_Aires").localize(midnight)
+    partes = []
+    if inicio.date() == fin.date():
+        partes.append((inicio, fin))
+    else:
+        partes.append((inicio, midnight))
+        partes.append((midnight, fin))
+
+    updates = []
+    for p_inicio, p_fin in partes:
+        time_cell, new_hms = acumular_tiempo_por_segmento(info, p_inicio, p_fin)
+        updates.append((time_cell, new_hms))
+
+    # limpiar marca de inicio
+    updates.append((est_cell, ""))
+
+    # escribir todo junto
+    batch_write(updates)
+    # intentar invalidar cache local para que próxima carga traiga datos actualizados
+    try:
+        st.cache_data.clear()
+    except Exception:
+        pass
+
+# -------------------------
+# UI Principal (simplificada)
+# -------------------------
+def ui_principal():
+    st.title("Tiempo de Estudio — Optimizado")
+    # seleccionar usuario
     if "usuario_seleccionado" not in st.session_state:
-        # 1) Códigos cortos por clave (ej. ?f  ?fw ?i ?iw)
-        if "f" in params:
-            set_user_and_rerun("Facundo")
-        if "i" in params:
-            set_user_and_rerun("Iván")
-
-        # 2) Param user con valores largos o cortos (ej. ?user=facu, ?user=ivan, ?user=widget_f)
-        if "user" in params:
-            # params["user"] es lista en st.query_params; tomar el primero
-            try:
-                uval = params["user"][0].lower() if isinstance(params["user"], (list, tuple)) else str(params["user"]).lower()
-            except Exception:
-                uval = str(params["user"]).lower()
-
-            if uval in ["facu", "facundo"]:
-                set_user_and_rerun("Facundo")
-            if uval in ["ivan", "iván", "iva"]:
-                set_user_and_rerun("Iván")
-
-    # -------------------------------------------------------------------
-    # SELECCIÓN MANUAL (fallback si no vino por URL)
-    # -------------------------------------------------------------------
-    if "usuario_seleccionado" not in st.session_state:
-        st.markdown("<h1 style='text-align: center; margin-bottom: 30px;'>¿Quién sos?</h1>", unsafe_allow_html=True)
-
-        if st.button("👤 Facundo", use_container_width=True):
-            st.session_state["usuario_seleccionado"] = "Facundo"
-            st.rerun()
-
-        st.write("")
-
-        if st.button("👤 Iván", use_container_width=True):
-            st.session_state["usuario_seleccionado"] = "Iván"
-            st.rerun()
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("👤 Facundo", use_container_width=True):
+                st.session_state["usuario_seleccionado"] = "Facundo"
+                st.experimental_rerun()
+        with col2:
+            if st.button("👤 Iván", use_container_width=True):
+                st.session_state["usuario_seleccionado"] = "Iván"
+                st.experimental_rerun()
         st.stop()
 
-    # -------------------------------------------------------------------
-    # INTERFAZ PRINCIPAL (ajustada para manejar modos WIDGET)
-    # -------------------------------------------------------------------
-    USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
+    usuario = st.session_state["usuario_seleccionado"]
 
-    # OTRO_USUARIO usado en la UI normal (si corresponde)
-    OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
+    # cargar datos (cacheados)
+    datos = cargar_todo()  # ya guarda en st.session_state['last_cargar_todo']
+    resumen = st.session_state.get("last_cargar_todo", {}).get("resumen", {})
 
-    # Cargar datos (necesario tanto para widget como para modo normal)
-    datos = cargar_todo()
-    resumen_marcas = cargar_resumen_marcas()
+    # métricas rápidas
+    total_money, per_min, objetivo_min, total_min, progreso_money = calcular_metricas(usuario, datos, resumen)
 
-    # --- Si llegamos acá, es el modo normal (no widget) ---
-    # --- Banderas ---
-    usuario_estudiando = any(str(v).strip() != "" for v in datos[USUARIO_ACTUAL]["estado"].values())
-    otro_estudiando = any(str(v).strip() != "" for v in datos[OTRO_USUARIO]["estado"].values())
+    st.metric(label=f"{usuario} — Total (min)", value=f"{int(total_min)} min", delta=f"${total_money:.2f}")
+    st.write(f"Tarifa por minuto: ${per_min:.2f}  ·  Objetivo (min): {objetivo_min}")
 
-    # --- Círculos ---
-    def circle(color):
-        return (
-            f'<span '
-            f'style="display:inline-flex; align-items:center; justify-content:center; '
-            f'width:10px; height:10px; border-radius:50%; background:{color}; '
-            f'margin-right:6px; flex-shrink:0;"></span>'
-        )
+    # Listado de materias con botones
+    st.subheader("Materias")
+    materia_en_curso = None
+    for m, info in USERS[usuario].items():
+        est_val = datos[usuario]["estado"].get(m, "")
+        tiempo_acum = datos[usuario]["tiempos"].get(m, "00:00:00")
+        en_curso = str(est_val).strip() != ""
+        cols = st.columns([3,1])
+        with cols[0]:
+            st.markdown(f"**{m}** — {tiempo_acum} {'(estudiando)' if en_curso else ''}")
+        with cols[1]:
+            if en_curso:
+                if st.button(f"⛔ Detener", key=f"stop_{usuario}_{m}"):
+                    stop_materia(usuario, m)
+                    st.experimental_rerun()
+            else:
+                if st.button(f"▶ Start", key=f"start_{usuario}_{m}"):
+                    start_materia(usuario, m)
+                    st.experimental_rerun()
 
-    circle_usuario  = circle("#00e676" if usuario_estudiando else "#ffffff")
-    circle_otro     = circle("#00e676" if otro_estudiando else "#ffffff")
-
-    # --- Materia actual del otro usuario ---
-    materia_otro = next((m for m, v in datos[OTRO_USUARIO]["estado"].items() if str(v).strip() != ""), "")
-    
-    # Métricas
-    def calcular_metricas(usuario):
-        per_min = parse_float_or_zero(resumen_marcas[usuario].get("per_min", ""))
-        total_min = 0.0
-        for materia, info in USERS[usuario].items():
-            base = hms_a_minutos(datos[usuario]["tiempos"][materia])
-            progreso = 0
-            est_raw = datos[usuario]["estado"][materia]
-            if str(est_raw).strip() != "":
+        # Expander corrección manual
+        with st.expander(f"Corregir tiempo — {m}"):
+            new_val = st.text_input("Tiempo (HH:MM:SS)", value=tiempo_acum, key=f"input_{usuario}_{m}")
+            if st.button("Guardar corrección", key=f"save_{usuario}_{m}"):
+                # escribir directamente en la celda time de TIME_ROW
+                time_col = info.get("time_col")
+                sheet = info.get("sheet", SHEET_FACUNDO)
+                target = cell_range(sheet, time_col, TIME_ROW)
+                batch_write([(target, new_val)])
+                # limpiar cache y recargar
                 try:
-                    inicio = parse_datetime(est_raw)
-                    progreso = (_argentina_now_global() - inicio).total_seconds() / 60
+                    st.cache_data.clear()
                 except:
                     pass
-            total_min += base + progreso
+                st.experimental_rerun()
 
-        col_obj = "O" if usuario == "Iván" else "P"
-        objetivo = 0.0
-        try:
-            res = sheets_batch_get(st.secrets["sheet_id"], [f"'{SHEET_MARCAS}'!{col_obj}{TIME_ROW}"])
-            vr = res.get("valueRanges", [{}])[0]
-            objetivo = parse_float_or_zero(vr.get("values", [[0]])[0][0]) if vr.get("values") else 0.0
-        except Exception:
-            objetivo = 0.0
+# -------------------------
+# Helpers pequenos
+# -------------------------
+def parse_float_or_zero(s):
+    try:
+        return float(str(s).replace(",", "."))
+    except:
+        return 0.0
 
-        return total_min * per_min, per_min, objetivo, total_min, progreso * per_min
+AUTOREFRESH_INTERVAL_DEFAULT = 180_000  # 5 minutos en ms
+AUTOREFRESH_INTERVAL_ACTIVE = 120_000    # 1 minuto cuando hay actividad (opcional)
+MIN_SECONDS_BETWEEN_FORCED_RELOADS = 5  # para evitar loops (segundos)
 
-    # ---- MÉTRICAS PROPIAS ----
-    m_tot, m_rate, m_obj, total_min, progreso_min = calcular_metricas(USUARIO_ACTUAL)
-    pago_objetivo = m_rate * m_obj
-    progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
-    color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
+def should_autorefresh():
+    """
+    Decide si inyectamos st_autorefresh con menor intervalo (actividad) o mayor (inactivo).
+    También evita refrescar si el último refresh fue muy reciente.
+    """
+    last = st.session_state.get("_last_refresh_ts", 0)
+    now = time.time()
+    if now - last < MIN_SECONDS_BETWEEN_FORCED_RELOADS:
+        return None  # bloquear refresh inmediato
 
-    objetivo_hms = segundos_a_hms(int(m_obj * 60))
-    total_hms = segundos_a_hms(int(total_min * 60))
+    # Si hay datos en cache, chequear si alguien está estudiando
+    last_data = st.session_state.get("last_cargar_todo", {}).get("data", {})
+    activo = False
+    for udata in last_data.values():
+        for v in udata.get("estado", {}).values():
+            if str(v).strip() != "":
+                activo = True
+                break
+        if activo:
+            break
 
-    # obtener valor de semana desde la hoja
-    semana_val = cargar_semana()
+    # actualizar timestamp de intento
+    st.session_state["_last_refresh_ts"] = now
 
-    # si el usuario es Facundo, el valor debe tomarse con el signo invertido
-    if USUARIO_ACTUAL == "Facundo":
-        semana_val = -semana_val
+    return AUTOREFRESH_INTERVAL_ACTIVE if activo else AUTOREFRESH_INTERVAL_DEFAULT
 
-    semana_val += progreso * progreso_min
-
-    if semana_val > 0:
-        semana_color = "#00e676"
-    elif semana_val < 0:
-        semana_color = "#ff1744"
-    else:
-        semana_color = "#aaa"
-
-    # decidir color: positivo -> verde, negativo -> rojo, cero -> color por defecto (gris claro)
-    if semana_val < 0:
-        semana_str = f"-${abs(semana_val):.2f}"
-    elif semana_val > 0:
-        semana_str = f"+${semana_val:.2f}"
-    else:
-        semana_str = "$0.00"
-
-    st.markdown(f"""
-        <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-            <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
-            <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${m_tot:.2f}</div>
-            <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
-                <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
-            </div>
-            <div style="display:flex; justify-content:space-between; color:#888;">
-                <div>Semana: <span style="color:{semana_color};">{semana_str}</span></div>
-                <div>{objetivo_hms} | ${pago_objetivo:.2f}</div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-    # --- INICIO DEL BLOQUE PARA ACTUALIZAR EL WIDGET ---
-    
-    # 1. Reunir todas las variables que necesita el widget
-    # (Asegúrate de que estas variables ya se han calculado antes en tu código)
-    w_total_hms = total_hms                  # String "HH:MM:SS"
-    w_money = m_tot                          # float, ej: 15.75
-    w_progress = int(progreso_pct)           # int, ej: 60
-    w_week_value = semana_val                # float, ej: 12.50 o -5.20
-    w_goal = f"{objetivo_hms} | ${pago_objetivo:.2f}" # String "HH:MM:SS | $XX.XX"
-    
-    # ¡NUEVO! Define variables para los datos del "otro usuario".
-    # La función de Android los espera, así que los añadimos con valores por defecto.
-    w_other_user_total_hms = "00:00:00"
-    w_other_user_money = 0.0
-    w_other_user_progress = 0
-    
-    # 2. Crear el código JavaScript que llama al puente
+# -------------------------
+# Widget bridge JS (opcional)
+# -------------------------
+def inject_widget_bridge(total_hms, money, progress_pct, week_val, goal_str, other_total_hms="00:00:00", other_money=0.0, other_progress=0):
+    """
+    Injerta un pequeño script que, si existe window.AndroidBridge, llama a updateWidgetData(...)
+    Mantener height=0 para no afectar layout.
+    """
     js_code = f"""
     <script>
-        // Comprueba si el puente 'AndroidBridge' existe
-        if (window.AndroidBridge) {{
-            // Llama a la función en tu clase WebAppInterface con TODOS los argumentos
-            window.AndroidBridge.updateWidgetData(
-                "{w_total_hms}",
-                {w_money},
-                {w_progress},
-                {w_week_value},
-                "{w_goal}",
-                "{w_other_user_total_hms}",
-                {w_other_user_money},
-                {w_other_user_progress}
-            );
+        if (window.AndroidBridge && typeof window.AndroidBridge.updateWidgetData === 'function') {{
+            try {{
+                window.AndroidBridge.updateWidgetData(
+                    "{total_hms}",
+                    {money},
+                    {int(progress_pct)},
+                    {week_val},
+                    "{goal_str}",
+                    "{other_total_hms}",
+                    {other_money},
+                    {int(other_progress)}
+                );
+            }} catch(e) {{
+                console.warn("Widget bridge error", e);
+            }}
         }}
     </script>
     """
-    
-    # 3. Ejecutar el JavaScript en Streamlit
-    # Usamos st.components.v1.html para inyectar el script.
     import streamlit.components.v1 as components
     components.html(js_code, height=0)
-    
-    # --- FIN DEL BLOQUE PARA ACTUALIZAR EL WIDGET ---
 
-    # ---- PROGRESO DEL OTRO USUARIO (ahora expandido=True) ----
-    with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
-        o_tot, o_rate, o_obj, total_min_otro, progreso_min = calcular_metricas(OTRO_USUARIO)
-        o_pago_obj = o_rate * o_obj
-        o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
-        o_color_bar = "#00e676" if o_progreso_pct >= 90 else "#ffeb3b" if o_progreso_pct >= 50 else "#ff1744"
-        o_obj_hms = segundos_a_hms(int(o_obj * 60))
-        o_total_hms = segundos_a_hms(int(total_min_otro * 60))
+# -------------------------
+# Visual helpers
+# -------------------------
+def progress_bar_html(pct, color="#00e676", height_px=12):
+    pct = max(0, min(100, float(pct)))
+    return f"""
+    <div style="width:100%; background-color:#333; border-radius:8px; height:{height_px}px;">
+       <div style="width:{pct}%; background-color:{color}; height:100%; border-radius:8px;"></div>
+    </div>
+    """
 
-        st.markdown(f"""
-            <div style="margin-bottom: 10px;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size: 1.1rem; color: #ddd;"><b>{o_total_hms} | ${o_tot:.2f}</b></span>
-                </div>
-                <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
-                    <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
-                </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#aaa; margin-top:5px;">
-                    <div style="display:flex; align-items:center;">
-                        {circle_otro}
-                        <span style="color:#00e676; margin-left:6px; visibility:{ 'visible' if materia_otro else 'hidden' };">
-                            {materia_otro if materia_otro else 'Placeholder'}
-                        </span>
-                    </div>
-                    <span style="font-size: 0.9rem; color: #888;">{o_obj_hms} | ${o_pago_obj:.2f}</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+def money_str(val):
+    try:
+        return f"${float(val):.2f}"
+    except:
+        return "$0.00"
 
-    # ---- MANIFIESTO ----
-    with st.expander("ℹ️ No pensar, actuar."):
-        md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
-        st.markdown(md_content)
+# -------------------------
+# Tips de configuración (mostrar como expander)
+# -------------------------
+def render_tips():
+    with st.expander("🛠️ Tips de configuración y dónde ajustar columnas"):
+        st.markdown("""
+        - Si tu layout cambia (columnas diferentes), ajusta `USERS` en la PARTE 1 para que `est_col` y `time_col`
+          correspondan a las columnas correctas.
+        - TIME_ROW define la fila base donde guardas los acumulados por día. Cámbialo si tu fila base varía.
+        - `cargar_todo_cached` agrega un TTL de 30s: modifícalo si necesitas más/menos latencia.
+        - Reduce `AUTOREFRESH_INTERVAL_DEFAULT` si quieres que la app sea más reactiva pero a costo de más consultas.
+        - Si tienes muchos usuarios/clientes, considera mover agregaciones a un endpoint servidor (Cloud Function).
+        """)
 
-    # -------------------------------------------------------------------
-    # LISTA DE MATERIAS
-    # -------------------------------------------------------------------
-    st.subheader("Materias")
+# -------------------------
+# Main consolidado
+# -------------------------
+def main():
+    # CSS liviano (puedes extender)
+    st.markdown("""
+    <style>
+      .title-compact { font-size: 1.8rem; font-weight:700; margin-bottom:6px; }
+      .muted { color:#999; font-size:0.9rem; }
+      .card { background:#111; padding:12px; border-radius:10px; margin-bottom:10px; }
+    </style>
+    """, unsafe_allow_html=True)
 
-    mis_materias = USERS[USUARIO_ACTUAL]
-    materia_en_curso = None
-    for m, info in mis_materias.items():
-        if str(datos[USUARIO_ACTUAL]["estado"][m]).strip() != "":
-            materia_en_curso = m
-            break
+    # manejar autorefresh inteligente
+    chosen_interval = should_autorefresh()
+    if chosen_interval:
+        try:
+            # st_autorefresh requiere import local (evitar en top-level si no se usa)
+            from streamlit_autorefresh import st_autorefresh
+            st_autorefresh(interval=chosen_interval, key="smart_autorefresh")
+        except Exception:
+            # si no está disponible, no es crítico
+            pass
 
-    for materia, info in mis_materias.items():
-        est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
-        tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]  # ya en HH:MM:SS
+    # UI principal (llama a ui_principal definido en PARTE 2)
+    ui_principal()
 
-        tiempo_anadido_seg = 0
-        en_curso = False
-        if str(est_raw).strip() != "":
-            try:
-                inicio = parse_datetime(est_raw)
-                tiempo_anadido_seg = int((_argentina_now_global() - inicio).total_seconds())
-                en_curso = True
-            except:
-                pass
+    # Mostrar tips
+    render_tips()
 
-        tiempo_total_hms = segundos_a_hms(
-            hms_a_segundos(tiempo_acum) + max(0, tiempo_anadido_seg)
-        )
+    # Si quieres inyectar datos al widget Android (opcional), puedes hacerlo al final:
+    try:
+        usuario = st.session_state.get("usuario_seleccionado")
+        if usuario:
+            datos = st.session_state.get("last_cargar_todo", {}).get("data", {})
+            resumen = st.session_state.get("last_cargar_todo", {}).get("resumen", {})
+            if datos and resumen:
+                total_money, per_min, objetivo_min, total_min, progreso_money = calcular_metricas(usuario, datos, resumen)
+                goal_str = f"{int(objetivo_min)} min | {money_str(per_min * objetivo_min)}"
+                inject_widget_bridge(segundos_a_hms(int(total_min*60)), total_money, (total_money / max(1, per_min*objetivo_min))*100 if per_min*objetivo_min else 0, 0.0, goal_str)
+    except Exception:
+        pass
 
-        badge_html = f'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''
-
-        html_card = f"""<div class="materia-card">
-<div class="materia-title">{materia}</div>
-{badge_html}
-<div class="materia-time">{tiempo_total_hms}</div>
-</div>"""
-
-        st.markdown(html_card, unsafe_allow_html=True)
-
-        c_actions = st.container()
-
-        with c_actions:
-            # BOTÓN DETENER: ahora reparte en caso de cruzar medianoche
-            if materia_en_curso == materia:
-                if st.button(f"⛔ DETENER {materia[:10]}...", key=f"stop_{materia}", use_container_width=True, type="primary"):
-                    try:
-                        inicio = parse_datetime(est_raw)  # marca de inicio (timezone aware)
-                    except Exception as e:
-                        st.error("No se pudo parsear la marca de inicio.")
-                        st.rerun()
-
-                    fin = _argentina_now_global()
-                    if fin <= inicio:
-                        # caso raro: marca futura o igual
-                        st.error("La marca de inicio es igual o posterior a ahora. Ignorado.")
-                        # limpiar por seguridad
-                        batch_write([(info["est"], "")])
-                        st.rerun()
-
-                    # frontera de medianoche (primer segundo del día siguiente al inicio)
-                    midnight = datetime.combine(inicio.date() + timedelta(days=1), dt_time(0,0)).replace(tzinfo=inicio.tzinfo)
-
-                    partes = []
-                    if inicio.date() == fin.date():
-                        # todo en un mismo día
-                        partes.append((inicio, fin))
-                    else:
-                        # parte 1: inicio -> midnight (día de inicio)
-                        partes.append((inicio, midnight))
-                        # parte 2: midnight -> fin (día de fin)
-                        partes.append((midnight, fin))
-
-                    updates = []
-                    for (p_inicio, p_fin) in partes:
-                        segs = int((p_fin - p_inicio).total_seconds())
-                        # target row correspondiente a p_inicio.date()
-                        target_row = FILA_BASE + (p_inicio.date() - FECHA_BASE).days
-                        time_cell_for_row = replace_row_in_range(info["time"], target_row)
-                        # leer valor previo
-                        try:
-                            res = sheets_batch_get(st.secrets["sheet_id"], [time_cell_for_row])
-                            vr = res.get("valueRanges", [{}])[0]
-                            prev_raw = vr.get("values", [[""]])[0][0] if vr.get("values") else ""
-                        except Exception:
-                            prev_raw = ""
-                        prev_secs = parse_time_cell_to_seconds(prev_raw)
-                        new_secs = prev_secs + segs
-                        # escribir como HH:MM:SS
-                        updates.append((time_cell_for_row, segundos_a_hms(new_secs)))
-
-                    # limpiar marca de inicio
-                    updates.append((info["est"], ""))
-
-                    # ejecutar escritura
-                    batch_write(updates)
-                    st.rerun()
-            else:
-                if materia_en_curso is None:
-                    if st.button(f"▶ INICIAR", key=f"start_{materia}", use_container_width=True):
-                        # limpiar marcas y poner marca actual en esta materia
-                        limpiar_estudiando(mis_materias)
-                        batch_write([(info["est"], ahora_str())])
-                        st.rerun()
-                else:
-                    st.button("...", disabled=True, key=f"dis_{materia}", use_container_width=True)
-
-        with st.expander("🛠️ Corregir tiempo manualmente"):
-            new_val = st.text_input("Tiempo (HH:MM:SS)", value=tiempo_acum, key=f"input_{materia}")
-            if st.button("Guardar Corrección", key=f"save_{materia}"):
-                try:
-                    # validar formato HH:MM:SS simple
-                    if ":" not in new_val:
-                        raise ValueError("Formato inválido, usar HH:MM:SS")
-                    # escribir como HH:MM:SS
-                    batch_write([(info["time"], new_val)])
-                    st.rerun()
-                except Exception as e:
-                    st.error("Formato inválido")
-
-try:
-    main()
-except Exception as e:
-    st.error(f"Error crítico: {e}")
-
-    # 1. Borrar absolutamente todo el estado
-    st.session_state.clear()
-
-    # 2. Forzar recarga de la página (equivalente a F5)
-    st.markdown(
-        '<meta http-equiv="refresh" content="0">',
-        unsafe_allow_html=True
-    )
-
-    # 3. Fallback por si el browser refresh falla
-    st.rerun()
-
-
-
-
-
-
-
-
+# -------------------------
+# Ejecutar main y manejo de errores
+# -------------------------
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        st.error(f"Error crítico: {e}")
+        # limpiar estado sensible y forzar recarga suave
+        try:
+            st.session_state.clear()
+        except:
+            pass
+        st.experimental_rerun()
