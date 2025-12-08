@@ -510,7 +510,7 @@ def main():
     total_hms = segundos_a_hms(int(total_min * 60))
 
     # obtener valor de semana desde la hoja
-    semana_val = cargar_semana()
+    semana_val = cargar_semana() + m_tot
 
     # si el usuario es Facundo, el valor debe tomarse con el signo invertido
     if USUARIO_ACTUAL == "Facundo":
@@ -757,6 +757,7 @@ except Exception as e:
 
     # 3. Fallback por si el browser refresh falla
     st.rerun()
+
 
 
 
