@@ -410,10 +410,6 @@ def main():
             set_user_and_rerun("Facundo")
         if "i" in params:
             set_user_and_rerun("Iván")
-        if "fw" in params:
-            set_user_and_rerun("WIDGET_F")
-        if "iw" in params:
-            set_user_and_rerun("WIDGET_I")
 
         # 2) Param user con valores largos o cortos (ej. ?user=facu, ?user=ivan, ?user=widget_f)
         if "user" in params:
@@ -427,10 +423,6 @@ def main():
                 set_user_and_rerun("Facundo")
             if uval in ["ivan", "iván", "iva"]:
                 set_user_and_rerun("Iván")
-            if uval in ["widget_f", "widget-f", "widgetf"]:
-                set_user_and_rerun("WIDGET_F")
-            if uval in ["widget_i", "widget-i", "widgeti"]:
-                set_user_and_rerun("WIDGET_I")
 
     # -------------------------------------------------------------------
     # SELECCIÓN MANUAL (fallback si no vino por URL)
@@ -454,96 +446,16 @@ def main():
     # -------------------------------------------------------------------
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
 
-    # Modo widget?
-    MODO_WIDGET = USUARIO_ACTUAL in ["WIDGET_F", "WIDGET_I"]
-
-    # Usuario real (para cálculos) — en modo widget mapeamos a Facundo/Iván
-    if USUARIO_ACTUAL == "WIDGET_F":
-        USUARIO_REAL = "Facundo"
-    elif USUARIO_ACTUAL == "WIDGET_I":
-        USUARIO_REAL = "Iván"
-    else:
-        USUARIO_REAL = USUARIO_ACTUAL
-
     # OTRO_USUARIO usado en la UI normal (si corresponde)
-    OTRO_USUARIO = "Iván" if USUARIO_REAL == "Facundo" else "Facundo"
+    OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
 
     # Cargar datos (necesario tanto para widget como para modo normal)
     datos = cargar_todo()
     resumen_marcas = cargar_resumen_marcas()
 
-    # Si estamos en modo widget → mostramos solo el bloque "Hoy" para USUARIO_REAL y terminamos.
-    if MODO_WIDGET:
-        # calcular métricas para el usuario real (Facundo o Iván)
-        def calcular_metricas_widget(usuario):
-            per_min = parse_float_or_zero(resumen_marcas[usuario].get("per_min", ""))
-            total_min = 0.0
-            for materia, info in USERS[usuario].items():
-                base = hms_a_minutos(datos[usuario]["tiempos"][materia])
-                progreso = 0
-                est_raw = datos[usuario]["estado"][materia]
-                if str(est_raw).strip() != "":
-                    try:
-                        inicio = parse_datetime(est_raw)
-                        progreso = (_argentina_now_global() - inicio).total_seconds() / 60
-                    except:
-                        pass
-                total_min += base + progreso
-
-            col_obj = "O" if usuario == "Iván" else "P"
-            objetivo = 0.0
-            try:
-                res = sheets_batch_get(st.secrets["sheet_id"], [f"'{SHEET_MARCAS}'!{col_obj}{TIME_ROW}"])
-                vr = res.get("valueRanges", [{}])[0]
-                objetivo = parse_float_or_zero(vr.get("values", [[0]])[0][0]) if vr.get("values") else 0.0
-            except Exception:
-                objetivo = 0.0
-
-            return total_min * per_min, per_min, objetivo, total_min
-
-        m_tot, m_rate, m_obj, total_min = calcular_metricas_widget(USUARIO_REAL)
-        pago_objetivo = m_rate * m_obj
-        progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
-        color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
-
-        objetivo_hms = segundos_a_hms(int(m_obj * 60))
-        total_hms = segundos_a_hms(int(total_min * 60))
-
-        semana_val = cargar_semana()
-        # si el usuario real es Facundo (en tu sheet estaba invertido)
-        if USUARIO_REAL == "Facundo":
-            semana_val = -semana_val
-
-        if semana_val > 0:
-            semana_color = "#00e676"
-            semana_str = f"+${semana_val:.2f}"
-        elif semana_val < 0:
-            semana_color = "#ff1744"
-            semana_str = f"-${abs(semana_val):.2f}"
-        else:
-            semana_color = "#aaa"
-            semana_str = "$0.00"
-
-        st.markdown(f"""
-            <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
-                <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${m_tot:.2f}</div>
-                <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
-                    <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
-                </div>
-                <div style="display:flex; justify-content:space-between; color:#888;">
-                    <div>Semana: <span style="color:{semana_color};">{semana_str}</span></div>
-                    <div>{objetivo_hms} | ${pago_objetivo:.2f}</div>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # Muy importante: detener render del resto para que el widget sea solo esto
-        st.stop()
-
     # --- Si llegamos acá, es el modo normal (no widget) ---
     # --- Banderas ---
-    usuario_estudiando = any(str(v).strip() != "" for v in datos[USUARIO_REAL]["estado"].values())
+    usuario_estudiando = any(str(v).strip() != "" for v in datos[USUARIO_ACTUAL]["estado"].values())
     otro_estudiando = any(str(v).strip() != "" for v in datos[OTRO_USUARIO]["estado"].values())
 
     # --- Círculos ---
@@ -589,7 +501,7 @@ def main():
         return total_min * per_min, per_min, objetivo, total_min
 
     # ---- MÉTRICAS PROPIAS ----
-    m_tot, m_rate, m_obj, total_min = calcular_metricas(USUARIO_REAL)
+    m_tot, m_rate, m_obj, total_min = calcular_metricas(USUARIO_ACTUAL)
     pago_objetivo = m_rate * m_obj
     progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
     color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
@@ -601,7 +513,7 @@ def main():
     semana_val = cargar_semana()
 
     # si el usuario es Facundo, el valor debe tomarse con el signo invertido
-    if USUARIO_REAL == "Facundo":
+    if USUARIO_ACTUAL == "Facundo":
         semana_val = -semana_val
 
     if semana_val > 0:
@@ -698,7 +610,7 @@ def main():
 
     # ---- MANIFIESTO ----
     with st.expander("ℹ️ No pensar, actuar."):
-        md_content = st.secrets["md"]["facundo"] if USUARIO_REAL == "Facundo" else st.secrets["md"]["ivan"]
+        md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
         st.markdown(md_content)
 
     # -------------------------------------------------------------------
@@ -706,16 +618,16 @@ def main():
     # -------------------------------------------------------------------
     st.subheader("Materias")
 
-    mis_materias = USERS[USUARIO_REAL]
+    mis_materias = USERS[USUARIO_ACTUAL]
     materia_en_curso = None
     for m, info in mis_materias.items():
-        if str(datos[USUARIO_REAL]["estado"][m]).strip() != "":
+        if str(datos[USUARIO_ACTUAL]["estado"][m]).strip() != "":
             materia_en_curso = m
             break
 
     for materia, info in mis_materias.items():
-        est_raw = datos[USUARIO_REAL]["estado"][materia]
-        tiempo_acum = datos[USUARIO_REAL]["tiempos"][materia]  # ya en HH:MM:SS
+        est_raw = datos[USUARIO_ACTUAL]["estado"][materia]
+        tiempo_acum = datos[USUARIO_ACTUAL]["tiempos"][materia]  # ya en HH:MM:SS
 
         tiempo_anadido_seg = 0
         en_curso = False
@@ -837,4 +749,5 @@ except Exception as e:
 
     # 3. Fallback por si el browser refresh falla
     st.rerun()
+
 
