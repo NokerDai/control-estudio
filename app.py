@@ -584,10 +584,10 @@ def main():
         badge_html = f'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''
         
         html_card = f"""<div class="materia-card">
-    <div class="materia-title">{materia}</div>
-    {badge_html}
-    <div class="materia-time">{tiempo_total_hms}</div>
-    </div>"""
+<div class="materia-title">{materia}</div>
+{badge_html}
+<div class="materia-time">{tiempo_total_hms}</div>
+</div>"""
         
         st.markdown(html_card, unsafe_allow_html=True)
     
@@ -687,6 +687,7 @@ except Exception as e:
 
     # 3. Fallback por si el browser refresh falla
     st.rerun()
+
 
 
 
