@@ -8,7 +8,7 @@ from google.auth.transport.requests import AuthorizedSession
 from requests.exceptions import RequestException
 from streamlit_autorefresh import st_autorefresh
 
-st_autorefresh(interval=60000, key="auto_refresh")
+st_autorefresh(interval=300000, key="auto_refresh")
 
 # timezone helpers
 try:
@@ -288,6 +288,7 @@ USERS = {
 # -------------------------------------------------------------------
 # LÓGICA DATOS (usando REST)
 # -------------------------------------------------------------------
+@st.cache_data(ttl=20) 
 def cargar_todo():
     # Leemos todos los rangos (estados y tiempos)
     ranges = []
@@ -759,3 +760,4 @@ except Exception as e:
 
     # 3. Fallback por si el browser refresh falla
     st.rerun()
+
