@@ -1,4 +1,9 @@
 streamlit
-google-api-python-client
-streamlit-autorefresh
 google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+requests
+pytz
+python-dateutil
+streamlit-autorefresh
