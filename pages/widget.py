@@ -11,9 +11,7 @@ from app import (
     sheets_batch_get
 )
 
-# --------------------------------------------------------
-# 1) Detectar usuario vía URL: ?u=facundo   o    ?u=ivan
-# --------------------------------------------------------
+# Detectar usuario vía URL: ?u=ivan o ?u=facundo
 params = st.query_params
 u = params.get("u", "").lower()
 
@@ -27,9 +25,6 @@ else:
     st.error("Falta especificar el usuario. Usá por ejemplo: `?u=facundo` o `?u=ivan`")
     st.stop()
 
-# --------------------------------------------------------
-# Configuración de página
-# --------------------------------------------------------
 st.set_page_config(
     page_title=f"Widget Hoy — {USUARIO}",
     page_icon="⏳",
@@ -38,9 +33,7 @@ st.set_page_config(
 
 st.title(f"⏳ Hoy — {USUARIO}")
 
-# --------------------------------------------------------
-# 2) Cálculo de métricas
-# --------------------------------------------------------
+
 def calcular_metricas(usuario):
     resumen = cargar_resumen_marcas()
     datos = cargar_todo()
@@ -72,12 +65,8 @@ def calcular_metricas(usuario):
     return total_min * per_min, per_min, objetivo, total_min
 
 
-# --------------------------------------------------------
-# 3) Datos reales
-# --------------------------------------------------------
 m_tot, m_rate, m_obj, total_min = calcular_metricas(USUARIO)
 pago_obj = m_rate * m_obj
-
 progreso_pct = min(m_tot / max(1, pago_obj), 1) * 100
 color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
 
@@ -85,17 +74,12 @@ total_hms = segundos_a_hms(int(total_min * 60))
 objetivo_hms = segundos_a_hms(int(m_obj * 60))
 
 semana = cargar_semana()
-
-# Facundo debe invertir signo
 if USUARIO == "Facundo":
     semana = -semana
 
-sem_color = "#00e676" if semana > 0 else "#ff1744" if semana < 0 else "#aaa"
+sem_color = "#00e176" if semana > 0 else "#ff1744" if semana < 0 else "#aaa"
 sem_str = f"+${semana:.2f}" if semana > 0 else f"-${abs(semana):.2f}" if semana < 0 else "$0.00"
 
-# --------------------------------------------------------
-# 4) Render final
-# --------------------------------------------------------
 st.markdown(f"""
 <div style="background:#1e1e1e; padding:15px; border-radius:10px;">
     <div style="font-size:1.1rem; color:#aaa;">Hoy</div>
