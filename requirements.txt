@@ -1,4 +1,5 @@
 streamlit
-google-api-python-client
-streamlit-autorefresh
 google-auth
+requests
+streamlit-autorefresh
+pytz
