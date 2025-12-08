@@ -9,6 +9,7 @@ from requests.exceptions import RequestException
 from streamlit_autorefresh import st_autorefresh
 
 def main():
+    1/0
     # timezone helpers
     try:
         from zoneinfo import ZoneInfo
@@ -687,3 +688,4 @@ except Exception as e:
 
     # 3. Fallback por si el browser refresh falla
     st.rerun()
+
