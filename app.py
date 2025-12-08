@@ -1,5 +1,3 @@
-# app.py (versión parcheada: manejo de 429, backoff, cache corto y prefetch de objetivos)
-
 import re
 import json
 import time
@@ -479,6 +477,13 @@ def calcular_metricas_prefetch(usuario, datos, resumen_marcas, objetivos_prefetc
 # MAIN (interfaz + lógica) - usa las versiones cacheadas y prefetch
 # -------------------------------------------------------------------
 def main():
+    # --- FIX BOTONES CONGELADOS ---
+    # Si el usuario acaba de hacer click, forzamos un rerender suave
+    if st.session_state.get("just_clicked", False):
+        st.session_state["just_clicked"] = False
+        st.session_state["busy"] = False
+        st.rerun()
+    
     # -------------------------------------------------------------------
     # SELECCIÓN AUTOMÁTICA POR URL (incluye códigos cortos f/i/fw/iw)
     # -------------------------------------------------------------------
@@ -715,6 +720,8 @@ def main():
             # BOTÓN DETENER: ahora reparte en caso de cruzar medianoche
             if materia_en_curso == materia:
                 if st.button(f"⛔ DETENER {materia[:10]}...", key=f"stop_{materia}", use_container_width=True, type="primary"):
+                    st.session_state["busy"] = True
+                    st.session_state["just_clicked"] = True
                     try:
                         inicio = parse_datetime(est_raw)  # marca de inicio (timezone aware)
                     except Exception as e:
@@ -755,11 +762,12 @@ def main():
                     batch_write(updates)
                     st.rerun()
             else:
-                if materia_en_curso is None:
-                    if st.button(f"▶ INICIAR", key=f"start_{materia}", use_container_width=True):
-                        limpiar_estudiando(mis_materias)
-                        batch_write([(info["est"], ahora_str())])
-                        st.rerun()
+                if st.button(f"▶ INICIAR", key=f"start_{materia}", use_container_width=True):
+                    st.session_state["busy"] = True
+                    st.session_state["just_clicked"] = True
+                    limpiar_estudiando(mis_materias)
+                    batch_write([(info["est"], ahora_str())])
+                    st.rerun()
                 else:
                     st.button("...", disabled=True, key=f"dis_{materia}", use_container_width=True)
 
@@ -790,3 +798,4 @@ except Exception as e:
 
     # 3. Fallback por si el browser refresh falla
     st.rerun()
+
