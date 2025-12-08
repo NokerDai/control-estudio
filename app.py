@@ -545,7 +545,7 @@ def main():
         </div>
     """, unsafe_allow_html=True)
     # --- INICIO DEL BLOQUE PARA ACTUALIZAR EL WIDGET ---
-
+    
     # 1. Reunir todas las variables que necesita el widget
     # (Asegúrate de que estas variables ya se han calculado antes en tu código)
     w_total_hms = total_hms                  # String "HH:MM:SS"
@@ -554,18 +554,27 @@ def main():
     w_week_value = semana_val                # float, ej: 12.50 o -5.20
     w_goal = f"{objetivo_hms} | ${pago_objetivo:.2f}" # String "HH:MM:SS | $XX.XX"
     
+    # ¡NUEVO! Define variables para los datos del "otro usuario".
+    # La función de Android los espera, así que los añadimos con valores por defecto.
+    w_other_user_total_hms = "00:00:00"
+    w_other_user_money = 0.0
+    w_other_user_progress = 0
+    
     # 2. Crear el código JavaScript que llama al puente
     js_code = f"""
     <script>
         // Comprueba si el puente 'AndroidBridge' existe
         if (window.AndroidBridge) {{
-            // Llama a la función en tu clase WebAppInterface
+            // Llama a la función en tu clase WebAppInterface con TODOS los argumentos
             window.AndroidBridge.updateWidgetData(
                 "{w_total_hms}",
                 {w_money},
                 {w_progress},
                 {w_week_value},
-                "{w_goal}"
+                "{w_goal}",
+                "{w_other_user_total_hms}",
+                {w_other_user_money},
+                {w_other_user_progress}
             );
         }}
     </script>
@@ -573,7 +582,6 @@ def main():
     
     # 3. Ejecutar el JavaScript en Streamlit
     # Usamos st.components.v1.html para inyectar el script.
-    # No te preocupes, esto no mostrará nada visible en la pantalla.
     import streamlit.components.v1 as components
     components.html(js_code, height=0)
     
@@ -749,6 +757,7 @@ except Exception as e:
 
     # 3. Fallback por si el browser refresh falla
     st.rerun()
+
 
 
 
