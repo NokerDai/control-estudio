@@ -645,6 +645,40 @@ def main():
             </div>
         </div>
     """, unsafe_allow_html=True)
+    # --- INICIO DEL BLOQUE PARA ACTUALIZAR EL WIDGET ---
+
+    # 1. Reunir todas las variables que necesita el widget
+    # (Asegúrate de que estas variables ya se han calculado antes en tu código)
+    w_total_hms = total_hms                  # String "HH:MM:SS"
+    w_money = m_tot                          # float, ej: 15.75
+    w_progress = int(progreso_pct)           # int, ej: 60
+    w_week_value = semana_val                # float, ej: 12.50 o -5.20
+    w_goal = f"{objetivo_hms} | ${pago_objetivo:.2f}" # String "HH:MM:SS | $XX.XX"
+    
+    # 2. Crear el código JavaScript que llama al puente
+    js_code = f"""
+    <script>
+        // Comprueba si el puente 'AndroidBridge' existe
+        if (window.AndroidBridge) {{
+            // Llama a la función en tu clase WebAppInterface
+            window.AndroidBridge.updateWidgetData(
+                "{w_total_hms}",
+                {w_money},
+                {w_progress},
+                {w_week_value},
+                "{w_goal}"
+            );
+        }}
+    </script>
+    """
+    
+    # 3. Ejecutar el JavaScript en Streamlit
+    # Usamos st.components.v1.html para inyectar el script.
+    # No te preocupes, esto no mostrará nada visible en la pantalla.
+    import streamlit.components.v1 as components
+    components.html(js_code, height=0)
+    
+    # --- FIN DEL BLOQUE PARA ACTUALIZAR EL WIDGET ---
 
     # ---- PROGRESO DEL OTRO USUARIO (ahora expandido=True) ----
     with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
@@ -816,6 +850,7 @@ except Exception as e:
 
     # 3. Fallback por si el browser refresh falla
     st.rerun()
+
 
 
 
