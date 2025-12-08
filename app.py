@@ -468,19 +468,6 @@ def main():
     # OTRO_USUARIO usado en la UI normal (si corresponde)
     OTRO_USUARIO = "Iván" if USUARIO_REAL == "Facundo" else "Facundo"
 
-    # Sidebar solo en modo normal (no widget)
-    if not MODO_WIDGET:
-        with st.sidebar:
-            st.header(f"Hola, {USUARIO_REAL}")
-            if st.button("Cerrar Sesión", use_container_width=True):
-                del st.session_state["usuario_seleccionado"]
-                st.rerun()
-
-        st.title("⏳ Estudio")
-    else:
-        # En modo widget no mostramos título ni sidebar.
-        pass
-
     # Cargar datos (necesario tanto para widget como para modo normal)
     datos = cargar_todo()
     resumen_marcas = cargar_resumen_marcas()
@@ -850,3 +837,4 @@ except Exception as e:
 
     # 3. Fallback por si el browser refresh falla
     st.rerun()
+
