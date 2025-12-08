@@ -392,14 +392,21 @@ def main():
         new_secs = prev_secs + add_secs
         batch_write([(info["time"], segundos_a_hms(new_secs))])
 
-    # --- SELECCIÓN AUTOMÁTICA POR URL ---
-    params = st.query_params
-    if "user" in params:
+    try:
+        params = st.query_params      # Streamlit 1.33+
+    except:
+        params = st.experimental_get_query_params()   # versiones anteriores
+    
+    if "user" in params and "usuario_seleccionado" not in st.session_state:
         u = params["user"].lower()
-        if u == "facu":
+    
+        if u in ["facu", "facundo"]:
             st.session_state["usuario_seleccionado"] = "Facundo"
-        elif u == "ivan":
+            st.rerun()
+    
+        if u in ["ivan", "iván", "iva"]:
             st.session_state["usuario_seleccionado"] = "Iván"
+            st.rerun()
     
     # -------------------------------------------------------------------
     # SELECCIÓN USUARIO
@@ -696,6 +703,7 @@ except Exception as e:
 
     # 3. Fallback por si el browser refresh falla
     st.rerun()
+
 
 
 
