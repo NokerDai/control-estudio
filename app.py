@@ -231,6 +231,7 @@ RANGO_OBJ_IVAN = f"'{SHEET_MARCAS}'!O{TIME_ROW}"
 @st.cache_data()
 def cargar_datos_unificados():
     """Carga todos los datos necesarios de Google Sheets (solo al inicio o tras acción de botón)."""
+    st.info("⚠️ Leyendo datos de Google Sheets...")
     all_ranges = []
     mapa_indices = {"materias": {}, "rates": {}, "objs": {}, "week": None}
     idx = 0
@@ -298,6 +299,7 @@ def cargar_datos_unificados():
         st.session_state["materia_activa"] = materia_en_curso
         st.session_state["inicio_dt"] = inicio_dt
 
+    st.success("✅ Datos cargados correctamente.")
     return {"users_data": data_usuarios, "resumen": resumen, "balance": balance_val}
 
 def batch_write(updates):
@@ -569,8 +571,16 @@ def main():
                     </div>
                 </div>
             """, unsafe_allow_html=True)
-
-                o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
+            
+        # --- Progreso Otro Usuario (solo renderizado la primera vez o si se activa/desactiva) ---
+        # Dado que esta sección no necesita actualización de tiempo real (solo la del usuario actual), 
+        # la renderizamos fuera del bucle de `st.empty` la primera vez y luego simplemente mostramos el contenido.
+        
+        # Opcional: Si quieres que el progreso del otro usuario se actualice *solo* cuando la data cambia,
+        # lo dejamos como estaba, pero lo sacamos del bucle de tiempo real. Para este ejercicio lo mantenemos fuera
+        # del bucle forzado, solo se actualiza si hay un rerun.
+        
+        o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
         o_pago_obj = o_rate * o_obj
         o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
         o_color_bar = "#00e676" if o_progreso_pct >= 90 else "#ffeb3b" if o_progreso_pct >= 50 else "#ff1744"
@@ -681,4 +691,3 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
-
