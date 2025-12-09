@@ -267,9 +267,9 @@ def cargar_datos_unificados():
         "Iván": {"per_min": parse_float_or_zero(get_val(mapa_indices["rates"]["Iván"])), "obj": parse_float_or_zero(get_val(mapa_indices["objs"]["Iván"]))}
     }
     raw_week = get_val(mapa_indices["week"], "0")
-    semana_val = parse_float_or_zero(raw_week)
+    balance_val = parse_float_or_zero(raw_week)
 
-    return {"users_data": data_usuarios, "resumen": resumen, "semana": semana_val}
+    return {"users_data": data_usuarios, "resumen": resumen, "balance": balance_val}
 
 def batch_write(updates):
     try:
@@ -412,7 +412,7 @@ def main():
     datos_globales = cargar_datos_unificados()
     datos = datos_globales["users_data"]
     resumen_marcas = datos_globales["resumen"]
-    semana_val_raw = datos_globales["semana"]
+    balance_val_raw = datos_globales["balance"]
 
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
     OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
@@ -457,12 +457,12 @@ def main():
     objetivo_hms = segundos_a_hms(int(m_obj * 60))
     total_hms = segundos_a_hms(int(total_min * 60))
 
-    semana_val = semana_val_raw
+    balance_val = balance_val_raw
     if USUARIO_ACTUAL == "Facundo":
-        semana_val = -semana_val
-    semana_val += progreso_en_dinero
-    semana_color = "#00e676" if semana_val > 0 else "#ff1744" if semana_val < 0 else "#aaa"
-    semana_str = f"+${semana_val:.2f}" if semana_val > 0 else (f"-${abs(semana_val):.2f}" if semana_val < 0 else "$0.00")
+        balance_val = -balance_val
+    balance_val += progreso_en_dinero
+    balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa"
+    balance_str = f"+${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
 
     st.markdown(f"""
         <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
@@ -472,7 +472,7 @@ def main():
                 <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
             </div>
             <div style="display:flex; justify-content:space-between; color:#888;">
-                <div>Semana: <span style="color:{semana_color};">{semana_str}</span></div>
+                <div>Balance: <span style="color:{balance_color};">{balance_str}</span></div>
                 <div>{objetivo_hms} | ${pago_objetivo:.2f}</div>
             </div>
         </div>
