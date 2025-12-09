@@ -569,16 +569,8 @@ def main():
                     </div>
                 </div>
             """, unsafe_allow_html=True)
-            
-        # --- Progreso Otro Usuario (solo renderizado la primera vez o si se activa/desactiva) ---
-        # Dado que esta sección no necesita actualización de tiempo real (solo la del usuario actual), 
-        # la renderizamos fuera del bucle de `st.empty` la primera vez y luego simplemente mostramos el contenido.
-        
-        # Opcional: Si quieres que el progreso del otro usuario se actualice *solo* cuando la data cambia,
-        # lo dejamos como estaba, pero lo sacamos del bucle de tiempo real. Para este ejercicio lo mantenemos fuera
-        # del bucle forzado, solo se actualiza si hay un rerun.
-        
-        o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
+
+                o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
         o_pago_obj = o_rate * o_obj
         o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
         o_color_bar = "#00e676" if o_progreso_pct >= 90 else "#ffeb3b" if o_progreso_pct >= 50 else "#ff1744"
@@ -689,3 +681,4 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
+
