@@ -615,7 +615,7 @@ def main():
                             {materia_otro if materia_otro else 'Placeholder'}
                         </span>
                     </div>
-                    <span style="font-size: 0.9rem; color: #888;">{o_obj_hms} | ${o_pago_objetivo:.2f}</span>
+                    <span style="font-size: 0.9rem; color: #888;">{o_obj_hms} | ${o_pago_obj:.2f}</span>
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -744,3 +744,4 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
+
