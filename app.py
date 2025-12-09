@@ -583,7 +583,7 @@ def main():
                     data.otherUserProgress
                 );
             }}
-        })();
+        }}})(); 
     </script>
     """
 
@@ -764,3 +764,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
