@@ -213,7 +213,7 @@ USERS = {
         "Matemática 2": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"},
         "Matemática 3": {"time": f"'{SHEET_FACUNDO}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!C{MARCAS_ROW}"},
         "Macroeconomía 1": {"time": f"'{SHEET_FACUNDO}'!D{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!D{MARCAS_ROW}"},
-        "Historia":      {"time": f"'{SHEET_FACUNDO}'!E{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!E{MARCAS_ROW}"},
+        "Historia":        {"time": f"'{SHEET_FACUNDO}'!E{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!E{MARCAS_ROW}"},
     },
     "Iván": {
         "Física":    {"time": f"'{SHEET_IVAN}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!F{MARCAS_ROW}"},
@@ -554,7 +554,7 @@ def main():
         balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa"
         balance_str = f"+${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
 
-        # --- Actualizar Placeholder Global (HOY) ---
+        # --- Actualizar Placeholder Global ---
         with placeholder_total.container():
             st.markdown(f"""
                 <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
@@ -570,11 +570,14 @@ def main():
                 </div>
             """, unsafe_allow_html=True)
             
-        # ----------------------------------------------------------------------
-        # SECCIONES MOVIDAS: Progreso de otro usuario, Manifiesto y Materias
-        # ----------------------------------------------------------------------
+        # --- Progreso Otro Usuario (solo renderizado la primera vez o si se activa/desactiva) ---
+        # Dado que esta sección no necesita actualización de tiempo real (solo la del usuario actual), 
+        # la renderizamos fuera del bucle de `st.empty` la primera vez y luego simplemente mostramos el contenido.
         
-        # --- Progreso Otro Usuario ---
+        # Opcional: Si quieres que el progreso del otro usuario se actualice *solo* cuando la data cambia,
+        # lo dejamos como estaba, pero lo sacamos del bucle de tiempo real. Para este ejercicio lo mantenemos fuera
+        # del bucle forzado, solo se actualiza si hay un rerun.
+        
         o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
         o_pago_obj = o_rate * o_obj
         o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
@@ -583,7 +586,7 @@ def main():
         o_total_hms = segundos_a_hms(int(total_min_otro * 60))
 
         with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
-              st.markdown(f"""
+             st.markdown(f"""
                 <div style="margin-bottom: 10px;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <span style="font-size: 1.1rem; color: #ddd;"><b>{o_total_hms} | ${o_tot:.2f}</b></span>
@@ -608,12 +611,7 @@ def main():
             md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
             st.markdown(md_content)
 
-        # Encabezado "Materias"
         st.subheader("Materias")
-        
-        # ----------------------------------------------------------------------
-        # CONTINÚA CON EL LISTADO DE MATERIAS
-        # ----------------------------------------------------------------------
 
         # --- Actualizar Placeholders de Materias y Botones ---
         mis_materias = USERS[USUARIO_ACTUAL]
@@ -644,11 +642,11 @@ def main():
                     if en_curso:
                         # mostrar DETENER
                         st.button(f"⛔ DETENER {materia[:14]}", key=key_stop, use_container_width=True,
-                                  on_click=stop_materia_callback, args=(USUARIO_ACTUAL, materia))
+                                    on_click=stop_materia_callback, args=(USUARIO_ACTUAL, materia))
                     else:
                         if materia_en_curso is None:
                             st.button("▶ INICIAR", key=key_start, use_container_width=True,
-                                      on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia))
+                                        on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia))
                         else:
                             st.button("...", disabled=True, key=key_disabled, use_container_width=True)
 
@@ -677,7 +675,7 @@ def main():
         st.rerun() # Fuerza el ciclo de Streamlit para la actualización del tiempo.
         
     # footer: opción de reinicio de sesión si hay una excepción grave
-    st.write("") # espacio
+    st.write("")  # espacio
     if st.sidebar.button("🔄 Forzar limpieza session_state"):
         st.session_state.clear()
         st.rerun()
