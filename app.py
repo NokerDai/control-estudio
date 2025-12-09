@@ -87,33 +87,10 @@ def parse_datetime(s):
     raise ValueError(f"Formato inválido: {s}")
 
 def hms_a_segundos(hms):
-    """Convierte 'HH:MM:SS' o 'MM:SS' a segundos. Si recibe número, intenta parsear a float."""
-    if hms is None:
-        return 0
-    s = str(hms).strip()
-    if s == "":
-        return 0
-    if ":" in s:
-        parts = s.split(":")
-        try:
-            if len(parts) == 3:
-                h, m, sec = map(int, parts)
-            elif len(parts) == 2:
-                # Aceptamos MM:SS o H:M; interpretamos como MM:SS si el primer valor < 24 assume minutos,
-                # pero para ser coherente asumimos MM:SS (más común para tiempos cortos).
-                m, sec = map(int, parts)
-                h = 0
-            else:
-                return 0
-            return h*3600 + m*60 + sec
-        except:
-            return 0
-    # si no tiene ":", interpretar como número (segundos o fracción de día)
+    if not hms: return 0
     try:
-        f = float(s.replace(",", "."))
-        if 0 <= f <= 1:
-            return int(f * 86400)
-        return int(f)
+        h, m, s = map(int, hms.split(":"))
+        return h*3600 + m*60 + s
     except:
         return 0
 
@@ -250,6 +227,7 @@ RANGO_OBJ_FACU = f"'{SHEET_MARCAS}'!P{TIME_ROW}"
 RANGO_OBJ_IVAN = f"'{SHEET_MARCAS}'!O{TIME_ROW}"
 
 # ------------------ CARGA UNIFICADA (cacheada) ------------------
+# Eliminamos el `ttl` para que solo se refresque con .clear()
 @st.cache_data()
 def cargar_datos_unificados():
     """Carga todos los datos necesarios de Google Sheets (solo al inicio o tras acción de botón)."""
@@ -284,6 +262,7 @@ def cargar_datos_unificados():
 
     data_usuarios = {u: {"estado": {}, "tiempos": {}, "inicio_dt": None, "materia_activa": None} for u in USERS}
     
+    # Nuevo: Sincronizar session_state con el estado de la hoja de cálculo
     materia_en_curso = None
     inicio_dt = None
     
@@ -304,6 +283,7 @@ def cargar_datos_unificados():
                     inicio_dt = parse_datetime(raw_est)
                     materia_en_curso = m
                 except Exception:
+                    # En caso de formato inválido, no hacemos nada y dejamos el estado vacío
                     pass
 
     resumen = {
@@ -423,72 +403,21 @@ def stop_materia_callback(usuario, materia):
     finally:
         pedir_rerun()
 
-# ------------------ VALIDACIÓN Y CONVERSIÓN DE CORRECCIÓN ------------------
-def validar_y_convertir_a_hms(valor_str):
-    """Valida el valor ingresado y devuelve HH:MM:SS. Lanza ValueError si inválido."""
-    if valor_str is None:
-        raise ValueError("Valor vacío")
-    s = str(valor_str).strip()
-    if s == "":
-        raise ValueError("Valor vacío")
-    # Si tiene partes separadas por ":", intentar parsear
-    if ":" in s:
-        parts = s.split(":")
-        try:
-            if len(parts) == 3:
-                h = int(parts[0]); m = int(parts[1]); sec = int(parts[2])
-            elif len(parts) == 2:
-                # interpretamos como MM:SS
-                h = 0; m = int(parts[0]); sec = int(parts[1])
-            else:
-                raise ValueError("Formato HH:MM:SS esperado")
-            if m < 0 or m >= 60 or sec < 0 or sec >= 60 or h < 0:
-                raise ValueError("Valores fuera de rango")
-            return segundos_a_hms(h*3600 + m*60 + sec)
-        except Exception:
-            raise ValueError("Formato HH:MM:SS inválido")
-    # Si no tiene ":", intentar como número o fracción de día
-    try:
-        f = float(s.replace(",", "."))
-        if 0 <= f <= 1:
-            segs = int(f * 86400)
-            return segundos_a_hms(segs)
-        if f >= 1:
-            segs = int(f)
-            return segundos_a_hms(segs)
-        raise ValueError("Número inválido")
-    except Exception:
-        raise ValueError("Formato inválido - use HH:MM:SS o número")
-
 # ------------------ UI PRINCIPAL ------------------
 def main():
     # Si un callback pidió un rerun, hacerlo aquí (fuera del callback)
     if st.session_state.get("_do_rerun", False):
         st.session_state["_do_rerun"] = False
         st.rerun()
-
-    # --- Procesar correcciones pendientes (antes de cargar datos y antes del loop) ---
-    if "correccion_pend" in st.session_state:
-        corr = st.session_state.pop("correccion_pend")
-        usuario = corr.get("usuario")
-        materia = corr.get("materia")
-        nuevo_val = corr.get("nuevo_valor")
-        try:
-            hms = validar_y_convertir_a_hms(nuevo_val)
-            info = USERS[usuario][materia]
-            target_row = TIME_ROW  # por defecto corregimos la fila de hoy
-            time_cell_for_row = replace_row_in_range(info["time"], target_row)
-            # escribir
-            batch_write([(time_cell_for_row, hms)])
-            # forzar relectura y volver al flow normal
-            pedir_rerun()
-            st.stop()
-        except Exception as e:
-            st.error(f"Error aplicando corrección: {e}")
-            # dejamos que el usuario intente de nuevo; no pedimos rerun
-
+        
     # --- Sidebar debug (simplificado) ---
     st.sidebar.header("🔧 Debug & Controls")
+    
+    # -----------------------------------------------------------------------------------------
+    # NO USAMOS st_autorefresh, el bucle de abajo se encargará
+    # st.sidebar.checkbox("Autorefresh (5 min)", value=False, disabled=True) 
+    # -----------------------------------------------------------------------------------------
+    
     st.sidebar.markdown("**session_state**")
     st.sidebar.write(dict(st.session_state))
     if st.sidebar.button("Test click (sidebar)"):
@@ -501,12 +430,15 @@ def main():
         params = st.experimental_get_query_params()
 
     if "usuario_seleccionado" not in st.session_state:
+        # Lógica de selección de usuario (sin cambios)
         def set_user_and_rerun(u):
             st.session_state["usuario_seleccionado"] = u
             st.rerun()
 
         if "f" in params: set_user_and_rerun("Facundo")
         if "i" in params: set_user_and_rerun("Iván")
+        
+        # ... (restante de la lógica de selección de usuario) ...
         if "user" in params:
             try:
                 uval = params["user"][0].lower() if isinstance(params["user"], (list, tuple)) else str(params["user"]).lower()
@@ -527,6 +459,7 @@ def main():
             st.stop()
 
     # --- Carga de Datos y Variables Globales ---
+    # Solo carga/refresca la data si la caché está vacía (por primera vez o tras batch_write.clear())
     datos_globales = cargar_datos_unificados()
     datos = datos_globales["users_data"]
     resumen_marcas = datos_globales["resumen"]
@@ -656,7 +589,7 @@ def main():
                         <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#aaa; margin-top:5px;">
                             <div style="display:flex; align-items:center;">
                                 {circle_otro}
-                                <span style="color:#00e676; margin-left:6px; visibility:{ 'visible' if materia_otro else 'hidden' };">
+                                <span style="color:#00e676; margin-left:6px; visibility:{ 'visible' if materia_otro else 'hidden' }>
                                     {materia_otro if materia_otro else 'Placeholder'}
                                 </span>
                             </div>
@@ -712,23 +645,47 @@ def main():
                 with cols[1]:
                     # Manual correction expander y guardado
                     with st.expander("🛠️ Corregir tiempo manualmente"):
-                        input_key = f"input_{sanitize_key(USUARIO_ACTUAL)}_{sanitize_key(materia)}"
-                        init_val = datos[USUARIO_ACTUAL]["tiempos"][materia]
-                        # Mostramos el input siempre, pero solo permitimos guardar si no se está estudiando
-                        st.text_input("Tiempo (HH:MM:SS)", value=init_val, key=input_key)
+                        # Usamos un text_input con key que guardaremos en session_state para leerlo dentro del callback
+                        input_key = f"input_{sanitize_key(materia)}"
+                        new_val = st.text_input("Tiempo (HH:MM:SS)", value=datos[USUARIO_ACTUAL]["tiempos"][materia], key=input_key)
                         
-                        save_key = f"save_{sanitize_key(USUARIO_ACTUAL)}_{sanitize_key(materia)}"
-                        if usuario_estudiando:
-                            st.info("No podés corregir mientras estés estudiando. Detené la materia para poder editar el tiempo.")
-                        else:
-                            if st.button("Guardar Corrección", key=save_key):
-                                st.session_state["correccion_pend"] = {
-                                    "usuario": USUARIO_ACTUAL,
-                                    "materia": materia,
-                                    "nuevo_valor": st.session_state.get(input_key, init_val)
-                                }
+                        # Definir la función de corrección como callback que LEE el valor desde session_state
+                        def save_correction_callback(materia_key):
+                            # Solo permitir corrección si NO se está estudiando
+                            if st.session_state.get("materia_activa") is not None:
+                                st.error("⛔ No podés corregir el tiempo mientras estás estudiando.")
                                 pedir_rerun()
-                                st.stop()
+                                return
+
+                            val = st.session_state.get(f"input_{sanitize_key(materia_key)}", "").strip()
+                            if ":" not in val:
+                                st.error("Formato inválido (debe ser HH:MM:SS)")
+                                pedir_rerun()
+                                return
+
+                            try:
+                                # Normalizar y validar
+                                segs = hms_a_segundos(val)
+                                hhmmss = segundos_a_hms(segs)
+
+                                # Target row (día actual)
+                                target_row = TIME_ROW
+                                time_cell_for_row = replace_row_in_range(USERS[USUARIO_ACTUAL][materia_key]["time"], target_row)
+
+                                # Escribir en Sheets
+                                batch_write([(time_cell_for_row, hhmmss)])
+                                st.success("Tiempo corregido correctamente.")
+                            except Exception as e:
+                                st.error(f"Error al corregir el tiempo: {e}")
+                            finally:
+                                pedir_rerun()
+
+                        # Mostrar el botón solo si la materia NO está en curso y el usuario no está estudiando
+                        if en_curso or usuario_estudiando:
+                            st.info("⛔ No podés corregir el tiempo mientras estás estudiando.")
+                        else:
+                            if st.button("Guardar Corrección", key=f"save_{sanitize_key(materia)}", on_click=save_correction_callback, args=(materia,)):
+                                pass # la lógica corre en el callback
 
         # Si no hay materia activa, salimos del bucle para no consumir recursos.
         if not usuario_estudiando:
