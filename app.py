@@ -227,6 +227,7 @@ RANGO_OBJ_IVAN = f"'{SHEET_MARCAS}'!O{TIME_ROW}"
 @st.cache_data()
 def cargar_datos_unificados():
     """Carga todos los datos necesarios de Google Sheets (solo al inicio o tras acción de botón)."""
+    # ... [Código de carga de rangos y llamada a sheets_batch_get] ...
     all_ranges = []
     mapa_indices = {"materias": {}, "rates": {}, "objs": {}, "week": None}
     idx = 0
@@ -258,9 +259,12 @@ def cargar_datos_unificados():
 
     data_usuarios = {u: {"estado": {}, "tiempos": {}} for u in USERS}
     
-    materia_en_curso = None
-    inicio_dt = None
-    
+    # 📌 Cambios aquí 📌
+    # Usaremos estas variables para almacenar el estado detectado en la hoja
+    materia_en_curso_hoja = None
+    inicio_dt_hoja = None
+    usuario_actual = st.session_state.get("usuario_seleccionado") # Leemos el usuario seleccionado (si existe)
+
     for user, materias in USERS.items():
         for m in materias:
             idx_est = mapa_indices["materias"][(user, m, "est")]
@@ -272,14 +276,17 @@ def cargar_datos_unificados():
             secs = parse_time_cell_to_seconds(raw_time)
             data_usuarios[user]["tiempos"][m] = segundos_a_hms(secs)
             
-            # Buscar el inicio_dt y materia_activa para el usuario actualmente seleccionado
-            if "usuario_seleccionado" in st.session_state and user == st.session_state.get("usuario_seleccionado") and str(raw_est).strip() != "":
+            # Buscar el inicio_dt y materia_activa para el USUARIO ACTUALMENTE SELECCIONADO
+            # OJO: Solo intentamos restaurar el estado para el usuario que está viendo la página.
+            if user == usuario_actual and str(raw_est).strip() != "":
                 try:
-                    inicio_dt = parse_datetime(raw_est)
-                    materia_en_curso = m
+                    inicio_dt_hoja = parse_datetime(raw_est)
+                    materia_en_curso_hoja = m
                 except Exception:
+                    # Si no se puede parsear la fecha, limpiamos la marca de inicio de la hoja
+                    # (Esto evitaría el error, pero por ahora solo seguimos adelante sin marcarla como activa)
                     pass
-                
+
     resumen = {
         "Facundo": {"per_min": parse_float_or_zero(get_val(mapa_indices["rates"]["Facundo"])), "obj": parse_float_or_zero(get_val(mapa_indices["objs"]["Facundo"]))},
         "Iván": {"per_min": parse_float_or_zero(get_val(mapa_indices["rates"]["Iván"])), "obj": parse_float_or_zero(get_val(mapa_indices["objs"]["Iván"]))}
@@ -287,10 +294,11 @@ def cargar_datos_unificados():
     raw_week = get_val(mapa_indices["week"], "0")
     balance_val = parse_float_or_zero(raw_week)
 
-    # Inicializar/Actualizar el estado de sesión (solo si el usuario ya está seleccionado)
-    if "usuario_seleccionado" in st.session_state:
-        st.session_state["materia_activa"] = materia_en_curso
-        st.session_state["inicio_dt"] = inicio_dt
+    # 📌 La clave: Inicializar/Actualizar el estado de sesión SIEMPRE que se carga la data
+    # usando el valor leído de la hoja (siempre que el usuario esté seleccionado).
+    if usuario_actual:
+        st.session_state["materia_activa"] = materia_en_curso_hoja
+        st.session_state["inicio_dt"] = inicio_dt_hoja
 
     return {"users_data": data_usuarios, "resumen": resumen, "balance": balance_val}
 
@@ -774,5 +782,6 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
+
 
 
