@@ -397,6 +397,23 @@ def stop_materia_callback(usuario, materia):
         pedir_rerun()
 
 def main():
+    def save_correction_callback(materia_key, input_key):
+        """Callback para guardar la corrección manual leyendo directamente de st.session_state."""
+        # Obtenemos el valor del campo de texto usando la clave proporcionada
+        try:
+            new_time_val = st.session_state[input_key] 
+            
+            if ":" in new_time_val:
+                # Escribimos el nuevo valor en la hoja de cálculo
+                batch_write([(USERS[st.session_state["usuario_seleccionado"]][materia_key]["time"], new_time_val)])
+            else:
+                # Usamos st.warning o st.error para notificar al usuario
+                st.warning("Formato inválido. Por favor, usa HH:MM:SS.") 
+        except KeyError:
+            st.error("Error al leer el valor del campo de texto. Inténtalo de nuevo.")
+        
+        pedir_rerun() # Forzamos la recarga para que el nuevo tiempo se muestre
+    
     # Si un callback pidió un rerun, hacerlo aquí (fuera del callback)
     if st.session_state.get("_do_rerun", False):
         st.session_state["_do_rerun"] = False
@@ -684,16 +701,17 @@ def main():
                         # Manual correction expander y guardado
                         with st.expander("🛠️ Corregir tiempo manualmente"):
                             tiempo_acumulado_hms = datos[USUARIO_ACTUAL]["tiempos"][materia]
-                            new_val = st.text_input("Tiempo (HH:MM:SS)", value=tiempo_acumulado_hms, key=f"input_{sanitize_key(materia)}")
                             
-                            def save_correction_callback(materia_key, new_time_val):
-                                if ":" in new_time_val:
-                                    batch_write([(USERS[USUARIO_ACTUAL][materia_key]["time"], new_time_val)])
-                                else:
-                                    st.error("Formato inválido (debe ser HH:MM:SS)")
-                                pedir_rerun()
+                            # 1. Creamos una clave única para el st.text_input
+                            input_key = f"input_{sanitize_key(materia)}" 
                             
-                            if st.button("Guardar Corrección", key=f"save_{sanitize_key(materia)}", on_click=save_correction_callback, args=(materia, new_val)):
+                            # 2. El st.text_input usa la clave
+                            st.text_input("Tiempo (HH:MM:SS)", value=tiempo_acumulado_hms, key=input_key) 
+                            
+                            # 3. El botón llama al callback, PASANDO LA CLAVE (input_key) como argumento
+                            if st.button("Guardar Corrección", key=f"save_{sanitize_key(materia)}", 
+                                         on_click=save_correction_callback, 
+                                         args=(materia, input_key)): 
                                 pass
 
 
