@@ -569,49 +569,41 @@ def main():
                     </div>
                 </div>
             """, unsafe_allow_html=True)
-            
-        # --- Progreso Otro Usuario (solo renderizado la primera vez o si se activa/desactiva) ---
-        # Dado que esta sección no necesita actualización de tiempo real (solo la del usuario actual), 
-        # la renderizamos fuera del bucle de `st.empty` la primera vez y luego simplemente mostramos el contenido.
-        
-        # Opcional: Si quieres que el progreso del otro usuario se actualice *solo* cuando la data cambia,
-        # lo dejamos como estaba, pero lo sacamos del bucle de tiempo real. Para este ejercicio lo mantenemos fuera
-        # del bucle forzado, solo se actualiza si hay un rerun.
-        
-        o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
-        o_pago_obj = o_rate * o_obj
-        o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
-        o_color_bar = "#00e676" if o_progreso_pct >= 90 else "#ffeb3b" if o_progreso_pct >= 50 else "#ff1744"
-        o_obj_hms = segundos_a_hms(int(o_obj * 60))
-        o_total_hms = segundos_a_hms(int(total_min_otro * 60))
 
-        with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
-             st.markdown(f"""
-                <div style="margin-bottom: 10px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-size: 1.1rem; color: #ddd;"><b>{o_total_hms} | ${o_tot:.2f}</b></span>
-                    </div>
-                    <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
-                        <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#aaa; margin-top:5px;">
-                        <div style="display:flex; align-items:center;">
-                            {circle_otro}
-                            <span style="color:#00e676; margin-left:6px; visibility:{ 'visible' if materia_otro else 'hidden' };">
-                                {materia_otro if materia_otro else 'Placeholder'}
-                            </span>
+                o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
+                o_pago_obj = o_rate * o_obj
+                o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
+                o_color_bar = "#00e676" if o_progreso_pct >= 90 else "#ffeb3b" if o_progreso_pct >= 50 else "#ff1744"
+                o_obj_hms = segundos_a_hms(int(o_obj * 60))
+                o_total_hms = segundos_a_hms(int(total_min_otro * 60))
+        
+                with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
+                     st.markdown(f"""
+                        <div style="margin-bottom: 10px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span style="font-size: 1.1rem; color: #ddd;"><b>{o_total_hms} | ${o_tot:.2f}</b></span>
+                            </div>
+                            <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
+                                <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#aaa; margin-top:5px;">
+                                <div style="display:flex; align-items:center;">
+                                    {circle_otro}
+                                    <span style="color:#00e676; margin-left:6px; visibility:{ 'visible' if materia_otro else 'hidden' };">
+                                        {materia_otro if materia_otro else 'Placeholder'}
+                                    </span>
+                                </div>
+                                <span style="font-size: 0.9rem; color: #888;">{o_obj_hms} | ${o_pago_obj:.2f}</span>
+                            </div>
                         </div>
-                        <span style="font-size: 0.9rem; color: #888;">{o_obj_hms} | ${o_pago_obj:.2f}</span>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-            
-        # Manifiesto
-        with st.expander("ℹ️ No pensar, actuar."):
-            md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
-            st.markdown(md_content)
-
-        st.subheader("Materias")
+                    """, unsafe_allow_html=True)
+                    
+                # Manifiesto
+                with st.expander("ℹ️ No pensar, actuar."):
+                    md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
+                    st.markdown(md_content)
+        
+                st.subheader("Materias")
 
         # --- Actualizar Placeholders de Materias y Botones ---
         mis_materias = USERS[USUARIO_ACTUAL]
