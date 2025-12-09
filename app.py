@@ -231,7 +231,6 @@ RANGO_OBJ_IVAN = f"'{SHEET_MARCAS}'!O{TIME_ROW}"
 @st.cache_data()
 def cargar_datos_unificados():
     """Carga todos los datos necesarios de Google Sheets (solo al inicio o tras acción de botón)."""
-    st.info("⚠️ Leyendo datos de Google Sheets...")
     all_ranges = []
     mapa_indices = {"materias": {}, "rates": {}, "objs": {}, "week": None}
     idx = 0
@@ -299,7 +298,6 @@ def cargar_datos_unificados():
         st.session_state["materia_activa"] = materia_en_curso
         st.session_state["inicio_dt"] = inicio_dt
 
-    st.success("✅ Datos cargados correctamente.")
     return {"users_data": data_usuarios, "resumen": resumen, "balance": balance_val}
 
 def batch_write(updates):
@@ -691,3 +689,4 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
+
