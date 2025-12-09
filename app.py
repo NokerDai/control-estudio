@@ -6,7 +6,8 @@ import streamlit as st
 from google.oauth2 import service_account
 from google.auth.transport.requests import AuthorizedSession
 from requests.exceptions import RequestException
-import streamlit.components.v1 as components 
+import streamlit.components.v1 as components
+from zoneinfo import ZoneInfo
 
 # ------------------ CONFIG ------------------
 st.set_page_config(page_title="Tiempo de Estudio", page_icon="⏳", layout="centered")
@@ -39,7 +40,6 @@ st.markdown("""
 
 # ------------------ TIMEZONE HELPERS ------------------
 try:
-    from zoneinfo import ZoneInfo
     _HAS_ZONEINFO = True
 except Exception:
     ZoneInfo = None
@@ -792,3 +792,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
