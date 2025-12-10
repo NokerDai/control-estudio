@@ -1,4 +1,3 @@
-# --- (todo el encabezado e imports igual que antes) ---
 import re
 import json
 import time
@@ -7,6 +6,8 @@ import streamlit as st
 from google.oauth2 import service_account
 from google.auth.transport.requests import AuthorizedSession
 from requests.exceptions import RequestException
+import plotly.graph_objects as go
+import requests
 
 # ------------------ CONFIG ------------------
 st.set_page_config(page_title="Tiempo de Estudio", page_icon="⏳", layout="centered")
@@ -375,6 +376,31 @@ def stop_materia_callback(usuario, materia):
     finally:
         pedir_rerun()
 
+def cargar_drive_json(url):
+    try:
+        resp = requests.get(url)
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        st.error(f"No se pudo cargar JSON de Duolingo: {e}")
+        return {}
+        
+def crear_pie_anki(datos, titulo):
+    if not datos: return go.Figure()
+    labels = ["Nuevas", "Aprendiendo", "Reaprendiendo", "Jóvenes", "Maduras"]
+    values = [
+        datos.get("new", 0),
+        datos.get("learning", 0),
+        datos.get("relearning", 0),
+        datos.get("young", 0),
+        datos.get("mature", 0)
+    ]
+    colores = ["#6BAED6", "#FD8D3C", "#FB6A4A", "#74C476", "#31A354"]
+
+    fig = go.Figure(data=[go.Pie(labels=labels, values=values, marker_colors=colores, hole=0.3)])
+    fig.update_layout(title_text=titulo)
+    return fig
+
 def main():
     if st.session_state.get("_do_rerun", False):
         st.session_state["_do_rerun"] = False
@@ -542,6 +568,17 @@ def main():
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
+
+            # --- EXPANDER: PROGRESO DUOLINGO ---
+            with st.expander("📊 Anki", expanded=True):
+                duolingo_ivan = cargar_drive_json(f"https://drive.google.com/uc?id={st.secrets['drive_ids']['ivan']}")
+                duolingo_facundo = cargar_drive_json(f"https://drive.google.com/uc?id={st.secrets['drive_ids']['facundo']}")
+            
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.plotly_chart(crear_pie_anki(duolingo_ivan, "Iván"), use_container_width=True)
+                with col2:
+                    st.plotly_chart(crear_pie_anki(duolingo_facundo, "Facundo"), use_container_width=True)
 
             # Manifiesto
             with st.expander("ℹ️ No pensar, actuar."):
