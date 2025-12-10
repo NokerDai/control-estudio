@@ -401,6 +401,19 @@ def crear_pie_anki(datos, titulo):
     fig.update_layout(title_text=titulo)
     return fig
 
+# Colores fijos para todas las categorías
+colores = {
+    "new": "#6BAED6",
+    "learning": "#FD8D3C",
+    "relearning": "#FB6A4A",
+    "young": "#74C476",
+    "mature": "#31A354"
+}
+
+# Etiquetas
+labels = ["Nuevas", "Aprendiendo", "Reaprendiendo", "Jóvenes", "Maduras"]
+keys = ["new", "learning", "relearning", "young", "mature"]
+
 def main():
     if st.session_state.get("_do_rerun", False):
         st.session_state["_do_rerun"] = False
@@ -569,59 +582,34 @@ def main():
                     </div>
                 """, unsafe_allow_html=True)
 
-            # --- EXPANDER: PROGRESO ANKI ---
+            # --- Expander Anki compartiendo leyenda ---
             with st.expander("📊 Anki"):
-                # Inicializamos diccionarios vacíos
                 anki_data = {}
-            
-                # Validamos si existen los IDs en secrets
                 if "ivan" in st.secrets.get("drive_ids", {}):
-                    url_ivan = f"https://drive.google.com/uc?id={st.secrets['drive_ids']['ivan']}"
-                    anki_data["Iván"] = cargar_drive_json(url_ivan)
-            
+                    anki_data["Iván"] = cargar_drive_json(f"https://drive.google.com/uc?id={st.secrets['drive_ids']['ivan']}")
                 if "facundo" in st.secrets.get("drive_ids", {}):
-                    url_facundo = f"https://drive.google.com/uc?id={st.secrets['drive_ids']['facundo']}"
-                    anki_data["Facundo"] = cargar_drive_json(url_facundo)
+                    anki_data["Facundo"] = cargar_drive_json(f"https://drive.google.com/uc?id={st.secrets['drive_ids']['facundo']}")
             
                 if not anki_data:
                     st.info("No hay datos de Anki disponibles.")
                 else:
-                    # Selector compartido para categorías
-                    categoria = st.radio(
-                        "Seleccionar categoría:",
-                        ["Todas", "Nuevas", "Aprendiendo", "Reaprendiendo", "Jóvenes", "Maduras"],
-                        horizontal=True
-                    )
-            
-                    # Mostrar gráficos lado a lado según los usuarios disponibles
                     cols = st.columns(len(anki_data))
                     for i, (usuario, datos_json) in enumerate(anki_data.items()):
                         with cols[i]:
-                            if categoria == "Todas":
-                                st.plotly_chart(crear_pie_anki(datos_json, usuario), use_container_width=True)
-                            else:
-                                # Mapear nombres de categorías a claves del JSON
-                                cat_map = {
-                                    "Nuevas": "new",
-                                    "Aprendiendo": "learning",
-                                    "Reaprendiendo": "relearning",
-                                    "Jóvenes": "young",
-                                    "Maduras": "mature"
-                                }
-                                cat_key = cat_map[categoria]
-                                labels = [categoria]
-                                values = [datos_json.get(cat_key, 0)]
-                                # Colores según categoría
-                                colores_cat = [
-                                    "#6BAED6" if cat_key=="new" else
-                                    "#FD8D3C" if cat_key=="learning" else
-                                    "#FB6A4A" if cat_key=="relearning" else
-                                    "#74C476" if cat_key=="young" else
-                                    "#31A354"
-                                ]
-                                fig = go.Figure(data=[go.Pie(labels=labels, values=values, marker_colors=colores_cat, hole=0.3)])
-                                fig.update_layout(title_text=usuario)
-                                st.plotly_chart(fig, use_container_width=True)
+                            values = [datos_json.get(k, 0) for k in keys]
+                            # Solo mostrar la leyenda en el primer gráfico
+                            show_legend = i == 0
+                            fig = go.Figure(
+                                data=[go.Pie(
+                                    labels=labels,
+                                    values=values,
+                                    marker_colors=[colores[k] for k in keys],
+                                    hole=0.3,
+                                    showlegend=show_legend
+                                )]
+                            )
+                            fig.update_layout(title_text=usuario)
+                            st.plotly_chart(fig, use_container_width=True)
 
             # Manifiesto
             with st.expander("ℹ️ No pensar, actuar."):
@@ -719,5 +707,6 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
+
 
 
