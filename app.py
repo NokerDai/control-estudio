@@ -580,7 +580,7 @@ def main():
                 else:
                     p_mat, p_you, p_oth = 0, 0, 0
 
-                with st.expander("Estadísticas de Anki (Tarjetas)"):
+                with st.expander("Anki"):
                     st.write(f"Total: **{a_total}**")
                     st.markdown(f"""
                         <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 5px; color: #ccc;">
@@ -691,4 +691,5 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
+
 
