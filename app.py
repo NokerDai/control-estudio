@@ -382,7 +382,7 @@ def cargar_drive_json(url):
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
-        st.error(f"No se pudo cargar JSON de Duolingo: {e}")
+        st.error(f"No se pudo cargar JSON de Anki: {e}")
         return {}
         
 def crear_pie_anki(datos, titulo):
@@ -569,16 +569,28 @@ def main():
                     </div>
                 """, unsafe_allow_html=True)
 
-            # --- EXPANDER: PROGRESO DUOLINGO ---
-            with st.expander("📊 Anki", expanded=True):
-                duolingo_ivan = cargar_drive_json(f"https://drive.google.com/uc?id={st.secrets['drive_ids']['ivan']}")
-                duolingo_facundo = cargar_drive_json(f"https://drive.google.com/uc?id={st.secrets['drive_ids']['facundo']}")
+            # --- EXPANDER: PROGRESO ANKI ---
+            with st.expander("📊 Anki"):
+                # Inicializamos diccionarios vacíos
+                anki_data = {}
             
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.plotly_chart(crear_pie_anki(duolingo_ivan, "Iván"), use_container_width=True)
-                with col2:
-                    st.plotly_chart(crear_pie_anki(duolingo_facundo, "Facundo"), use_container_width=True)
+                # Validamos si existen los IDs en secrets
+                if "ivan" in st.secrets.get("drive_ids", {}):
+                    url_ivan = f"https://drive.google.com/uc?id={st.secrets['drive_ids']['ivan']}"
+                    anki_data["Iván"] = cargar_drive_json(url_ivan)
+            
+                if "facundo" in st.secrets.get("drive_ids", {}):
+                    url_facundo = f"https://drive.google.com/uc?id={st.secrets['drive_ids']['facundo']}"
+                    anki_data["Facundo"] = cargar_drive_json(url_facundo)
+            
+                # Mostramos solo los que existen
+                if anki_data:
+                    cols = st.columns(len(anki_data))
+                    for i, (usuario, datos_json) in enumerate(anki_data.items()):
+                        with cols[i]:
+                            st.plotly_chart(crear_pie_anki(datos_json, usuario), use_container_width=True)
+                else:
+                    st.info("No hay datos de Anki disponibles.")
 
             # Manifiesto
             with st.expander("ℹ️ No pensar, actuar."):
@@ -676,3 +688,4 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
+
