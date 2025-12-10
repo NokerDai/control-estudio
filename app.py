@@ -1,3 +1,4 @@
+# --- (todo el encabezado e imports igual que antes) ---
 import re
 import json
 import time
@@ -6,7 +7,6 @@ import streamlit as st
 from google.oauth2 import service_account
 from google.auth.transport.requests import AuthorizedSession
 from requests.exceptions import RequestException
-import matplotlib.pyplot as plt
 
 # ------------------ CONFIG ------------------
 st.set_page_config(page_title="Tiempo de Estudio", page_icon="⏳", layout="centered")
@@ -291,17 +291,6 @@ def cargar_datos_unificados():
 
     return {"users_data": data_usuarios, "resumen": resumen, "balance": balance_val}
 
-@st.cache_data()
-def cargar_anki_stats(file_id):
-    try:
-        url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
-        resp = session.get(url)
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as e:
-        st.error(f"Error leyendo stats de Anki desde Drive: {e}")
-        return {"nuevas":0, "aprendiendo":0, "reaprendiendo":0, "jóvenes":0, "maduras":0}
-
 def batch_write(updates):
     try:
         sheets_batch_update(st.secrets["sheet_id"], updates)
@@ -436,14 +425,6 @@ def main():
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
     OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
 
-    # Seleccionamos el archivo de Anki según el usuario
-    if USUARIO_ACTUAL == "Facundo":
-        ANKI_FILE_ID = st.secrets["anki_file_facu"]
-    else:
-        ANKI_FILE_ID = st.secrets["anki_file_ivan"]
-    
-    anki_stats = cargar_anki_stats(ANKI_FILE_ID)
-
     materia_en_curso = st.session_state.get("materia_activa")
     inicio_dt = st.session_state.get("inicio_dt")
 
@@ -562,42 +543,6 @@ def main():
                     </div>
                 """, unsafe_allow_html=True)
 
-            # ------------------ ANKI STATS ------------------
-            with st.expander("📊 Progreso Anki", expanded=True):
-                col1, col2 = st.columns(2)
-            
-                # IDs de archivos JSON de cada usuario
-                ANKI_FILE_ID_ACTUAL = st.secrets["anki_file_facu"] if USUARIO_ACTUAL == "Facundo" else st.secrets["anki_file_ivan"]
-                ANKI_FILE_ID_OTRO = st.secrets["anki_file_facu"] if OTRO_USUARIO == "Facundo" else st.secrets["anki_file_ivan"]
-            
-                # Cargar stats de Anki
-                stats_actual = cargar_anki_stats(ANKI_FILE_ID_ACTUAL)
-                stats_otro = cargar_anki_stats(ANKI_FILE_ID_OTRO)
-            
-                # Función para crear gráfico de torta
-                def anki_pie(stats):
-                    labels = ["Nuevas", "Aprendiendo", "Reaprendiendo", "Jóvenes", "Maduras"]
-                    sizes = [
-                        stats.get("nuevas", 0),
-                        stats.get("aprendiendo", 0),
-                        stats.get("reaprendiendo", 0),
-                        stats.get("jóvenes", 0),
-                        stats.get("maduras", 0)
-                    ]
-                    colors = ["#6BAED6", "#FD8D3C", "#FB6A4A", "#74C476", "#31A354"]
-                    fig, ax = plt.subplots(figsize=(4,4))
-                    ax.pie(sizes, labels=labels, colors=colors, autopct="%1.1f%%", startangle=90)
-                    ax.axis("equal")
-                    return fig
-            
-                with col1:
-                    st.markdown(f"**{USUARIO_ACTUAL}**")
-                    st.pyplot(anki_pie(stats_actual))
-            
-                with col2:
-                    st.markdown(f"**{OTRO_USUARIO}**")
-                    st.pyplot(anki_pie(stats_otro))
-
             # Manifiesto
             with st.expander("ℹ️ No pensar, actuar."):
                 md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
@@ -694,5 +639,3 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
-
-
