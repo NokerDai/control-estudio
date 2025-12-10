@@ -568,56 +568,41 @@ def main():
                     </div>
                 """, unsafe_allow_html=True)
 
-            # ======================= DESPLEGABLE CON GRÁFICO DE TORTA ========================= #
-            st.markdown("### 🧠 Tus estadísticas de Anki (desde Drive)")
+            # ------------------ ANKI STATS ------------------
+            with st.expander("📊 Progreso Anki", expanded=True):
+                col1, col2 = st.columns(2)
             
-            # Cargar JSON del usuario actual
-            drive_link = st.secrets["drive"][USUARIO_ACTUAL]
-            stats = cargar_stats_desde_drive(drive_link)
+                # IDs de archivos JSON de cada usuario
+                ANKI_FILE_ID_ACTUAL = st.secrets["anki_file_facu"] if USUARIO_ACTUAL == "Facundo" else st.secrets["anki_file_ivan"]
+                ANKI_FILE_ID_OTRO = st.secrets["anki_file_facu"] if OTRO_USUARIO == "Facundo" else st.secrets["anki_file_ivan"]
             
-            with st.expander("📊 Ver estadísticas de Anki"):
+                # Cargar stats de Anki
+                stats_actual = cargar_anki_stats(ANKI_FILE_ID_ACTUAL)
+                stats_otro = cargar_anki_stats(ANKI_FILE_ID_OTRO)
             
-                if not stats:
-                    st.warning("No se pudo cargar el archivo stats.json.")
-                else:
-                    # Datos del JSON
-                    labels = [
-                        "Nuevas", 
-                        "Aprendiendo", 
-                        "Reaprendiendo", 
-                        "Jóvenes", 
-                        "Maduras"
-                    ]
-                    values = [
-                        stats["new"],
-                        stats["learning"],
-                        stats["relearning"],
-                        stats["young"],
-                        stats["mature"]
+                # Función para crear gráfico de torta
+                def anki_pie(stats):
+                    labels = ["Nuevas", "Aprendiendo", "Reaprendiendo", "Jóvenes", "Maduras"]
+                    sizes = [
+                        stats.get("nuevas", 0),
+                        stats.get("aprendiendo", 0),
+                        stats.get("reaprendiendo", 0),
+                        stats.get("jóvenes", 0),
+                        stats.get("maduras", 0)
                     ]
                     colors = ["#6BAED6", "#FD8D3C", "#FB6A4A", "#74C476", "#31A354"]
-            
-                    # Crear pie chart
-                    fig, ax = plt.subplots()
-                    ax.pie(
-                        values,
-                        labels=labels,
-                        colors=colors,
-                        autopct="%1.1f%%",
-                        startangle=90,
-                        wedgeprops={"linewidth": 1, "edgecolor": "white"}
-                    )
+                    fig, ax = plt.subplots(figsize=(4,4))
+                    ax.pie(sizes, labels=labels, colors=colors, autopct="%1.1f%%", startangle=90)
                     ax.axis("equal")
+                    return fig
             
-                    st.markdown(f"**📘 {stats['deck']}**")
-                    st.markdown(
-                        f"<span style='color:#999;font-size:0.85rem;'>Actualizado: {stats['timestamp']}</span>",
-                        unsafe_allow_html=True
-                    )
+                with col1:
+                    st.markdown(f"**{USUARIO_ACTUAL}**")
+                    st.pyplot(anki_pie(stats_actual))
             
-                    st.pyplot(fig)
-            
-            # ================================================================================ #
+                with col2:
+                    st.markdown(f"**{OTRO_USUARIO}**")
+                    st.pyplot(anki_pie(stats_otro))
 
             # Manifiesto
             with st.expander("ℹ️ No pensar, actuar."):
@@ -715,3 +700,4 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
+
