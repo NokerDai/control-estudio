@@ -4,3 +4,5 @@ requests
 streamlit-autorefresh
 pytz
 matplotlib
+plotly>=5.0.0
+requests>=2.0.0
