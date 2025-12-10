@@ -688,7 +688,7 @@ def main():
         if not usuario_estudiando:
             st.stop()
 
-        time.sleep(5)
+        time.sleep(1)
         st.rerun()
 
     st.write("")
@@ -705,4 +705,5 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
+
 
