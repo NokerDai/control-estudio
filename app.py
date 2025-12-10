@@ -401,19 +401,6 @@ def crear_pie_anki(datos, titulo):
     fig.update_layout(title_text=titulo)
     return fig
 
-# Colores fijos para todas las categorías
-colores = {
-    "new": "#6BAED6",
-    "learning": "#FD8D3C",
-    "relearning": "#FB6A4A",
-    "young": "#74C476",
-    "mature": "#31A354"
-}
-
-# Etiquetas
-labels = ["Nuevas", "Aprendiendo", "Reaprendiendo", "Jóvenes", "Maduras"]
-keys = ["new", "learning", "relearning", "young", "mature"]
-
 def main():
     if st.session_state.get("_do_rerun", False):
         st.session_state["_do_rerun"] = False
@@ -582,34 +569,28 @@ def main():
                     </div>
                 """, unsafe_allow_html=True)
 
-            # --- Expander Anki compartiendo leyenda ---
+            # --- EXPANDER: PROGRESO ANKI ---
             with st.expander("📊 Anki"):
+                # Inicializamos diccionarios vacíos
                 anki_data = {}
-                if "ivan" in st.secrets.get("drive_ids", {}):
-                    anki_data["Iván"] = cargar_drive_json(f"https://drive.google.com/uc?id={st.secrets['drive_ids']['ivan']}")
-                if "facundo" in st.secrets.get("drive_ids", {}):
-                    anki_data["Facundo"] = cargar_drive_json(f"https://drive.google.com/uc?id={st.secrets['drive_ids']['facundo']}")
             
-                if not anki_data:
-                    st.info("No hay datos de Anki disponibles.")
-                else:
+                # Validamos si existen los IDs en secrets
+                if "ivan" in st.secrets.get("drive_ids", {}):
+                    url_ivan = f"https://drive.google.com/uc?id={st.secrets['drive_ids']['ivan']}"
+                    anki_data["Iván"] = cargar_drive_json(url_ivan)
+            
+                if "facundo" in st.secrets.get("drive_ids", {}):
+                    url_facundo = f"https://drive.google.com/uc?id={st.secrets['drive_ids']['facundo']}"
+                    anki_data["Facundo"] = cargar_drive_json(url_facundo)
+            
+                # Mostramos solo los que existen
+                if anki_data:
                     cols = st.columns(len(anki_data))
                     for i, (usuario, datos_json) in enumerate(anki_data.items()):
                         with cols[i]:
-                            values = [datos_json.get(k, 0) for k in keys]
-                            # Solo mostrar la leyenda en el primer gráfico
-                            show_legend = i == 0
-                            fig = go.Figure(
-                                data=[go.Pie(
-                                    labels=labels,
-                                    values=values,
-                                    marker_colors=[colores[k] for k in keys],
-                                    hole=0.3,
-                                    showlegend=show_legend
-                                )]
-                            )
-                            fig.update_layout(title_text=usuario)
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(crear_pie_anki(datos_json, usuario), use_container_width=True)
+                else:
+                    st.info("No hay datos de Anki disponibles.")
 
             # Manifiesto
             with st.expander("ℹ️ No pensar, actuar."):
@@ -707,6 +688,3 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
-
-
-
