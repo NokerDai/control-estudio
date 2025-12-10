@@ -292,21 +292,15 @@ def cargar_datos_unificados():
     return {"users_data": data_usuarios, "resumen": resumen, "balance": balance_val}
 
 @st.cache_data()
-def cargar_anki_stats(file_id: str):
-    """
-    file_id: ID del archivo JSON de Anki en Google Drive
-    Retorna el contenido del JSON como diccionario
-    """
-    url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
-
+def cargar_anki_stats(file_id):
     try:
-        resp = session.get(url, timeout=30)  # usamos la misma sesión de credenciales
+        url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
+        resp = session.get(url)
         resp.raise_for_status()
-        data = resp.json()
-        return data
+        return resp.json()
     except Exception as e:
         st.error(f"Error leyendo stats de Anki desde Drive: {e}")
-        return {}
+        return {"nuevas":0, "aprendiendo":0, "reaprendiendo":0, "jóvenes":0, "maduras":0}
 
 def batch_write(updates):
     try:
@@ -700,4 +694,5 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
+
 
