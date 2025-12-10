@@ -291,6 +291,23 @@ def cargar_datos_unificados():
 
     return {"users_data": data_usuarios, "resumen": resumen, "balance": balance_val}
 
+@st.cache_data()
+def cargar_anki_stats(file_id: str):
+    """
+    file_id: ID del archivo JSON de Anki en Google Drive
+    Retorna el contenido del JSON como diccionario
+    """
+    url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
+
+    try:
+        resp = session.get(url, timeout=30)  # usamos la misma sesión de credenciales
+        resp.raise_for_status()
+        data = resp.json()
+        return data
+    except Exception as e:
+        st.error(f"Error leyendo stats de Anki desde Drive: {e}")
+        return {}
+
 def batch_write(updates):
     try:
         sheets_batch_update(st.secrets["sheet_id"], updates)
@@ -424,6 +441,14 @@ def main():
 
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
     OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
+
+    # Seleccionamos el archivo de Anki según el usuario
+    if USUARIO_ACTUAL == "Facundo":
+        ANKI_FILE_ID = st.secrets["anki_file_facu"]
+    else:
+        ANKI_FILE_ID = st.secrets["anki_file_ivan"]
+    
+    anki_stats = cargar_anki_stats(ANKI_FILE_ID)
 
     materia_en_curso = st.session_state.get("materia_activa")
     inicio_dt = st.session_state.get("inicio_dt")
