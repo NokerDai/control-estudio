@@ -1,4 +1,3 @@
-# --- (todo el encabezado e imports igual que antes) ---
 import re
 import json
 import time
@@ -7,6 +6,7 @@ import streamlit as st
 from google.oauth2 import service_account
 from google.auth.transport.requests import AuthorizedSession
 from requests.exceptions import RequestException
+import matplotlib.pyplot as plt
 
 # ------------------ CONFIG ------------------
 st.set_page_config(page_title="Tiempo de Estudio", page_icon="⏳", layout="centered")
@@ -542,6 +542,57 @@ def main():
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
+
+            # ======================= DESPLEGABLE CON GRÁFICO DE TORTA ========================= #
+            st.markdown("### 🧠 Tus estadísticas de Anki (desde Drive)")
+            
+            # Cargar JSON del usuario actual
+            drive_link = st.secrets["drive"][USUARIO_ACTUAL]
+            stats = cargar_stats_desde_drive(drive_link)
+            
+            with st.expander("📊 Ver estadísticas de Anki"):
+            
+                if not stats:
+                    st.warning("No se pudo cargar el archivo stats.json.")
+                else:
+                    # Datos del JSON
+                    labels = [
+                        "Nuevas", 
+                        "Aprendiendo", 
+                        "Reaprendiendo", 
+                        "Jóvenes", 
+                        "Maduras"
+                    ]
+                    values = [
+                        stats["new"],
+                        stats["learning"],
+                        stats["relearning"],
+                        stats["young"],
+                        stats["mature"]
+                    ]
+                    colors = ["#6BAED6", "#FD8D3C", "#FB6A4A", "#74C476", "#31A354"]
+            
+                    # Crear pie chart
+                    fig, ax = plt.subplots()
+                    ax.pie(
+                        values,
+                        labels=labels,
+                        colors=colors,
+                        autopct="%1.1f%%",
+                        startangle=90,
+                        wedgeprops={"linewidth": 1, "edgecolor": "white"}
+                    )
+                    ax.axis("equal")
+            
+                    st.markdown(f"**📘 {stats['deck']}**")
+                    st.markdown(
+                        f"<span style='color:#999;font-size:0.85rem;'>Actualizado: {stats['timestamp']}</span>",
+                        unsafe_allow_html=True
+                    )
+            
+                    st.pyplot(fig)
+            
+            # ================================================================================ #
 
             # Manifiesto
             with st.expander("ℹ️ No pensar, actuar."):
