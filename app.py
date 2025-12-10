@@ -1,8 +1,7 @@
-# --- (todo el encabezado e imports igual que antes + requests) ---
 import re
 import json
 import time
-import requests  # <--- NUEVO IMPORT NECESARIO
+import requests
 from datetime import datetime, date, timedelta, time as dt_time
 import streamlit as st
 from google.oauth2 import service_account
@@ -596,12 +595,12 @@ def main():
                         </div>
                     """, unsafe_allow_html=True)
 
-            st.subheader("Materias")
-
             # --- MANIFIESTO ---
             with st.expander("ℹ️ No pensar, actuar."):
                 md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
                 st.markdown(md_content)
+
+            st.subheader("Materias")
         
         # --- Actualizar Placeholders de Materias y Botones ---
         mis_materias = USERS[USUARIO_ACTUAL]
@@ -692,3 +691,4 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
+
