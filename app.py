@@ -195,10 +195,10 @@ def sheets_batch_update(spreadsheet_id, updates):
 
 # ------------------ ANKI HELPERS ------------------
 @st.cache_data(ttl=300) # Cachear por 5 minutos para no saturar la API en el rerun loop
-def fetch_anki_stats():
+def fetch_anki_stats(USUARIO_ACTUAL, OTRO_USUARIO):
     # Obtener el ID del archivo desde st.secrets
     try:
-        DRIVE_JSON_ID = st.secrets["ID_DEL_JSON_FACUNDO"]
+        DRIVE_JSON_ID = st.secrets["ID_DEL_JSON_FACUNDO"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ID_DEL_JSON_IVAN"]
         URL = f"https://drive.google.com/uc?id={DRIVE_JSON_ID}"
     except KeyError:
         # Si no está la key, retornamos datos vacíos o None
@@ -561,7 +561,7 @@ def main():
                 """, unsafe_allow_html=True)
 
             # --- ANKI STATS (NUEVO / SOPORTE MÚLTIPLES MAZOS) ---
-            anki_data = fetch_anki_stats()
+            anki_data = fetch_anki_stats(USUARIO_ACTUAL, OTRO_USUARIO)
             
             # Colores para las barras
             C_MATURE = "#31A354"
@@ -705,3 +705,4 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
+
