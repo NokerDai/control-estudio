@@ -560,40 +560,54 @@ def main():
                     </div>
                 """, unsafe_allow_html=True)
 
-            # --- ANKI STATS (NUEVO) ---
+            # --- ANKI STATS (NUEVO / SOPORTE MÚLTIPLES MAZOS) ---
             anki_data = fetch_anki_stats()
+            
+            # Colores para las barras
+            C_MATURE = "#31A354"
+            C_YOUNG = "#74C476"
+            C_OTHER = "#BDBDBD"
+
             if anki_data:
-                a_total = anki_data.get("total_cards", 0)
-                a_young = anki_data.get("young", 0)
-                a_mature = anki_data.get("mature", 0)
-                a_other = a_total - a_mature - a_young
-                
-                # Colors
-                C_MATURE = "#31A354"
-                C_YOUNG = "#74C476"
-                C_OTHER = "#BDBDBD"
-
-                if a_total > 0:
-                    p_mat = (a_mature / a_total) * 100
-                    p_you = (a_young / a_total) * 100
-                    p_oth = (a_other / a_total) * 100
-                else:
-                    p_mat, p_you, p_oth = 0, 0, 0
-
                 with st.expander("Anki"):
-                    st.write(f"Total: **{a_total}**")
-                    st.markdown(f"""
-                        <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 5px; color: #ccc;">
-                            <span style="color: {C_MATURE};">Mature: {a_mature} ({p_mat:.0f}%)</span>
-                            <span style="color: {C_YOUNG};">Young: {a_young} ({p_you:.0f}%)</span>
-                            <span style="color: {C_OTHER};">Otras: {a_other}</span>
-                        </div>
-                        <div style="width: 100%; height: 20px; border-radius: 5px; overflow: hidden; display: flex; border: 1px solid #444;">
-                            <div title="Mature" style="background-color: {C_MATURE}; width: {p_mat}%; height: 100%;"></div>
-                            <div title="Young" style="background-color: {C_YOUNG}; width: {p_you}%; height: 100%;"></div>
-                            <div title="Otros" style="background-color: {C_OTHER}; width: {p_oth}%; height: 100%;"></div>
-                        </div>
-                    """, unsafe_allow_html=True)
+                    # Iteramos sobre los mazos del JSON (ej: "🇩🇪 Alemán", "Matemáticas", etc)
+                    for deck_name, stats in anki_data.items():
+                        # Verificamos que 'stats' sea un diccionario por seguridad
+                        if not isinstance(stats, dict):
+                            continue
+
+                        # Extraemos los valores. Usamos .get(..., 0) por si falta alguna llave
+                        a_total = stats.get("total", 0)
+                        a_young = stats.get("young", 0)
+                        a_mature = stats.get("mature", 0)
+                        
+                        # Calculamos 'other' restando
+                        a_other = max(0, a_total - a_mature - a_young)
+
+                        # Porcentajes para la barra
+                        if a_total > 0:
+                            p_mat = (a_mature / a_total) * 100
+                            p_you = (a_young / a_total) * 100
+                            p_oth = (a_other / a_total) * 100
+                        else:
+                            p_mat, p_you, p_oth = 0, 0, 0
+                        
+                        # Renderizamos el Título del mazo
+                        st.markdown(f"**{deck_name}** <span style='color:#888; font-size:0.8em;'>({a_total} cartas)</span>", unsafe_allow_html=True)
+                        
+                        # Renderizamos los detalles y la barra de progreso
+                        st.markdown(f"""
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 2px; color: #ccc;">
+                                <span style="color: {C_MATURE};">Mat: {a_mature} ({p_mat:.0f}%)</span>
+                                <span style="color: {C_YOUNG};">Yng: {a_young} ({p_you:.0f}%)</span>
+                                <span style="color: {C_OTHER};">Oth: {a_other}</span>
+                            </div>
+                            <div style="width: 100%; height: 15px; border-radius: 5px; overflow: hidden; display: flex; border: 1px solid #444; margin-bottom: 15px;">
+                                <div title="Mature" style="background-color: {C_MATURE}; width: {p_mat}%; height: 100%;"></div>
+                                <div title="Young" style="background-color: {C_YOUNG}; width: {p_you}%; height: 100%;"></div>
+                                <div title="Otros" style="background-color: {C_OTHER}; width: {p_oth}%; height: 100%;"></div>
+                            </div>
+                        """, unsafe_allow_html=True)
 
             # --- MANIFIESTO ---
             with st.expander("ℹ️ No pensar, actuar."):
@@ -691,5 +705,3 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
-
-
