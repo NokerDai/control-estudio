@@ -195,34 +195,22 @@ def sheets_batch_update(spreadsheet_id, updates):
 
 # ------------------ ANKI HELPERS ------------------
 @st.cache_data(ttl=300) # Cachear por 5 minutos para no saturar la API en el rerun loop
-def fetch_anki_stats(usuario_a_consultar):
-    # Obtener el ID del archivo desde st.secrets
-    try:
-        # Usamos el parámetro para determinar qué JSON cargar
-        if usuario_a_consultar == "Facundo":
-            DRIVE_JSON_ID = st.secrets.get("ID_DEL_JSON_FACUNDO")
-        elif usuario_a_consultar == "Iván":
-            DRIVE_JSON_ID = st.secrets.get("ID_DEL_JSON_IVAN")
-        else:
-            return None # Usuario no reconocido
+def fetch_anki_stats(USUARIO_ACTUAL):
+    # Obtener el ID del archivo desde st.secrets
+    try:
+        DRIVE_JSON_ID = st.secrets["ID_DEL_JSON_FACUNDO"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ID_DEL_JSON_IVAN"]
+        URL = f"https://drive.google.com/uc?id={DRIVE_JSON_ID}"
+    except KeyError:
+        # Si no está la key, retornamos datos vacíos o None
+        return None
 
-        if DRIVE_JSON_ID is None:
-            # Podrías emitir una advertencia si falta el secreto
-            return None
-            
-        URL = f"https://drive.google.com/uc?id={DRIVE_JSON_ID}"
-    except KeyError:
-        # Si no está la key, retornamos datos vacíos o None
-        return None
-
-    try:
-        response = requests.get(URL)
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        # Si falla, retornamos None para manejarlo silenciosamente en la UI
-        # st.warning(f"Error cargando Anki stats para {usuario_a_consultar}: {e}") # Descomentar para debug
-        return None
+    try:
+        response = requests.get(URL)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        # Si falla, retornamos None para manejarlo silenciosamente en la UI
+        return None
 
 # ------------------ CONSTANTES Y ESTRUCTURAS ------------------
 FILA_BASE = 170
@@ -448,9 +436,6 @@ def main():
                 st.rerun()
             st.stop()
 
-            if "anki_user_view" not in st.session_state:
-                st.session_state["anki_user_view"] = st.session_state["usuario_seleccionado"]
-
     datos_globales = cargar_datos_unificados()
     datos = datos_globales["users_data"]
     resumen_marcas = datos_globales["resumen"]
@@ -575,90 +560,54 @@ def main():
                     </div>
                 """, unsafe_allow_html=True)
 
-                # Colores para las barras (DEJÁ ESTO ANTES DE LA SECCIÓN ANKI)
-                C_MATURE = "#31A354"
-                C_YOUNG = "#74C476"
-                C_OTHER = "#BDBDBD"
-    
-                # --- ANKI STATS (NUEVO / SOPORTE MÚLTIPLES MAZOS) ---
-                
-                # --- LÓGICA DEL BOTÓN ALTERNADOR ---
-                USER_VIEW = st.session_state["anki_user_view"]
-                BUTTON_TEXT = f"Stats Anki de {OTRO_USUARIO}"
-                
-                def toggle_anki_user_view():
-                    current_view = st.session_state["anki_user_view"]
-                    actual = st.session_state["usuario_seleccionado"]
-                    otro = "Iván" if actual == "Facundo" else "Facundo"
-                    
-                    if current_view == actual:
-                        st.session_state["anki_user_view"] = otro
-                    else:
-                        st.session_state["anki_user_view"] = actual
-                    pedir_rerun() # Fuerza el refresh para que la data cambie
-    
-                # Definimos un contenedor para el expander y el botón para alinearlos
-                # Creamos dos columnas: una invisible para el expander, otra para el botón
-                col_anki_expander, col_anki_button = st.columns([0.8, 0.2])
-    
-                with col_anki_button:
-                     # El botón está visible si es el usuario actual, y oculta su nombre si es el otro usuario.
-                    current_button_text = OTRO_USUARIO if USER_VIEW == USUARIO_ACTUAL else USUARIO_ACTUAL
-                    st.button(
-                        f"👀 {current_button_text}",
-                        key="toggle_anki_view",
-                        on_click=toggle_anki_user_view,
-                        use_container_width=True
-                    )
-    
-    
-                # La lógica de mostrar las stats de Anki
-                anki_data = fetch_anki_stats(USER_VIEW)
-                
-                with col_anki_expander:
-                    with st.expander(f"Anki: {USER_VIEW}", expanded=True):
-                        if anki_data:
-                            # Iteramos sobre los mazos del JSON (ej: "🇩🇪 Alemán", "Matemáticas", etc)
-                            for deck_name, stats in anki_data.items():
-                                # Verificamos que 'stats' sea un diccionario por seguridad
-                                if not isinstance(stats, dict):
-                                    continue
-    
-                                # Extraemos los valores. Usamos .get(..., 0) por si falta alguna llave
-                                a_total = stats.get("total", 0)
-                                a_young = stats.get("young", 0)
-                                a_mature = stats.get("mature", 0)
-                                
-                                # Calculamos 'other' restando
-                                a_other = max(0, a_total - a_mature - a_young)
-    
-                                # Porcentajes para la barra
-                                if a_total > 0:
-                                    p_mat = (a_mature / a_total) * 100
-                                    p_you = (a_young / a_total) * 100
-                                    p_oth = (a_other / a_total) * 100
-                                else:
-                                    p_mat, p_you, p_oth = 0, 0, 0
-                                
-                                # Renderizamos el Título del mazo
-                                st.markdown(f"**{deck_name}** <span style='color:#888; font-size:0.8em;'>({a_total} cartas)</span>", unsafe_allow_html=True)
-                                
-                                # Renderizamos los detalles y la barra de progreso
-                                st.markdown(f"""
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 2px; color: #ccc;">
-                                        <span style="color: {C_MATURE};">Mat: {a_mature} ({p_mat:.0f}%)</span>
-                                        <span style="color: {C_YOUNG};">Yng: {a_young} ({p_you:.0f}%)</span>
-                                        <span style="color: {C_OTHER};">Oth: {a_other}</span>
-                                    </div>
-                                    <div style="width: 100%; height: 15px; border-radius: 5px; overflow: hidden; display: flex; border: 1px solid #444; margin-bottom: 15px;">
-                                        <div title="Mature" style="background-color: {C_MATURE}; width: {p_mat}%; height: 100%;"></div>
-                                        <div title="Young" style="background-color: {C_YOUNG}; width: {p_you}%; height: 100%;"></div>
-                                        <div title="Otros" style="background-color: {C_OTHER}; width: {p_oth}%; height: 100%;"></div>
-                                    </div>
-                                """, unsafe_allow_html=True)
+            # --- ANKI STATS (NUEVO / SOPORTE MÚLTIPLES MAZOS) ---
+            anki_data = fetch_anki_stats(USUARIO_ACTUAL)
+            
+            # Colores para las barras
+            C_MATURE = "#31A354"
+            C_YOUNG = "#74C476"
+            C_OTHER = "#BDBDBD"
+
+            if anki_data:
+                with st.expander("Anki"):
+                    # Iteramos sobre los mazos del JSON (ej: "🇩🇪 Alemán", "Matemáticas", etc)
+                    for deck_name, stats in anki_data.items():
+                        # Verificamos que 'stats' sea un diccionario por seguridad
+                        if not isinstance(stats, dict):
+                            continue
+
+                        # Extraemos los valores. Usamos .get(..., 0) por si falta alguna llave
+                        a_total = stats.get("total", 0)
+                        a_young = stats.get("young", 0)
+                        a_mature = stats.get("mature", 0)
+                        
+                        # Calculamos 'other' restando
+                        a_other = max(0, a_total - a_mature - a_young)
+
+                        # Porcentajes para la barra
+                        if a_total > 0:
+                            p_mat = (a_mature / a_total) * 100
+                            p_you = (a_young / a_total) * 100
+                            p_oth = (a_other / a_total) * 100
                         else:
-                            st.info(f"No hay estadísticas de Anki disponibles para {USER_VIEW}.")
-        
+                            p_mat, p_you, p_oth = 0, 0, 0
+                        
+                        # Renderizamos el Título del mazo
+                        st.markdown(f"**{deck_name}** <span style='color:#888; font-size:0.8em;'>({a_total} cartas)</span>", unsafe_allow_html=True)
+                        
+                        # Renderizamos los detalles y la barra de progreso
+                        st.markdown(f"""
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 2px; color: #ccc;">
+                                <span style="color: {C_MATURE};">Mat: {a_mature} ({p_mat:.0f}%)</span>
+                                <span style="color: {C_YOUNG};">Yng: {a_young} ({p_you:.0f}%)</span>
+                                <span style="color: {C_OTHER};">Oth: {a_other}</span>
+                            </div>
+                            <div style="width: 100%; height: 15px; border-radius: 5px; overflow: hidden; display: flex; border: 1px solid #444; margin-bottom: 15px;">
+                                <div title="Mature" style="background-color: {C_MATURE}; width: {p_mat}%; height: 100%;"></div>
+                                <div title="Young" style="background-color: {C_YOUNG}; width: {p_you}%; height: 100%;"></div>
+                                <div title="Otros" style="background-color: {C_OTHER}; width: {p_oth}%; height: 100%;"></div>
+                            </div>
+                        """, unsafe_allow_html=True)
 
             # --- MANIFIESTO ---
             with st.expander("ℹ️ No pensar, actuar."):
@@ -756,5 +705,3 @@ if __name__ == "__main__":
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
             st.rerun()
-
-
