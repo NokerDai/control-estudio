@@ -1,7 +1,8 @@
-# --- (todo el encabezado e imports igual que antes) ---
+# --- (todo el encabezado e imports igual que antes + requests) ---
 import re
 import json
 import time
+import requests  # <--- NUEVO IMPORT NECESARIO
 from datetime import datetime, date, timedelta, time as dt_time
 import streamlit as st
 from google.oauth2 import service_account
@@ -193,6 +194,25 @@ def sheets_batch_update(spreadsheet_id, updates):
         # Aquí puedes añadir un mensaje más claro para el usuario
         raise RuntimeError(f"Error HTTP en batchUpdate al escribir en la hoja: {e}")
 
+# ------------------ ANKI HELPERS ------------------
+@st.cache_data(ttl=300) # Cachear por 5 minutos para no saturar la API en el rerun loop
+def fetch_anki_stats():
+    # Obtener el ID del archivo desde st.secrets
+    try:
+        DRIVE_JSON_ID = st.secrets["ID_DEL_JSON_FACUNDO"]
+        URL = f"https://drive.google.com/uc?id={DRIVE_JSON_ID}"
+    except KeyError:
+        # Si no está la key, retornamos datos vacíos o None
+        return None
+
+    try:
+        response = requests.get(URL)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        # Si falla, retornamos None para manejarlo silenciosamente en la UI
+        return None
+
 # ------------------ CONSTANTES Y ESTRUCTURAS ------------------
 FILA_BASE = 170
 FECHA_BASE = date(2025, 12, 2)
@@ -328,9 +348,9 @@ def stop_materia_callback(usuario, materia):
                 vr = res.get("valueRanges", [{}])[0]
                 prev_est = vr.get("values", [[""]])[0][0] if vr.get("values") else ""
                 if not prev_est:
-                     st.error("No hay marca de inicio registrada (no se puede detener).")
-                     pedir_rerun()
-                     return
+                      st.error("No hay marca de inicio registrada (no se puede detener).")
+                      pedir_rerun()
+                      return
                 inicio = parse_datetime(prev_est)
             except Exception as e:
                  st.error(f"Error leyendo marca de inicio de la hoja: {e}")
@@ -510,7 +530,7 @@ def main():
                 </div>
             """, unsafe_allow_html=True)
 
-            # --- PROGRESO DEL OTRO USUARIO (FIXED) ---
+            # --- PROGRESO DEL OTRO USUARIO ---
             o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
             o_pago_obj = o_rate * o_obj
             o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
@@ -518,8 +538,6 @@ def main():
             o_obj_hms = segundos_a_hms(int(o_obj * 60))
             o_total_hms = segundos_a_hms(int(total_min_otro * 60))
 
-            # Aquí corregimos la presentación: el nombre de la materia aparece en verde SOLO si existe,
-            # y el objetivo (tiempo | $) tendrá color verde solo si el otro está estudiando; en caso contrario será gris.
             materia_visible = 'visible' if materia_otro else 'hidden'
             materia_nombre_html = f'<span style="color:#00e676; margin-left:6px; visibility:{materia_visible};">{materia_otro if materia_otro else ""}</span>'
             o_obj_color = "#00e676" if otro_estudiando else "#888"
@@ -543,13 +561,48 @@ def main():
                     </div>
                 """, unsafe_allow_html=True)
 
-            # Manifiesto
-            with st.expander("ℹ️ No pensar, actuar."):
-                md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
-                st.markdown(md_content)
+            # --- ANKI STATS (NUEVO) ---
+            anki_data = fetch_anki_stats()
+            if anki_data:
+                a_total = anki_data.get("total_cards", 0)
+                a_young = anki_data.get("young", 0)
+                a_mature = anki_data.get("mature", 0)
+                a_other = a_total - a_mature - a_young
+                
+                # Colors
+                C_MATURE = "#31A354"
+                C_YOUNG = "#74C476"
+                C_OTHER = "#BDBDBD"
+
+                if a_total > 0:
+                    p_mat = (a_mature / a_total) * 100
+                    p_you = (a_young / a_total) * 100
+                    p_oth = (a_other / a_total) * 100
+                else:
+                    p_mat, p_you, p_oth = 0, 0, 0
+
+                with st.expander("Estadísticas de Anki (Tarjetas)"):
+                    st.write(f"Total: **{a_total}**")
+                    st.markdown(f"""
+                        <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 5px; color: #ccc;">
+                            <span style="color: {C_MATURE};">Mature: {a_mature} ({p_mat:.0f}%)</span>
+                            <span style="color: {C_YOUNG};">Young: {a_young} ({p_you:.0f}%)</span>
+                            <span style="color: {C_OTHER};">Otras: {a_other}</span>
+                        </div>
+                        <div style="width: 100%; height: 20px; border-radius: 5px; overflow: hidden; display: flex; border: 1px solid #444;">
+                            <div title="Mature" style="background-color: {C_MATURE}; width: {p_mat}%; height: 100%;"></div>
+                            <div title="Young" style="background-color: {C_YOUNG}; width: {p_you}%; height: 100%;"></div>
+                            <div title="Otros" style="background-color: {C_OTHER}; width: {p_oth}%; height: 100%;"></div>
+                        </div>
+                    """, unsafe_allow_html=True)
 
             st.subheader("Materias")
 
+            # --- MANIFIESTO ---
+            with st.expander("ℹ️ No pensar, actuar."):
+                md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
+                st.markdown(md_content)
+        
         # --- Actualizar Placeholders de Materias y Botones ---
         mis_materias = USERS[USUARIO_ACTUAL]
         for materia, info in mis_materias.items():
@@ -576,11 +629,11 @@ def main():
                 with cols[0]:
                     if en_curso:
                         st.button(f"⛔ DETENER {materia[:14]}", key=key_stop, use_container_width=True,
-                                    on_click=stop_materia_callback, args=(USUARIO_ACTUAL, materia))
+                                  on_click=stop_materia_callback, args=(USUARIO_ACTUAL, materia))
                     else:
                         if materia_en_curso is None:
                             st.button("▶ INICIAR", key=key_start, use_container_width=True,
-                                        on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia))
+                                      on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia))
                         else:
                             st.button("...", disabled=True, key=key_disabled, use_container_width=True)
 
