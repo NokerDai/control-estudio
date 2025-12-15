@@ -71,8 +71,6 @@ def run():
     
     STREAK_HABIT_NAME = _gcp_secrets.get("streak_habit_name")
     
-    # ELIMINADO: STREAK_COLUMN_NAME. STREAK_HABIT_NAME es la columna de racha.
-
     # -------------------------------------------------------------------
     # CONEXIÓN A GOOGLE SHEETS
     # -------------------------------------------------------------------
@@ -102,8 +100,8 @@ def run():
             return None
 
     # -------------------------------------------------------------------
-    # LECTURA ESPECÍFICA DE RACHA (CON DEBUG)
-    # MODIFICADO para leer el número de racha de la columna del HÁBITO
+    # LECTURA ESPECÍFICA DE RACHA (PARA EL CÁLCULO DE LA NUEVA RACHA)
+    # Lee el valor del HÁBITO de AYER
     # -------------------------------------------------------------------
     def get_yesterdays_streak(worksheet, habit_name):
         """Lee el número de racha (que está en la columna del hábito) del día anterior."""
@@ -114,56 +112,48 @@ def run():
         yesterday_dt = _argentina_now_global().date() - timedelta(days=1)
         yesterday_str = f"{yesterday_dt.day:02d}/{yesterday_dt.month:02d}"
         
-        # DEBUG 1: Muestra la fecha que está buscando
-        st.info(f"DEBUG RACHA: Buscando racha de ayer: {yesterday_str} en columna '{habit_name}'")
+        st.info(f"DEBUG AYER: Buscando racha de ayer: {yesterday_str} en columna '{habit_name}'")
 
         try:
             headers = worksheet.row_values(1)
-            # El nombre del hábito es ahora el nombre de la columna de racha
             if habit_name not in headers:
-                st.warning(f"DEBUG RACHA: Columna de Hábito '{habit_name}' no encontrada. Retorna 0.")
+                st.warning(f"DEBUG AYER: Columna de Hábito '{habit_name}' no encontrada. Retorna 0.")
                 return 0 
 
             streak_col_index = headers.index(habit_name) + 1 
 
             all_dates = worksheet.col_values(1)
             if yesterday_str not in all_dates:
-                st.warning(f"DEBUG RACHA: Fecha de ayer '{yesterday_str}' no encontrada en Col A. Retorna 0.")
+                st.warning(f"DEBUG AYER: Fecha de ayer '{yesterday_str}' no encontrada en Col A. Retorna 0.")
                 return 0 
 
             yesterday_row_index = all_dates.index(yesterday_str) + 1 
 
-            # Leemos el valor de la columna del Hábito/Racha
             streak_val = worksheet.cell(yesterday_row_index, streak_col_index).value
             
-            # DEBUG 2: Muestra el valor crudo leído
-            st.info(f"DEBUG RACHA: Valor crudo leído de celda ({yesterday_row_index}, {streak_col_index}): '{streak_val}' (Tipo: {type(streak_val).__name__})")
+            st.info(f"DEBUG AYER: Valor crudo leído de celda ({yesterday_row_index}, {streak_col_index}): '{streak_val}'")
 
             if streak_val:
                 try:
-                    # Aplicamos .strip() para limpiar espacios
                     stripped_val = streak_val.strip()
-                    if not stripped_val:
-                        st.warning("DEBUG RACHA: Celda de racha vacía tras .strip(). Retorna 0.")
-                        return 0
+                    if not stripped_val: return 0
                         
                     final_streak = int(stripped_val)
-                    st.success(f"DEBUG RACHA: Conversión exitosa. Racha de ayer: {final_streak}") # DEBUG 3
+                    st.success(f"DEBUG AYER: Conversión exitosa. Racha de ayer: {final_streak}")
                     return final_streak
                 except ValueError:
-                    st.error(f"DEBUG RACHA: ERROR: ValueError al convertir '{stripped_val}' a int. Retorna 0.") # DEBUG 4
+                    st.error(f"DEBUG AYER: ERROR: ValueError al convertir '{stripped_val}' a int. Retorna 0.")
                     return 0
             else:
-                st.warning("DEBUG RACHA: Celda de racha de ayer vacía o None. Retorna 0.")
+                st.warning("DEBUG AYER: Celda de racha de ayer vacía o None. Retorna 0.")
                 return 0
 
         except Exception as e:
-            st.error(f"DEBUG RACHA: Error general en lectura de racha ({e.__class__.__name__}): {e}") # DEBUG 5
+            st.error(f"DEBUG AYER: Error general en lectura de racha ({e.__class__.__name__}): {e}")
             return 0
             
     # -------------------------------------------------------------------
     # LOG DE RACHA 
-    # MODIFICADO para solo actualizar la columna del HÁBITO con el número
     # -------------------------------------------------------------------
     def log_habit_streak(habit_name, worksheet):
         """Calcula new_streak = yesterday_streak + 1 y actualiza la celda del hábito con el número de racha."""
@@ -172,25 +162,25 @@ def run():
 
             today_str = get_argentina_date_str()
             
-            # Usamos el nombre del hábito como columna para obtener la racha
+            # Obtiene la racha de AYER para la base del cálculo de HOY
             current_streak = get_yesterdays_streak(worksheet, habit_name) 
             new_streak = current_streak + 1
 
-            # DEBUG: Muestra el cálculo de la nueva racha
-            st.info(f"DEBUG LOG: Racha de ayer: {current_streak}. Nueva racha: {new_streak}")
+            st.info(f"DEBUG LOG: Racha de ayer: {current_streak}. Nueva racha a registrar HOY: {new_streak}")
 
             # 1. Encontrar la fila de hoy
             all_dates = worksheet.col_values(1)
             if today_str not in all_dates:
-                st.error(f"La fecha de hoy ({today_str}) no está en la columna A. ¡Esto es un problema de planificación!")
+                st.error(f"La fecha de hoy ({today_str}) no está en la columna A.")
                 return
             date_row = all_dates.index(today_str) + 1
 
-            # 2. Encontrar/Crear la columna del Hábito (que ahora es la de la racha)
+            # 2. Encontrar/Crear la columna del Hábito/Racha
             headers = worksheet.row_values(1)
             if habit_name in headers:
                 habit_col_idx = headers.index(habit_name) + 1
             else:
+                # Lógica para encontrar el índice (Boundary)
                 if BOUNDARY_COLUMN in headers:
                     boundary = headers.index(BOUNDARY_COLUMN)
                     habit_col_idx = boundary + 1 
@@ -204,6 +194,7 @@ def run():
             if habit_name in headers:
                  habit_col_idx = headers.index(habit_name) + 1
                  worksheet.update_cell(date_row, habit_col_idx, new_streak)
+                 st.success(f"DEBUG LOG: Valor {new_streak} registrado con éxito en celda ({date_row}, {habit_col_idx}).")
             else:
                 st.error(f"Error interno: No se pudo encontrar la columna para el hábito '{habit_name}'.")
 
@@ -222,7 +213,6 @@ def run():
             raw_habits = _gcp_secrets.get("habits", [])
             if isinstance(raw_habits, list):
                 st.session_state.all_habits = raw_habits
-                # El hábito de racha NO se muestra en el grid
                 return [h for h in raw_habits if h["name"] != STREAK_HABIT_NAME]
             st.error("El campo [gcp].habits en secrets no es una lista válida.")
             return []
@@ -231,22 +221,18 @@ def run():
             return []
 
     # -------------------------------------------------------------------
-    # LOG A GOOGLE SHEETS
-    # MODIFICADO para verificar si la columna del HÁBITO tiene un número > 0
+    # CONFIGURACIÓN DEL ESTADO DIARIO (LÓGICA CORREGIDA)
+    # Prioridad: 1. Leer HOY. 2. Leer AYER (para el botón).
     # -------------------------------------------------------------------
     def setup_daily_state(worksheet):
         today_str = get_argentina_date_str()
         
         streak_habit_completed_today = False
         current_streak = 0
-        pending_habits_list = []
-
+        
+        # 1. Intentar establecer la racha A PARTIR DE HOY (el valor registrado)
         if worksheet is not None:
             try:
-                # Obtener la racha base (del día anterior)
-                # Esta racha es la que se mostrará si HOY AÚN NO se completó.
-                current_streak = get_yesterdays_streak(worksheet, STREAK_HABIT_NAME)
-                
                 all_dates = worksheet.col_values(1)
                 date_row_index = all_dates.index(today_str) if today_str in all_dates else -1
                 
@@ -254,29 +240,53 @@ def run():
                     today_row = worksheet.row_values(date_row_index + 1)
                     headers = worksheet.row_values(1)
                     
-                    # 2. Verificar si el hábito de racha ya está completado hoy (tiene un número > 0)
                     if STREAK_HABIT_NAME in headers:
                         col_idx = headers.index(STREAK_HABIT_NAME)
                         
-                        # Si la celda tiene un valor, se intenta leer
                         if col_idx < len(today_row) and today_row[col_idx].strip():
                             value_today_str = today_row[col_idx].strip()
+                            
+                            st.info(f"DEBUG ESTADO: Valor HOY leído: '{value_today_str}'")
+
                             try:
                                 value_today = int(value_today_str)
                                 
                                 if value_today > 0:
                                     streak_habit_completed_today = True
-                                    # Si ya está completado, actualizamos current_streak al valor de HOY
+                                    # Si HOY tiene un valor > 0, ese es el current_streak a mostrar
                                     current_streak = value_today
-                                    st.success(f"DEBUG ESTADO: Racha de hoy (completa) leída como: {current_streak}")
+                                    st.success(f"DEBUG ESTADO: Racha a mostrar (valor de HOY): {current_streak}")
                                 else:
-                                    st.warning("DEBUG ESTADO: La celda del hábito de hoy es 0 o vacía. Pendiente.")
+                                    st.warning("DEBUG ESTADO: Valor HOY es 0 o vacío. Usando racha de AYER.")
                             except:
-                                # Si es un valor que no es número (ej: "No"), lo consideramos completado para bloquear el botón.
+                                # Si no es un número (ej. "n/a" o texto), lo consideramos completo
                                 streak_habit_completed_today = True
-                                st.error("DEBUG ESTADO: La celda del hábito tiene un valor no numérico (se considera completado para bloquear botón).")
+                                st.error("DEBUG ESTADO: Valor HOY no es número (bloqueando botón).")
+                        else:
+                            st.warning("DEBUG ESTADO: Celda de HOY vacía. Usando racha de AYER.")
+                            
+                # 2. Si HOY no está completado, obtenemos la racha de AYER para la visualización del botón
+                if not streak_habit_completed_today:
+                    current_streak = get_yesterdays_streak(worksheet, STREAK_HABIT_NAME)
+                    st.info(f"DEBUG ESTADO: Hábito pendiente. Racha base para botón (valor de AYER): {current_streak}")
 
-                    # 3. Determinar el resto de hábitos pendientes
+            except ValueError:
+                st.warning(f"La fecha de hoy ({today_str}) no está en la columna A.")
+            except Exception as e:
+                st.error(f"Error al leer la planificación: {e}")
+
+        # El resto de la lógica (hábitos del grid) se mantiene
+        pending_habits_list = []
+        if worksheet is not None:
+            # Lógica para determinar el resto de hábitos pendientes
+            try:
+                all_dates = worksheet.col_values(1)
+                date_row_index = all_dates.index(today_str) if today_str in all_dates else -1
+                
+                if date_row_index != -1:
+                    today_row = worksheet.row_values(date_row_index + 1)
+                    headers = worksheet.row_values(1)
+                    
                     for habit in st.session_state.all_habits:
                         name = habit["name"]
                         if name == STREAK_HABIT_NAME:
@@ -284,17 +294,13 @@ def run():
 
                         if name in headers:
                             col_idx = headers.index(name)
-                            # Si no hay valor o está vacío, es pendiente
                             if col_idx >= len(today_row) or not today_row[col_idx].strip():
                                 pending_habits_list.append(name)
                         else:
                             pending_habits_list.append(name)
-
-            except ValueError:
-                st.warning(f"La fecha de hoy ({today_str}) no está en la columna A. No se puede cargar el estado de hábitos.")
-            except Exception as e:
-                st.error(f"Error al leer la planificación: {e}")
-
+            except:
+                 pass
+        
         st.session_state.streak_habit_info = {
             "habit_name": STREAK_HABIT_NAME,
             "is_completed": streak_habit_completed_today,
@@ -304,8 +310,6 @@ def run():
 
 
     def log_habit_grid(habit_name, worksheet):
-        # Esta función de logueo de hábitos que no son racha no se modifica
-        # ... (código log_habit_grid no se modifica)
         try:
             if worksheet is not None:
                 today_str = get_argentina_date_str()
@@ -342,7 +346,6 @@ def run():
 
         except Exception as e:
             st.error(f"Error al registrar el hábito: {e}")
-
 
     # -------------------------------------------------------------------
     # UI PRINCIPAL
@@ -386,7 +389,6 @@ def run():
 
     if not completed:
         st.button(
-            # MODIFICADO: Solo pasamos el nombre del hábito y el worksheet
             f"✅ Marcar {HABIT_NAME} (Día {streak + 1})",
             key="habit_streak_log",
             on_click=log_habit_streak,
