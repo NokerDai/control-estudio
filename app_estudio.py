@@ -279,7 +279,6 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
             html_content = f"""
             <html>
               <body style="font-family: Arial, sans-serif; background-color: #1e1e1e; color: #ffffff;">
-                <h2 style="color: #2E86C1; text-align: center;">Tu Balance</h2>
                 <p style="color: #ccc; text-align: center;">
                     Este es tu balance actual:
                 </p>
