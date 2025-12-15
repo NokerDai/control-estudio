@@ -19,23 +19,12 @@ import json
 # ---------------------------------------------------------------
 def check_password():
     """Devuelve True si la contraseña es correcta."""
-    
-    # 1) Intentar obtener contraseña desde la URL
-    params = st.query_params
-    url_password = params.get("password", None)
 
-    if url_password is not None:
-        if url_password == st.secrets["auth"]["password"]:
-            st.session_state.pw_correct = True
-            return True
-        else:
-            st.error("Contraseña incorrecta (pasada por URL).")
-
-    # 2) Si ya está logueado, no pedirla de nuevo
+    # 1) Si ya está logueado, no pedirla de nuevo
     if "pw_correct" in st.session_state and st.session_state.pw_correct:
         return True
 
-    # 3) Interfaz normal de contraseña
+    # 2) Interfaz normal de contraseña
     st.title("🔒 Acceso protegido")
     password = st.text_input("Contraseña:", type="password")
     if st.button("Entrar"):
