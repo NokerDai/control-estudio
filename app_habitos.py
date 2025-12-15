@@ -45,10 +45,11 @@ def run():
     # ZONA HORARIA ARGENTINA
     # -------------------------------------------------------------------
     def _argentina_now_global():
+        # CORRECCIÓN: Unificado a Córdoba para ser consistente con app_estudio.py
         if ZoneInfo is not None:
-            return datetime.now(ZoneInfo('America/Argentina/Buenos_Aires'))
+            return datetime.now(ZoneInfo('America/Argentina/Cordoba'))
         if 'pytz' in globals() and pytz is not None:
-            return datetime.now(pytz.timezone('America/Argentina/Buenos_Aires'))
+            return datetime.now(pytz.timezone('America/Argentina/Cordoba'))
         return datetime.now()
 
     def get_argentina_time_str():
@@ -299,11 +300,14 @@ def run():
                         boundary = headers.index(BOUNDARY_COLUMN)
                         col = None
                         for idx in range(1, boundary + 1):
+                            # Si la columna está fuera de los límites actuales o si el encabezado está vacío
                             if idx - 1 >= len(headers) or not headers[idx - 1].strip():
                                 col = idx
                                 break
                         if col is None:
-                            col = boundary
+                            # CORRECCIÓN: Si no se encuentra espacio ANTES del límite, 
+                            # insertar DESPUÉS del límite para no sobrescribir BOUNDARY_COLUMN.
+                            col = boundary + 1
                     else:
                         col = len(headers) + 1
 
