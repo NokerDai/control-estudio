@@ -110,8 +110,6 @@ def run():
 
         yesterday_dt = _argentina_now_global().date() - timedelta(days=1)
         yesterday_str = f"{yesterday_dt.day:02d}/{yesterday_dt.month:02d}"
-        
-        st.info(f"DEBUG AYER: Buscando racha de ayer: {yesterday_str} en columna '{habit_name}'")
 
         try:
             headers = worksheet.row_values(1)
@@ -129,8 +127,6 @@ def run():
             yesterday_row_index = all_dates.index(yesterday_str) + 1 
 
             streak_val = worksheet.cell(yesterday_row_index, streak_col_index).value
-            
-            st.info(f"DEBUG AYER: Valor crudo leído de celda ({yesterday_row_index}, {streak_col_index}): '{streak_val}'")
 
             if streak_val:
                 try:
@@ -164,8 +160,6 @@ def run():
             
             current_streak = get_yesterdays_streak(worksheet, habit_name) 
             new_streak = current_streak + 1
-
-            st.info(f"DEBUG LOG: Racha de ayer: {current_streak}. Nueva racha a registrar HOY: {new_streak}")
 
             # 1. Encontrar la fila de hoy
             all_dates = worksheet.col_values(1)
@@ -242,8 +236,6 @@ def run():
                         
                         if col_idx < len(today_row) and today_row[col_idx].strip():
                             value_today_str = today_row[col_idx].strip()
-                            
-                            st.info(f"DEBUG ESTADO: Valor HOY leído: '{value_today_str}'")
 
                             try:
                                 # CORRECCIÓN APLICADA: Usamos float() antes de int() para manejar '1.00'
@@ -265,7 +257,6 @@ def run():
                 # 2. Si HOY no está completado, obtenemos la racha de AYER para la visualización del botón
                 if not streak_habit_completed_today:
                     current_streak = get_yesterdays_streak(worksheet, STREAK_HABIT_NAME)
-                    st.info(f"DEBUG ESTADO: Hábito pendiente. Racha base para botón (valor de AYER): {current_streak}")
 
             except ValueError:
                 st.warning(f"La fecha de hoy ({today_str}) no está en la columna A.")
