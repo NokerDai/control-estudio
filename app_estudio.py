@@ -281,14 +281,15 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
               <body style="font-family: Arial, sans-serif; background-color: #1e1e1e; color: #ffffff;">
                 <h2 style="color: #2E86C1; text-align: center;">Tu Balance</h2>
                 <p style="color: #ccc; text-align: center;">
-                    Este es tu balance individual al momento de apertura de la app ({ahora_str()}):
+                    Este es tu balance actual:
                 </p>
                 
                 {balance_html}
 
                 <hr style="border-color: #444; margin: 20px 0;">
                 <p style="font-size: 0.9em; color: #888; text-align: center;">
-                    <i>Reporte automático.</i>
+                    <i>Se envía automáticamente cuando alguno entra por primera vez en el día.</i>
+                    <i>Se activa de 5:00 a 22:00.</i>
                 </p>
               </body>
             </html>
