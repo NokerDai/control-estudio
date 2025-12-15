@@ -45,7 +45,7 @@ def run():
     # ZONA HORARIA ARGENTINA
     # -------------------------------------------------------------------
     def _argentina_now_global():
-        # CORRECCIÓN: Unificado a Córdoba para ser consistente con app_estudio.py
+        # Unificado a Córdoba para ser consistente con app_estudio.py
         if ZoneInfo is not None:
             return datetime.now(ZoneInfo('America/Argentina/Cordoba'))
         if 'pytz' in globals() and pytz is not None:
@@ -53,8 +53,7 @@ def run():
         return datetime.now()
 
     def get_argentina_time_str():
-        # Función original que devuelve la hora, mantenida por si se usa en otro contexto, 
-        # pero log_habit_streak y log_habit_grid usarán '1'.
+        # Función para obtener la hora actual (no usada para el log, solo informativa)
         return _argentina_now_global().strftime('%H:%M:%S')
 
     def get_argentina_date_str():
@@ -70,10 +69,7 @@ def run():
     WORKSHEET_NAME = _gcp_secrets.get("worksheet_name", "F. Extra")
     BOUNDARY_COLUMN = _gcp_secrets.get("boundary_column", "Extracurricular")
     
-    # *** SECRETS GENERALIZADOS PARA EL HÁBITO DE RACHA (SOLO EL NOMBRE DEL HÁBITO) ***
     STREAK_HABIT_NAME = _gcp_secrets.get("streak_habit_name")
-    
-    # Calculamos el nombre de la columna de racha basado en el nombre del hábito.
     STREAK_COLUMN_NAME = f"Racha {STREAK_HABIT_NAME}"
 
     # -------------------------------------------------------------------
@@ -111,31 +107,25 @@ def run():
         """Lee el número de racha de la columna 'streak_column' del día anterior."""
         if worksheet is None: return 0
 
-        # Calcular la fecha de ayer
         yesterday_dt = _argentina_now_global().date() - timedelta(days=1)
         yesterday_str = f"{yesterday_dt.day:02d}/{yesterday_dt.month:02d}"
 
         try:
-            # 1. Obtener los encabezados y la columna de la racha
             headers = worksheet.row_values(1)
             if streak_column not in headers:
-                # Si la columna no existe, la racha es 0
                 return 0 
 
             streak_col_index = headers.index(streak_column) + 1 
 
-            # 2. Encontrar la fila de ayer
             all_dates = worksheet.col_values(1)
             if yesterday_str not in all_dates:
                 return 0 
 
             yesterday_row_index = all_dates.index(yesterday_str) + 1 
 
-            # 3. Leer el valor de la celda de la racha de ayer
             streak_val = worksheet.cell(yesterday_row_index, streak_col_index).value
 
             try:
-                # Si es un número, lo retornamos, si no, retornamos 0
                 return int(streak_val) if streak_val else 0
             except ValueError:
                 return 0 
@@ -153,10 +143,9 @@ def run():
 
             today_str = get_argentina_date_str()
             
-            # *** MODIFICACIÓN CLAVE: Usar '1' en lugar de la hora. ***
+            # VALOR A LOGUEAR: Siempre '1'
             log_value = 1 
             
-            # Usar la columna de la racha genérica
             current_streak = get_yesterdays_streak(worksheet, streak_column_name) 
             new_streak = current_streak + 1
 
@@ -175,7 +164,7 @@ def run():
                 # Si no existe, la creamos al final
                 streak_col_idx = len(headers) + 1
                 worksheet.update_cell(1, streak_col_idx, streak_column_name)
-                headers = worksheet.row_values(1) # Re-obtener headers
+                headers = worksheet.row_values(1)
             
             worksheet.update_cell(date_row, streak_col_idx, new_streak)
 
@@ -183,7 +172,6 @@ def run():
             if habit_name in headers:
                 habit_col_idx = headers.index(habit_name) + 1
             else:
-                # Usar la lógica de log_habit_grid para encontrar la posición (antes de BOUNDARY_COLUMN)
                 if BOUNDARY_COLUMN in headers:
                     boundary = headers.index(BOUNDARY_COLUMN)
                     habit_col_idx = boundary + 1 
@@ -195,12 +183,11 @@ def run():
 
             if habit_name in headers:
                  habit_col_idx = headers.index(habit_name) + 1
-                 # *** MODIFICACIÓN APLICADA: Guardar '1' en lugar de la hora
+                 # *** CORRECCIÓN APLICADA: Usar log_value (1) ***
                  worksheet.update_cell(date_row, habit_col_idx, log_value)
             else:
                 st.error(f"Error interno: No se pudo encontrar la columna para el hábito '{habit_name}'.")
 
-            # 4. Actualizar el estado local
             st.session_state.needs_rerun = True
 
         except Exception as e:
@@ -216,7 +203,6 @@ def run():
             raw_habits = _gcp_secrets.get("habits", [])
             if isinstance(raw_habits, list):
                 st.session_state.all_habits = raw_habits
-                # Retornar la lista filtrada para el loop de la UI (solo hábitos grupales, excluyendo el de racha)
                 return [h for h in raw_habits if h["name"] != STREAK_HABIT_NAME]
             st.error("El campo [gcp].habits en secrets no es una lista válida.")
             return []
@@ -236,7 +222,6 @@ def run():
 
         if worksheet is not None:
             try:
-                # 1. Leer racha de ayer
                 current_streak = get_yesterdays_streak(worksheet, STREAK_COLUMN_NAME)
                 
                 all_dates = worksheet.col_values(1)
@@ -246,14 +231,13 @@ def run():
                     today_row = worksheet.row_values(date_row_index + 1)
                     headers = worksheet.row_values(1)
                     
-                    # 2. Verificar si el hábito de racha ya está completado hoy (marca de tiempo/1)
+                    # 2. Verificar si el hábito de racha ya está completado hoy (marca '1' o tiempo)
                     if STREAK_HABIT_NAME in headers:
                         col_idx = headers.index(STREAK_HABIT_NAME)
-                        # Comprobamos si hay algún valor (hora o '1')
                         if col_idx < len(today_row) and today_row[col_idx].strip():
                             streak_habit_completed_today = True
                             
-                            # Si está completado, leer el número de racha guardado hoy (valor de HOY)
+                            # Leer el número de racha guardado hoy (valor de HOY)
                             if STREAK_COLUMN_NAME in headers:
                                 streak_col_idx = headers.index(STREAK_COLUMN_NAME)
                                 if streak_col_idx < len(today_row) and today_row[streak_col_idx].strip():
@@ -281,7 +265,6 @@ def run():
             except Exception as e:
                 st.error(f"Error al leer la planificación: {e}")
 
-        # Guardar el estado del hábito de racha
         st.session_state.streak_habit_info = {
             "habit_name": STREAK_HABIT_NAME,
             "is_completed": streak_habit_completed_today,
@@ -298,29 +281,25 @@ def run():
                 date_row = all_dates.index(today_str) + 1
                 headers = worksheet.row_values(1)
 
-                # *** MODIFICACIÓN CLAVE: Usar '1' en lugar de la hora. ***
+                # VALOR A LOGUEAR: Siempre '1'
                 log_value = 1 
 
                 if habit_name in headers:
                     col = headers.index(habit_name) + 1
                 else:
-                    # insertar antes de boundary
                     if BOUNDARY_COLUMN in headers:
                         boundary = headers.index(BOUNDARY_COLUMN)
                         col = None
                         for idx in range(1, boundary + 1):
-                            # Si la columna está fuera de los límites actuales o si el encabezado está vacío
                             if idx - 1 >= len(headers) or not headers[idx - 1].strip():
                                 col = idx
                                 break
                         if col is None:
-                            # CORRECCIÓN: Si no se encuentra espacio ANTES del límite, 
-                            # insertar DESPUÉS del límite para no sobrescribir BOUNDARY_COLUMN.
                             col = boundary + 1
                     else:
                         col = len(headers) + 1
                 
-                # *** MODIFICACIÓN APLICADA: Guardar '1' en lugar de la hora
+                # *** CORRECCIÓN APLICADA: Usar log_value (1) ***
                 worksheet.update_cell(date_row, col, log_value)
 
                 if habit_name not in headers:
@@ -344,7 +323,7 @@ def run():
     # Cargar hábitos desde secrets
     if 'habits' not in st.session_state:
         st.session_state.habits = load_habits()
-        st.session_state.all_habits = _gcp_secrets.get("habits", []) # Fallback
+        st.session_state.all_habits = _gcp_secrets.get("habits", [])
 
     if 'all_habits' not in st.session_state:
         st.session_state.all_habits = _gcp_secrets.get("habits", [])
