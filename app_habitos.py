@@ -347,10 +347,10 @@ def run():
     # -------------------------
     #     HÁBITO DE RACHA
     # -------------------------
-    STREAK_GOAL = 90 # Objetivo de la barra de progreso (ajustable)
+    STREAK_GOAL = 30 # Objetivo de la barra de progreso (ajustable)
     streak_pct = min(streak / STREAK_GOAL, 1.0) * 100
     
-    status_text = f"✅ ¡Completado hoy! Racha: {streak} días." if completed else f"⏳ Pendiente. Racha actual: {streak} días."
+    status_text = f"NF."
     
     st.markdown(f"## {HABIT_NAME}")
     st.markdown(f"""
