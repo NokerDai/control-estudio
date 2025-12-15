@@ -126,7 +126,9 @@ def run():
             streak_val = worksheet.cell(yesterday_row_index, streak_col_index).value
 
             try:
-                return int(streak_val) if streak_val else 0
+                # FIX APLICADO: Se usa .strip() para eliminar posibles espacios 
+                # en blanco que pueden causar un ValueError al convertir a int.
+                return int(streak_val.strip()) if streak_val else 0
             except ValueError:
                 return 0 
 
@@ -222,6 +224,7 @@ def run():
 
         if worksheet is not None:
             try:
+                # Obtener la racha base (del día anterior)
                 current_streak = get_yesterdays_streak(worksheet, STREAK_COLUMN_NAME)
                 
                 all_dates = worksheet.col_values(1)
@@ -242,7 +245,8 @@ def run():
                                 streak_col_idx = headers.index(STREAK_COLUMN_NAME)
                                 if streak_col_idx < len(today_row) and today_row[streak_col_idx].strip():
                                     try:
-                                        current_streak = int(today_row[streak_col_idx])
+                                        # FIX: También limpiar el valor de la racha de hoy
+                                        current_streak = int(today_row[streak_col_idx].strip())
                                     except:
                                         pass
                     
