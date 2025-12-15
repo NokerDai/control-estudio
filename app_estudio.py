@@ -417,6 +417,7 @@ def main():
             st.rerun()
 
         if "f" in params: set_user_and_rerun("Facundo")
+        if "password" in params: set_user_and_rerun("Facundo")
         if "i" in params: set_user_and_rerun("Iván")
         if "user" in params:
             try:
