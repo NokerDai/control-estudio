@@ -4,7 +4,7 @@ import app_habitos
 
 # 1. Configuración global (Siempre va primero)
 st.set_page_config(
-    page_title="Gestión Personal", 
+    page_title="Estudio", 
     page_icon="⏳", 
     layout="centered"
 )
