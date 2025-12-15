@@ -53,6 +53,8 @@ def run():
         return datetime.now()
 
     def get_argentina_time_str():
+        # Función original que devuelve la hora, mantenida por si se usa en otro contexto, 
+        # pero log_habit_streak y log_habit_grid usarán '1'.
         return _argentina_now_global().strftime('%H:%M:%S')
 
     def get_argentina_date_str():
@@ -150,7 +152,9 @@ def run():
             if worksheet is None: return
 
             today_str = get_argentina_date_str()
-            time_str = get_argentina_time_str()
+            
+            # *** MODIFICACIÓN CLAVE: Usar '1' en lugar de la hora. ***
+            log_value = 1 
             
             # Usar la columna de la racha genérica
             current_streak = get_yesterdays_streak(worksheet, streak_column_name) 
@@ -175,7 +179,7 @@ def run():
             
             worksheet.update_cell(date_row, streak_col_idx, new_streak)
 
-            # 3. Encontrar/Crear la columna del Hábito (STREAK_HABIT_NAME) y actualizar con el tiempo (marca)
+            # 3. Encontrar/Crear la columna del Hábito (STREAK_HABIT_NAME) y actualizar con el valor (marca '1')
             if habit_name in headers:
                 habit_col_idx = headers.index(habit_name) + 1
             else:
@@ -191,7 +195,8 @@ def run():
 
             if habit_name in headers:
                  habit_col_idx = headers.index(habit_name) + 1
-                 worksheet.update_cell(date_row, habit_col_idx, time_str)
+                 # *** MODIFICACIÓN APLICADA: Guardar '1' en lugar de la hora
+                 worksheet.update_cell(date_row, habit_col_idx, log_value)
             else:
                 st.error(f"Error interno: No se pudo encontrar la columna para el hábito '{habit_name}'.")
 
@@ -241,9 +246,10 @@ def run():
                     today_row = worksheet.row_values(date_row_index + 1)
                     headers = worksheet.row_values(1)
                     
-                    # 2. Verificar si el hábito de racha ya está completado hoy (marca de tiempo)
+                    # 2. Verificar si el hábito de racha ya está completado hoy (marca de tiempo/1)
                     if STREAK_HABIT_NAME in headers:
                         col_idx = headers.index(STREAK_HABIT_NAME)
+                        # Comprobamos si hay algún valor (hora o '1')
                         if col_idx < len(today_row) and today_row[col_idx].strip():
                             streak_habit_completed_today = True
                             
@@ -292,6 +298,9 @@ def run():
                 date_row = all_dates.index(today_str) + 1
                 headers = worksheet.row_values(1)
 
+                # *** MODIFICACIÓN CLAVE: Usar '1' en lugar de la hora. ***
+                log_value = 1 
+
                 if habit_name in headers:
                     col = headers.index(habit_name) + 1
                 else:
@@ -310,9 +319,9 @@ def run():
                             col = boundary + 1
                     else:
                         col = len(headers) + 1
-
-                time_str = get_argentina_time_str()
-                worksheet.update_cell(date_row, col, time_str)
+                
+                # *** MODIFICACIÓN APLICADA: Guardar '1' en lugar de la hora
+                worksheet.update_cell(date_row, col, log_value)
 
                 if habit_name not in headers:
                     worksheet.update_cell(1, col, habit_name)
