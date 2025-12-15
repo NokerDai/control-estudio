@@ -406,12 +406,6 @@ def main():
         st.session_state["_do_rerun"] = False
         st.rerun()
 
-    st.sidebar.header("🔧 Debug & Controls")
-    st.sidebar.markdown("**session_state**")
-    st.sidebar.write(dict(st.session_state))
-    if st.sidebar.button("Test click (sidebar)"):
-        st.sidebar.write("Click registrado:", ahora_str())
-
     try:
         params = st.query_params
     except Exception:
