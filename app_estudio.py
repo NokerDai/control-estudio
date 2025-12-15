@@ -225,63 +225,59 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
         password = email_config["password"]
         recipients = email_config["recipients"]
 
-        # 1. Calcular métricas snapshot
-        reporte = {}
-        for user in ["Facundo", "Iván"]:
-            per_min = resumen[user]["per_min"]
-            total_min = 0.0
-            for m in USERS[user]:
-                hms = datos_usuarios[user]["tiempos"][m]
-                total_min += hms_a_minutos(hms)
+        # --- Lógica de Formato de Balance con Color y Signo (Nuevo) ---
+        def format_balance_html(value, user):
+            """Aplica la lógica de signo (Iván: tal cual, Facundo: inverso) y formato con color."""
+            # Si el balance_raw de la hoja es el valor base,
+            # Facundo lo ve inverso (-número) e Iván lo ve directo (número).
+            final_value = -value if user == "Facundo" else value
             
-            dinero_ganado = total_min * per_min
-            reporte[user] = {
-                "horas": segundos_a_hms(int(total_min * 60)),
-                "dinero": dinero_ganado
-            }
+            if final_value > 0:
+                color = "#00e676" # Verde
+                sign_str = f"+${final_value:.2f}"
+            elif final_value < 0:
+                color = "#ff1744" # Rojo
+                sign_str = f"-${abs(final_value):.2f}"
+            else:
+                color = "#ffffff" # Blanco
+                sign_str = "$0.00"
 
-        # 2. Balance Total
-        # Nota: balance_raw viene de la celda de la hoja.
-        # Si Facundo es positivo en la app, en el balance global (hoja) suele restar o sumar dependiendo la logica.
-        # Asumiremos la logica visual:
-        
-        # Facundo's Balance logic en UI: balance = -balance_sheet + progreso_facu
-        # Ivan's Balance logic en UI: balance = balance_sheet + progreso_ivan
-        # Esto es complejo de replicar exacto sin saber quien "paga", pero haremos un resumen informativo.
-        
-        # Simplemente mostraremos lo ganado HOY y el balance acumulado base de la hoja.
-        
-        balance_formateado = f"${balance_raw:.2f}"
+            # Retorna el valor formateado con HTML para el color
+            return f'<span style="color: {color}; font-size: 1.8rem; font-weight: bold;">{sign_str}</span>'
 
-        # 3. Construir Email
+        # Aplicamos el formato al valor base de la hoja
+        balance_facundo_html = format_balance_html(balance_raw, "Facundo")
+        balance_ivan_html = format_balance_html(balance_raw, "Iván")
+        # -------------------------------------------------------------
+
+        # 1. Construir Email
         msg = MIMEMultipart()
         msg['From'] = sender
         msg['To'] = ", ".join(recipients)
-        msg['Subject'] = f"📊 Balance Diario Estudio - {date.today().strftime('%d/%m')}"
+        msg['Subject'] = f"📊 Balance Acumulado Estudio - {date.today().strftime('%d/%m')}" 
 
+        # El contenido HTML se simplifica para mostrar solo el balance, como solicitaste.
         html_content = f"""
         <html>
-          <body style="font-family: Arial, sans-serif;">
-            <h2 style="color: #2E86C1;">Resumen del Día</h2>
-            <p>Estado al momento de apertura de la app ({ahora_str()}):</p>
+          <body style="font-family: Arial, sans-serif; background-color: #1e1e1e; color: #ffffff;">
+            <h2 style="color: #2E86C1;">Balance</h2>
+            <p style="color: #ccc;">Estado acumulado (Hoja de cálculo) al momento de apertura de la app ({ahora_str()}):</p>
             
-            <hr>
+            <hr style="border-color: #444;">
             
-            <h3 style="color: #28B463;">👤 Facundo</h3>
-            <ul>
-                <li>Tiempo: <b>{reporte['Facundo']['horas']}</b></li>
-                <li>Generado hoy: <b>${reporte['Facundo']['dinero']:.2f}</b></li>
-            </ul>
+            <div style="margin-bottom: 20px; padding: 15px; border-radius: 10px; background-color: #262730;">
+                <h3 style="color: #28B463; margin-top: 0;">👤 Facundo</h3>
+                <p style="font-size: 1.1rem; margin: 5px 0;">Balance Acumulado: {balance_facundo_html}</p>
+            </div>
 
-            <h3 style="color: #D35400;">👤 Iván</h3>
-            <ul>
-                <li>Tiempo: <b>{reporte['Iván']['horas']}</b></li>
-                <li>Generado hoy: <b>${reporte['Iván']['dinero']:.2f}</b></li>
-            </ul>
+            <div style="margin-bottom: 20px; padding: 15px; border-radius: 10px; background-color: #262730;">
+                <h3 style="color: #D35400; margin-top: 0;">👤 Iván</h3>
+                <p style="font-size: 1.1rem; margin: 5px 0;">Balance Acumulado: {balance_ivan_html}</p>
+            </div>
             
-            <hr>
-            <p style="font-size: 0.9em; color: #555;">
-                <i>Balance base (semanal/acumulado hoja): {balance_formateado}</i><br>
+            <hr style="border-color: #444;">
+            <p style="font-size: 0.9em; color: #888;">
+                <i>Este es el balance semanal/acumulado base extraído directamente de la hoja de cálculo.</i><br>
                 (Este es un reporte automático generado al abrir la app).
             </p>
           </body>
@@ -300,6 +296,7 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
         return True
 
     except Exception as e:
+        # Se mantiene el log de error en consola
         print(f"Error enviando email: {e}")
         return False
 
