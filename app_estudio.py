@@ -8,33 +8,6 @@ from google.oauth2 import service_account
 from google.auth.transport.requests import AuthorizedSession
 from requests.exceptions import RequestException
 
-# ------------------ STYLES ------------------
-st.markdown("""
-    <style>
-    /* ... (Mismos estilos) ... */
-    html, body, [class*="css"] { font-size: 18px !important; }
-    h1 { font-size: 2.5rem !important; }
-    h2 { font-size: 2rem !important; }
-    h3 { font-size: 1.5rem !important; }
-
-    .materia-card {
-        background-color: #262730;
-        border: 1px solid #464b5c;
-        padding: 20px;
-        border-radius: 15px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    }
-    .materia-title { font-size: 1.4rem; font-weight: bold; color: #ffffff; margin-bottom: 5px; }
-    .materia-time { font-size: 1.6rem; font-weight: bold; color: #00e676; font-family: 'Courier New', monospace; margin-bottom: 15px; }
-
-    .status-badge { display: inline-block; padding: 5px 10px; border-radius: 12px; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; }
-    .status-active { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
-
-    div.stButton > button { height: 3.5rem; font-size: 1.2rem !important; font-weight: bold !important; border-radius: 12px !important; }
-    </style>
-""", unsafe_allow_html=True)
-
 # ------------------ TIMEZONE HELPERS ------------------
 try:
     from zoneinfo import ZoneInfo
@@ -392,6 +365,33 @@ def stop_materia_callback(usuario, materia):
         pedir_rerun()
 
 def main():
+    # ------------------ STYLES ------------------
+    st.markdown("""
+        <style>
+        /* ... (Mismos estilos) ... */
+        html, body, [class*="css"] { font-size: 18px !important; }
+        h1 { font-size: 2.5rem !important; }
+        h2 { font-size: 2rem !important; }
+        h3 { font-size: 1.5rem !important; }
+
+        .materia-card {
+            background-color: #262730;
+            border: 1px solid #464b5c;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .materia-title { font-size: 1.4rem; font-weight: bold; color: #ffffff; margin-bottom: 5px; }
+        .materia-time { font-size: 1.6rem; font-weight: bold; color: #00e676; font-family: 'Courier New', monospace; margin-bottom: 15px; }
+
+        .status-badge { display: inline-block; padding: 5px 10px; border-radius: 12px; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; }
+        .status-active { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
+
+        div.stButton > button { height: 3.5rem; font-size: 1.2rem !important; font-weight: bold !important; border-radius: 12px !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
     if st.session_state.get("_do_rerun", False):
         st.session_state["_do_rerun"] = False
         st.rerun()
@@ -732,11 +732,6 @@ def main():
             st.stop()
 
         time.sleep(10)
-        st.rerun()
-
-    st.write("")
-    if st.sidebar.button("🔄 Forzar limpieza session_state"):
-        st.session_state.clear()
         st.rerun()
 
 if __name__ == "__main__":
