@@ -20,6 +20,41 @@ except Exception:
     except Exception:
         pytz = None
 
+def cargar_estilos():
+    st.markdown("""
+        <style>
+        html, body, [class*="css"] { font-size: 18px !important; }
+        h1 { font-size: 2.5rem !important; }
+        h2 { font-size: 2rem !important; }
+        h3 { font-size: 1.5rem !important; }
+
+        /* Estilo de la tarjeta */
+        .materia-card {
+            background-color: #262730;
+            border: 1px solid #464b5c;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .materia-title { font-size: 1.4rem; font-weight: bold; color: #ffffff; margin-bottom: 5px; }
+        
+        /* EL TIEMPO (Este es el que se te rompió) */
+        .materia-time { 
+            font-size: 1.6rem; 
+            font-weight: bold; 
+            color: #00e676; 
+            font-family: 'Courier New', monospace; 
+            margin-bottom: 15px; 
+        }
+
+        .status-badge { display: inline-block; padding: 5px 10px; border-radius: 12px; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; }
+        .status-active { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
+
+        div.stButton > button { height: 3.5rem; font-size: 1.2rem !important; font-weight: bold !important; border-radius: 12px !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
 def _argentina_now_global():
     if ZoneInfo is not None:
         return datetime.now(ZoneInfo('America/Argentina/Cordoba'))
@@ -365,32 +400,7 @@ def stop_materia_callback(usuario, materia):
         pedir_rerun()
 
 def main():
-    # ------------------ STYLES ------------------
-    st.markdown("""
-        <style>
-        /* ... (Mismos estilos) ... */
-        html, body, [class*="css"] { font-size: 18px !important; }
-        h1 { font-size: 2.5rem !important; }
-        h2 { font-size: 2rem !important; }
-        h3 { font-size: 1.5rem !important; }
-
-        .materia-card {
-            background-color: #262730;
-            border: 1px solid #464b5c;
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
-        .materia-title { font-size: 1.4rem; font-weight: bold; color: #ffffff; margin-bottom: 5px; }
-        .materia-time { font-size: 1.6rem; font-weight: bold; color: #00e676; font-family: 'Courier New', monospace; margin-bottom: 15px; }
-
-        .status-badge { display: inline-block; padding: 5px 10px; border-radius: 12px; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; }
-        .status-active { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
-
-        div.stButton > button { height: 3.5rem; font-size: 1.2rem !important; font-weight: bold !important; border-radius: 12px !important; }
-        </style>
-    """, unsafe_allow_html=True)
+    cargar_estilos()
 
     if st.session_state.get("_do_rerun", False):
         st.session_state["_do_rerun"] = False
