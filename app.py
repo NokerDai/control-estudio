@@ -49,14 +49,18 @@ if st.session_state.authenticated:
     st.sidebar.header("Navegación")
     
     # Botón para ir a ESTUDIO
-    if st.sidebar.button("📚 Ir a Estudio", use_container_width=True):
-        st.session_state.current_page = "estudio"
-        st.rerun()
+    # Solo se muestra si NO estamos en la página "estudio"
+    if st.session_state.current_page != "estudio":
+        if st.sidebar.button("📚 Ir a Estudio", use_container_width=True):
+            st.session_state.current_page = "estudio"
+            st.rerun()
 
     # Botón para ir a HÁBITOS
-    if st.sidebar.button("📅 Ir a Hábitos", use_container_width=True):
-        st.session_state.current_page = "habitos"
-        st.rerun()
+    # Solo se muestra si NO estamos en la página "habitos"
+    if st.session_state.current_page != "habitos":
+        if st.sidebar.button("📅 Ir a Hábitos", use_container_width=True):
+            st.session_state.current_page = "habitos"
+            st.rerun()
 
     st.sidebar.markdown("---")
     if st.sidebar.button("🔒 Salir / Logout", use_container_width=True):
