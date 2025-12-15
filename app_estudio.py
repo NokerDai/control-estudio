@@ -2,6 +2,9 @@ import re
 import json
 import time
 import requests
+import smtplib # Nuevo
+from email.mime.text import MIMEText # Nuevo
+from email.mime.multipart import MIMEMultipart # Nuevo
 from datetime import datetime, date, timedelta, time as dt_time
 import streamlit as st
 from google.oauth2 import service_account
@@ -39,7 +42,7 @@ def cargar_estilos():
         }
         .materia-title { font-size: 1.4rem; font-weight: bold; color: #ffffff; margin-bottom: 5px; }
         
-        /* EL TIEMPO (Este es el que se te rompió) */
+        /* EL TIEMPO */
         .materia-time { 
             font-size: 1.6rem; 
             font-weight: bold; 
@@ -134,9 +137,8 @@ def replace_row_in_range(range_str, new_row):
 def sanitize_key(s):
     return re.sub(r'[^a-zA-Z0-9_]', '_', s)
 
-# ------------------ RERUN HELPER (recomendado para callbacks) ------------------
+# ------------------ RERUN HELPER ------------------
 def pedir_rerun():
-    """Establece un flag en session_state para que el rerun se haga fuera del callback."""
     st.session_state["_do_rerun"] = True
 
 # ------------------ GOOGLE SHEETS SESSION ------------------
@@ -157,7 +159,6 @@ def get_sheets_session():
         st.error(f"Error creando credenciales: {e}")
         st.stop()
 
-# La sesión NO debe ser cache_data para que no se use durante los callbacks (fuera de Streamlit flow)
 session = get_sheets_session()
 
 def sheets_batch_get(spreadsheet_id, ranges):
@@ -181,7 +182,6 @@ def sheets_batch_get(spreadsheet_id, ranges):
                 final_list.append({})
         return {"valueRanges": final_list}
     except RequestException as e:
-        # Aquí puedes añadir un mensaje más claro para el usuario
         raise RuntimeError(f"Error HTTP en batchGet al leer la hoja: {e}")
 
 def sheets_batch_update(spreadsheet_id, updates):
@@ -195,27 +195,113 @@ def sheets_batch_update(spreadsheet_id, updates):
         resp.raise_for_status()
         return resp.json()
     except RequestException as e:
-        # Aquí puedes añadir un mensaje más claro para el usuario
         raise RuntimeError(f"Error HTTP en batchUpdate al escribir en la hoja: {e}")
 
 # ------------------ ANKI HELPERS ------------------
-@st.cache_data(ttl=300) # Cachear por 5 minutos para no saturar la API en el rerun loop
+@st.cache_data(ttl=300) 
 def fetch_anki_stats(USUARIO_ACTUAL):
-    # Obtener el ID del archivo desde st.secrets
     try:
         DRIVE_JSON_ID = st.secrets["ID_DEL_JSON_FACUNDO"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ID_DEL_JSON_IVAN"]
         URL = f"https://drive.google.com/uc?id={DRIVE_JSON_ID}"
     except KeyError:
-        # Si no está la key, retornamos datos vacíos o None
         return None
-
     try:
         response = requests.get(URL)
         response.raise_for_status()
         return response.json()
-    except Exception as e:
-        # Si falla, retornamos None para manejarlo silenciosamente en la UI
+    except Exception:
         return None
+
+# ------------------ EMAIL HELPERS ------------------
+def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
+    """Calcula los saldos y envía el correo."""
+    try:
+        email_config = st.secrets.get("email")
+        if not email_config:
+            print("No hay configuración de email en secrets.")
+            return False
+
+        sender = email_config["sender"]
+        password = email_config["password"]
+        recipients = email_config["recipients"]
+
+        # 1. Calcular métricas snapshot
+        reporte = {}
+        for user in ["Facundo", "Iván"]:
+            per_min = resumen[user]["per_min"]
+            total_min = 0.0
+            for m in USERS[user]:
+                hms = datos_usuarios[user]["tiempos"][m]
+                total_min += hms_a_minutos(hms)
+            
+            dinero_ganado = total_min * per_min
+            reporte[user] = {
+                "horas": segundos_a_hms(int(total_min * 60)),
+                "dinero": dinero_ganado
+            }
+
+        # 2. Balance Total
+        # Nota: balance_raw viene de la celda de la hoja.
+        # Si Facundo es positivo en la app, en el balance global (hoja) suele restar o sumar dependiendo la logica.
+        # Asumiremos la logica visual:
+        
+        # Facundo's Balance logic en UI: balance = -balance_sheet + progreso_facu
+        # Ivan's Balance logic en UI: balance = balance_sheet + progreso_ivan
+        # Esto es complejo de replicar exacto sin saber quien "paga", pero haremos un resumen informativo.
+        
+        # Simplemente mostraremos lo ganado HOY y el balance acumulado base de la hoja.
+        
+        balance_formateado = f"${balance_raw:.2f}"
+
+        # 3. Construir Email
+        msg = MIMEMultipart()
+        msg['From'] = sender
+        msg['To'] = ", ".join(recipients)
+        msg['Subject'] = f"📊 Balance Diario Estudio - {date.today().strftime('%d/%m')}"
+
+        html_content = f"""
+        <html>
+          <body style="font-family: Arial, sans-serif;">
+            <h2 style="color: #2E86C1;">Resumen del Día</h2>
+            <p>Estado al momento de apertura de la app ({ahora_str()}):</p>
+            
+            <hr>
+            
+            <h3 style="color: #28B463;">👤 Facundo</h3>
+            <ul>
+                <li>Tiempo: <b>{reporte['Facundo']['horas']}</b></li>
+                <li>Generado hoy: <b>${reporte['Facundo']['dinero']:.2f}</b></li>
+            </ul>
+
+            <h3 style="color: #D35400;">👤 Iván</h3>
+            <ul>
+                <li>Tiempo: <b>{reporte['Iván']['horas']}</b></li>
+                <li>Generado hoy: <b>${reporte['Iván']['dinero']:.2f}</b></li>
+            </ul>
+            
+            <hr>
+            <p style="font-size: 0.9em; color: #555;">
+                <i>Balance base (semanal/acumulado hoja): {balance_formateado}</i><br>
+                (Este es un reporte automático generado al abrir la app).
+            </p>
+          </body>
+        </html>
+        """
+        
+        msg.attach(MIMEText(html_content, 'html'))
+
+        # 4. Enviar
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender, password)
+        text = msg.as_string()
+        server.sendmail(sender, recipients, text)
+        server.quit()
+        return True
+
+    except Exception as e:
+        print(f"Error enviando email: {e}")
+        return False
 
 # ------------------ CONSTANTES Y ESTRUCTURAS ------------------
 FILA_BASE = 170
@@ -223,6 +309,9 @@ FECHA_BASE = date(2025, 12, 2)
 SHEET_FACUNDO = "F. Economía"
 SHEET_IVAN = "I. Física"
 SHEET_MARCAS = "marcas"
+# Celda donde guardaremos la fecha del último mail enviado.
+# Usamos M1 en la hoja 'marcas' (ajustar si está ocupada)
+RANGO_FECHA_MAIL = f"'{SHEET_MARCAS}'!M1" 
 
 def get_time_row():
     hoy = _argentina_now_global().date()
@@ -255,7 +344,7 @@ RANGO_OBJ_IVAN = f"'{SHEET_MARCAS}'!O{TIME_ROW}"
 @st.cache_data()
 def cargar_datos_unificados():
     all_ranges = []
-    mapa_indices = {"materias": {}, "rates": {}, "objs": {}, "week": None}
+    mapa_indices = {"materias": {}, "rates": {}, "objs": {}, "week": None, "mail_date": None}
     idx = 0
     for user, materias in USERS.items():
         for m, info in materias.items():
@@ -266,6 +355,9 @@ def cargar_datos_unificados():
     all_ranges.append(RANGO_OBJ_FACU); mapa_indices["objs"]["Facundo"] = idx; idx += 1
     all_ranges.append(RANGO_OBJ_IVAN); mapa_indices["objs"]["Iván"] = idx; idx += 1
     all_ranges.append(WEEK_RANGE); mapa_indices["week"] = idx; idx += 1
+    
+    # Agregamos la fecha del mail al batch
+    all_ranges.append(RANGO_FECHA_MAIL); mapa_indices["mail_date"] = idx; idx += 1
 
     try:
         res = sheets_batch_get(st.secrets["sheet_id"], all_ranges)
@@ -308,12 +400,19 @@ def cargar_datos_unificados():
     }
     raw_week = get_val(mapa_indices["week"], "0")
     balance_val = parse_float_or_zero(raw_week)
+    
+    last_mail_date = get_val(mapa_indices["mail_date"], "")
 
     if "usuario_seleccionado" in st.session_state:
         st.session_state["materia_activa"] = materia_en_curso
         st.session_state["inicio_dt"] = inicio_dt
 
-    return {"users_data": data_usuarios, "resumen": resumen, "balance": balance_val}
+    return {
+        "users_data": data_usuarios, 
+        "resumen": resumen, 
+        "balance": balance_val,
+        "last_mail_date": last_mail_date
+    }
 
 def batch_write(updates):
     try:
@@ -437,10 +536,29 @@ def main():
                 st.rerun()
             st.stop()
 
+    # --- Carga de datos ---
     datos_globales = cargar_datos_unificados()
     datos = datos_globales["users_data"]
     resumen_marcas = datos_globales["resumen"]
     balance_val_raw = datos_globales["balance"]
+    last_mail_date_str = datos_globales["last_mail_date"]
+
+    # ------------------ LOGICA ENVIO EMAIL DIARIO ------------------
+    now = _argentina_now_global()
+    today_str = now.strftime("%Y-%m-%d")
+    
+    # Chequeamos hora (5 AM a 10 PM) y si ya se mandó hoy
+    if 5 <= now.hour < 22:
+        if last_mail_date_str != today_str:
+            # Enviamos el mail
+            exito = enviar_reporte_email(datos, resumen_marcas, balance_val_raw)
+            if exito:
+                st.toast(f"📧 Reporte diario enviado ({today_str})")
+                # Actualizamos la celda de la fecha
+                batch_write([(RANGO_FECHA_MAIL, today_str)])
+            else:
+                pass # Falló silenciosamente o lo logueamos en consola
+    # ----------------------------------------------------------------
 
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
     OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
@@ -561,56 +679,28 @@ def main():
                     </div>
                 """, unsafe_allow_html=True)
 
-            # ------------------ ANKI STATS (NUEVO / SOPORTE MÚLTIPLES MAZOS) ---
+            # ------------------ ANKI STATS ------------------
             anki_data = fetch_anki_stats(USUARIO_ACTUAL)
-            
-            # Colores para las barras
-            C_MATURE = "#31A354"
-            C_YOUNG = "#74C476"
-            C_OTHER = "#BDBDBD"
+            C_MATURE, C_YOUNG, C_OTHER = "#31A354", "#74C476", "#BDBDBD"
             
             if anki_data:
                 with st.expander("Anki"):
-                    # Iteramos sobre los mazos del JSON (ej: "🇩🇪 Alemán", "Matemáticas", etc)
                     for deck_name, stats in anki_data.items():
-                        
-                        # NUEVA LÓGICA: Determinar qué colección de estadísticas usar.
-                        # 1. Si 'stats' es un dict y *contiene* las claves de stats ("total", "young", etc.),
-                        #    entonces es un mazo simple. (Comportamiento original, pero lo manejaremos abajo si es un submazo).
-                        # 2. Si 'stats' es un dict y *NO contiene* las claves de stats, asumimos que son submazos.
-                        
-                        # Verificamos si es un mazo contenedor (padre) de submazos
                         if isinstance(stats, dict) and 'total' not in stats:
-                            
-                            # Renderizamos solo el título del mazo principal/padre
                             st.markdown(f"## {deck_name}", unsafe_allow_html=True)
-                            
-                            # Iteramos sobre los submazos
                             for subdeck_name, sub_stats in stats.items():
-                                if not isinstance(sub_stats, dict):
-                                    continue
-                                    
-                                # Las estadísticas del submazo son 'sub_stats'
+                                if not isinstance(sub_stats, dict): continue
                                 a_total = sub_stats.get("total", 0)
                                 a_young = sub_stats.get("young", 0)
                                 a_mature = sub_stats.get("mature", 0)
-                                
-                                # El resto de la lógica para submazos es la misma:
                                 a_other = max(0, a_total - a_mature - a_young)
-            
-                                # Porcentajes para la barra
                                 if a_total > 0:
                                     p_mat = (a_mature / a_total) * 100
                                     p_you = (a_young / a_total) * 100
                                     p_oth = (a_other / a_total) * 100
                                 else:
                                     p_mat, p_you, p_oth = 0, 0, 0
-                                    
-                                # Renderizamos el Título del SUBmazo
-                                # Usamos un tamaño más pequeño (h3 o simplemente negrita) para el submazo
                                 st.markdown(f"**{subdeck_name}** <span style='color:#888; font-size:0.8em;'>({a_total} cartas)</span>", unsafe_allow_html=True)
-            
-                                # Renderizamos los detalles y la barra de progreso
                                 st.markdown(f"""
                                     <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 2px; color: #ccc;">
                                         <span style="color: {C_MATURE};">Maduras: {a_mature} ({p_mat:.0f}%)</span>
@@ -623,26 +713,18 @@ def main():
                                         <div title="Otros" style="background-color: {C_OTHER}; width: {p_oth}%; height: 100%;"></div>
                                     </div>
                                 """, unsafe_allow_html=True)
-                            
-                        # Comportamiento para mazo simple (No es un mazo padre de submazos, sino un mazo con stats directas)
                         elif isinstance(stats, dict) and 'total' in stats: 
-                            
-                            # Comportamiento original si es un mazo simple
                             a_total = stats.get("total", 0)
                             a_young = stats.get("young", 0)
                             a_mature = stats.get("mature", 0)
                             a_other = max(0, a_total - a_mature - a_young)
-            
                             if a_total > 0:
                                 p_mat = (a_mature / a_total) * 100
                                 p_you = (a_young / a_total) * 100
                                 p_oth = (a_other / a_total) * 100
                             else:
                                 p_mat, p_you, p_oth = 0, 0, 0
-                            
                             st.markdown(f"**{deck_name}** <span style='color:#888; font-size:0.8em;'>({a_total} cartas)</span>", unsafe_allow_html=True)
-            
-                            # Renderizamos los detalles y la barra de progreso
                             st.markdown(f"""
                                 <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 2px; color: #ccc;">
                                     <span style="color: {C_MATURE};">Mat: {a_mature} ({p_mat:.0f}%)</span>

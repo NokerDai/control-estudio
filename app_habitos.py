@@ -114,7 +114,6 @@ def run():
         try:
             headers = worksheet.row_values(1)
             if habit_name not in headers:
-                st.warning(f"DEBUG AYER: Columna de Hábito '{habit_name}' no encontrada. Retorna 0.")
                 return 0 
 
             streak_col_index = headers.index(habit_name) + 1 
