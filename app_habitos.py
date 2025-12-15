@@ -101,12 +101,11 @@ def run():
 
     # -------------------------------------------------------------------
     # LECTURA ESPECÍFICA DE RACHA (PARA EL CÁLCULO DE LA NUEVA RACHA)
-    # Lee el valor del HÁBITO de AYER
     # -------------------------------------------------------------------
     def get_yesterdays_streak(worksheet, habit_name):
         """Lee el número de racha (que está en la columna del hábito) del día anterior."""
         if worksheet is None: 
-            st.error("DEBUG RACHA: Worksheet es None.")
+            st.error("DEBUG AYER: Worksheet es None.")
             return 0
 
         yesterday_dt = _argentina_now_global().date() - timedelta(days=1)
@@ -138,7 +137,8 @@ def run():
                     stripped_val = streak_val.strip()
                     if not stripped_val: return 0
                         
-                    final_streak = int(stripped_val)
+                    # CORRECCIÓN APLICADA: Usamos float() antes de int() para manejar '1.00'
+                    final_streak = int(float(stripped_val))
                     st.success(f"DEBUG AYER: Conversión exitosa. Racha de ayer: {final_streak}")
                     return final_streak
                 except ValueError:
@@ -162,7 +162,6 @@ def run():
 
             today_str = get_argentina_date_str()
             
-            # Obtiene la racha de AYER para la base del cálculo de HOY
             current_streak = get_yesterdays_streak(worksheet, habit_name) 
             new_streak = current_streak + 1
 
@@ -180,7 +179,6 @@ def run():
             if habit_name in headers:
                 habit_col_idx = headers.index(habit_name) + 1
             else:
-                # Lógica para encontrar el índice (Boundary)
                 if BOUNDARY_COLUMN in headers:
                     boundary = headers.index(BOUNDARY_COLUMN)
                     habit_col_idx = boundary + 1 
@@ -222,7 +220,6 @@ def run():
 
     # -------------------------------------------------------------------
     # CONFIGURACIÓN DEL ESTADO DIARIO (LÓGICA CORREGIDA)
-    # Prioridad: 1. Leer HOY. 2. Leer AYER (para el botón).
     # -------------------------------------------------------------------
     def setup_daily_state(worksheet):
         today_str = get_argentina_date_str()
@@ -249,11 +246,11 @@ def run():
                             st.info(f"DEBUG ESTADO: Valor HOY leído: '{value_today_str}'")
 
                             try:
-                                value_today = int(value_today_str)
+                                # CORRECCIÓN APLICADA: Usamos float() antes de int() para manejar '1.00'
+                                value_today = int(float(value_today_str)) 
                                 
                                 if value_today > 0:
                                     streak_habit_completed_today = True
-                                    # Si HOY tiene un valor > 0, ese es el current_streak a mostrar
                                     current_streak = value_today
                                     st.success(f"DEBUG ESTADO: Racha a mostrar (valor de HOY): {current_streak}")
                                 else:
@@ -261,7 +258,7 @@ def run():
                             except:
                                 # Si no es un número (ej. "n/a" o texto), lo consideramos completo
                                 streak_habit_completed_today = True
-                                st.error("DEBUG ESTADO: Valor HOY no es número (bloqueando botón).")
+                                st.error("DEBUG ESTADO: ERROR: Valor HOY no es número (bloqueando botón).")
                         else:
                             st.warning("DEBUG ESTADO: Celda de HOY vacía. Usando racha de AYER.")
                             
@@ -278,7 +275,6 @@ def run():
         # El resto de la lógica (hábitos del grid) se mantiene
         pending_habits_list = []
         if worksheet is not None:
-            # Lógica para determinar el resto de hábitos pendientes
             try:
                 all_dates = worksheet.col_values(1)
                 date_row_index = all_dates.index(today_str) if today_str in all_dates else -1
