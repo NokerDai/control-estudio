@@ -352,7 +352,6 @@ def run():
     
     status_text = f"NF."
     
-    st.markdown(f"## {HABIT_NAME}")
     st.markdown(f"""
         <div style="background-color: #262730; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
             <div style="font-size: 1.1rem; color: #aaa; margin-bottom: 8px;">{status_text}</div>
