@@ -350,7 +350,7 @@ def run():
     STREAK_GOAL = 30 # Objetivo de la barra de progreso (ajustable)
     streak_pct = min(streak / STREAK_GOAL, 1.0) * 100
     
-    status_text = f"NF."
+    status_text = f"{HABIT_NAME} - Día {streak} 🔥"
     
     st.markdown(f"""
         <div style="background-color: #262730; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
