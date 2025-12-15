@@ -68,7 +68,7 @@ def run():
     BOUNDARY_COLUMN = _gcp_secrets.get("boundary_column", "Extracurricular")
     
     # *** SECRETS GENERALIZADOS PARA EL HÁBITO DE RACHA (SOLO EL NOMBRE DEL HÁBITO) ***
-    STREAK_HABIT_NAME = _gcp_secrets.get("streak_habit_name", "No Fap")
+    STREAK_HABIT_NAME = _gcp_secrets.get("streak_habit_name")
     
     # Calculamos el nombre de la columna de racha basado en el nombre del hábito.
     STREAK_COLUMN_NAME = f"Racha {STREAK_HABIT_NAME}"
