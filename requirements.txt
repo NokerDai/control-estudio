@@ -1,9 +1,5 @@
 streamlit
-google-auth
+gspread
 requests
-streamlit-autorefresh
+google-auth
 pytz
-matplotlib
-plotly>=5.0.0
-requests>=2.0.0
-gspread 
