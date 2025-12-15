@@ -31,6 +31,8 @@ if "password" in query_params and not st.session_state.authenticated:
             st.session_state.authenticated = True
             # Bypass para que app_habitos no pida password de nuevo
             st.session_state.pw_correct = True 
+            # ===> AÑADIR ESTA LÍNEA <===
+            st.session_state.usuario_seleccionado = "Facundo" 
             # Volvemos a la página de inicio (Estudio) pero ya autenticados
             st.session_state.current_page = "estudio" 
             st.rerun()
