@@ -358,10 +358,6 @@ def run():
             <div style="width:100%; background-color:#444; border-radius:10px; height:12px;">
                 <div style="width:{streak_pct}%; background-color:#ff9800; height:100%; border-radius:10px;"></div>
             </div>
-            <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#888; margin-top:5px;">
-                <span>{streak} días</span>
-                <span>Objetivo: {STREAK_GOAL} días</span>
-            </div>
         </div>
     """, unsafe_allow_html=True)
 
