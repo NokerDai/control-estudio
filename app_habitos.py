@@ -374,10 +374,6 @@ def run():
             args=(HABIT_NAME, STREAK_COLUMN_NAME, sheet),
             use_container_width=True
         )
-    else:
-        st.info("Ya has marcado " + HABIT_NAME + " hoy.")
-        
-    st.markdown("---") # Separador visual
 
 
     # -------------------------
