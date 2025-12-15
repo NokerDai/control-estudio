@@ -101,38 +101,61 @@ def run():
             return None
 
     # -------------------------------------------------------------------
-    # LECTURA ESPECÍFICA DE RACHA
+    # LECTURA ESPECÍFICA DE RACHA (CON DEBUG)
     # -------------------------------------------------------------------
     def get_yesterdays_streak(worksheet, streak_column):
-        """Lee el número de racha de la columna 'streak_column' del día anterior."""
-        if worksheet is None: return 0
+        """Lee el número de racha de la columna 'streak_column' del día anterior (con debug)."""
+        if worksheet is None: 
+            st.error("DEBUG RACHA: Worksheet es None.")
+            return 0
 
         yesterday_dt = _argentina_now_global().date() - timedelta(days=1)
         yesterday_str = f"{yesterday_dt.day:02d}/{yesterday_dt.month:02d}"
+        
+        # DEBUG 1: Muestra la fecha que está buscando
+        st.info(f"DEBUG RACHA: Buscando racha de ayer: {yesterday_str}")
 
         try:
             headers = worksheet.row_values(1)
             if streak_column not in headers:
+                st.warning(f"DEBUG RACHA: Columna '{streak_column}' no encontrada.")
                 return 0 
 
             streak_col_index = headers.index(streak_column) + 1 
 
             all_dates = worksheet.col_values(1)
             if yesterday_str not in all_dates:
+                st.warning(f"DEBUG RACHA: Fecha de ayer '{yesterday_str}' no encontrada en Col A. Retorna 0.")
                 return 0 
 
             yesterday_row_index = all_dates.index(yesterday_str) + 1 
 
             streak_val = worksheet.cell(yesterday_row_index, streak_col_index).value
+            
+            # DEBUG 2: Muestra el valor crudo leído
+            st.info(f"DEBUG RACHA: Valor crudo leído de celda ({yesterday_row_index}, {streak_col_index}): '{streak_val}' (Tipo: {type(streak_val).__name__})")
 
-            try:
-                # FIX APLICADO: Se usa .strip() para eliminar posibles espacios 
-                # en blanco que pueden causar un ValueError al convertir a int.
-                return int(streak_val.strip()) if streak_val else 0
-            except ValueError:
-                return 0 
+            # --- Lógica de conversión (con el .strip() aplicado previamente) ---
+            if streak_val:
+                try:
+                    # Aplica strip y conversión
+                    stripped_val = streak_val.strip()
+                    if not stripped_val:
+                        st.warning("DEBUG RACHA: Celda de racha vacía tras .strip(). Retorna 0.")
+                        return 0
+                        
+                    final_streak = int(stripped_val)
+                    st.success(f"DEBUG RACHA: Conversión exitosa. Racha de ayer: {final_streak}") # DEBUG 3
+                    return final_streak
+                except ValueError:
+                    st.error(f"DEBUG RACHA: ERROR: ValueError al convertir '{stripped_val}' a int. Retorna 0.") # DEBUG 4
+                    return 0
+            else:
+                st.warning("DEBUG RACHA: Celda de racha de ayer vacía o None. Retorna 0.")
+                return 0
 
-        except Exception:
+        except Exception as e:
+            st.error(f"DEBUG RACHA: Error general en lectura de racha ({e.__class__.__name__}): {e}") # DEBUG 5
             return 0
             
     # -------------------------------------------------------------------
@@ -150,6 +173,9 @@ def run():
             
             current_streak = get_yesterdays_streak(worksheet, streak_column_name) 
             new_streak = current_streak + 1
+
+            # DEBUG: Muestra el cálculo de la nueva racha
+            st.info(f"DEBUG LOG: Racha de ayer: {current_streak}. Nueva racha: {new_streak}")
 
             # 1. Encontrar la fila de hoy
             all_dates = worksheet.col_values(1)
@@ -225,6 +251,7 @@ def run():
         if worksheet is not None:
             try:
                 # Obtener la racha base (del día anterior)
+                # Esta llamada ahora imprime los mensajes de DEBUG
                 current_streak = get_yesterdays_streak(worksheet, STREAK_COLUMN_NAME)
                 
                 all_dates = worksheet.col_values(1)
@@ -247,7 +274,9 @@ def run():
                                     try:
                                         # FIX: También limpiar el valor de la racha de hoy
                                         current_streak = int(today_row[streak_col_idx].strip())
+                                        st.success(f"DEBUG ESTADO: Racha de hoy (completa) leída como: {current_streak}")
                                     except:
+                                        st.error("DEBUG ESTADO: Error al leer racha de HOY para el estado (no es número).")
                                         pass
                     
                     # 3. Determinar el resto de hábitos pendientes
