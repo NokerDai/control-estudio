@@ -278,7 +278,12 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
             # Contenido simplificado sin mencionar al otro usuario.
             html_content = f"""
             <html>
-              <body style="font-family: Arial, sans-serif; background-color: #1e1e1e; color: #ffffff;">
+            <body style="
+                font-family: Arial, sans-serif;
+                background-color: #1e1e1e;
+                color: #ffffff;
+                padding: 20px 0;
+            ">
                 <p style="color: #ccc; text-align: center;">
                     Este es tu balance actual:
                 </p>
@@ -287,10 +292,10 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
 
                 <hr style="border-color: #444; margin: 20px 0;">
                 <p style="font-size: 0.9em; color: #888; text-align: center;">
-                    <i>Se envía automáticamente cuando alguno entra por primera vez en el día.</i>
+                    <i>Se envía automáticamente cuando alguno entra por primera vez en el día.</i><br>
                     <i>Se activa de 5:00 a 22:00.</i>
                 </p>
-              </body>
+            </body>
             </html>
             """
             
