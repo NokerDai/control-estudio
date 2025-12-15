@@ -214,7 +214,7 @@ def fetch_anki_stats(USUARIO_ACTUAL):
 
 # ------------------ EMAIL HELPERS ------------------
 def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
-    """Calcula los saldos y envía el correo."""
+    """Calcula los saldos y envía un correo personalizado a cada destinatario."""
     try:
         email_config = st.secrets.get("email")
         if not email_config:
@@ -223,12 +223,23 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
 
         sender = email_config["sender"]
         password = email_config["password"]
+        # Asumimos que la lista de recipients es: [email_facundo, email_ivan]
         recipients = email_config["recipients"]
 
-        # --- Lógica de Formato de Balance con Color y Signo (Nuevo) ---
+        # Mapa de usuario a email
+        # Asumiendo que Facundo es el primero y Iván el segundo en la lista de secrets.toml
+        if len(recipients) < 2:
+            print("Error: Se esperan al menos dos correos en la lista 'recipients'.")
+            return False
+
+        USER_EMAIL_MAP = {
+            "Facundo": recipients[0],
+            "Iván": recipients[1],
+        }
+
+        # --- Lógica de Formato de Balance con Color y Signo ---
         def format_balance_html(value, user):
             """Aplica la lógica de signo (Iván: tal cual, Facundo: inverso) y formato con color."""
-            # Si el balance_raw de la hoja es el valor base,
             # Facundo lo ve inverso (-número) e Iván lo ve directo (número).
             final_value = -value if user == "Facundo" else value
             
@@ -243,61 +254,63 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
                 sign_str = "$0.00"
 
             # Retorna el valor formateado con HTML para el color
-            return f'<span style="color: {color}; font-size: 1.8rem; font-weight: bold;">{sign_str}</span>'
+            return f'<div style="color: {color}; font-size: 2.5rem; font-weight: bold; text-align: center; padding: 20px;">{sign_str}</div>'
 
-        # Aplicamos el formato al valor base de la hoja
-        balance_facundo_html = format_balance_html(balance_raw, "Facundo")
-        balance_ivan_html = format_balance_html(balance_raw, "Iván")
-        # -------------------------------------------------------------
-
-        # 1. Construir Email
-        msg = MIMEMultipart()
-        msg['From'] = sender
-        msg['To'] = ", ".join(recipients)
-        msg['Subject'] = f"📊 Balance Acumulado Estudio - {date.today().strftime('%d/%m')}" 
-
-        # El contenido HTML se simplifica para mostrar solo el balance, como solicitaste.
-        html_content = f"""
-        <html>
-          <body style="font-family: Arial, sans-serif; background-color: #1e1e1e; color: #ffffff;">
-            <h2 style="color: #2E86C1;">Balance</h2>
-            <p style="color: #ccc;">Estado acumulado (Hoja de cálculo) al momento de apertura de la app ({ahora_str()}):</p>
-            
-            <hr style="border-color: #444;">
-            
-            <div style="margin-bottom: 20px; padding: 15px; border-radius: 10px; background-color: #262730;">
-                <h3 style="color: #28B463; margin-top: 0;">👤 Facundo</h3>
-                <p style="font-size: 1.1rem; margin: 5px 0;">Balance Acumulado: {balance_facundo_html}</p>
-            </div>
-
-            <div style="margin-bottom: 20px; padding: 15px; border-radius: 10px; background-color: #262730;">
-                <h3 style="color: #D35400; margin-top: 0;">👤 Iván</h3>
-                <p style="font-size: 1.1rem; margin: 5px 0;">Balance Acumulado: {balance_ivan_html}</p>
-            </div>
-            
-            <hr style="border-color: #444;">
-            <p style="font-size: 0.9em; color: #888;">
-                <i>Este es el balance semanal/acumulado base extraído directamente de la hoja de cálculo.</i><br>
-                (Este es un reporte automático generado al abrir la app).
-            </p>
-          </body>
-        </html>
-        """
-        
-        msg.attach(MIMEText(html_content, 'html'))
-
-        # 4. Enviar
+        # 2. Abrir conexión SMTP una sola vez
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
         server.login(sender, password)
-        text = msg.as_string()
-        server.sendmail(sender, recipients, text)
+        
+        exito = True
+
+        for user, email in USER_EMAIL_MAP.items():
+            if not email:
+                continue
+
+            # 3. Generar contenido personalizado
+            balance_html = format_balance_html(balance_raw, user)
+
+            msg = MIMEMultipart()
+            msg['From'] = sender
+            msg['To'] = email # Un solo destinatario por correo
+            msg['Subject'] = f"📊 Tu Balance Acumulado - {date.today().strftime('%d/%m')}" 
+
+            # Contenido simplificado sin mencionar al otro usuario.
+            html_content = f"""
+            <html>
+              <body style="font-family: Arial, sans-serif; background-color: #1e1e1e; color: #ffffff;">
+                <h2 style="color: #2E86C1; text-align: center;">Tu Balance</h2>
+                <p style="color: #ccc; text-align: center;">
+                    Este es tu balance individual al momento de apertura de la app ({ahora_str()}):
+                </p>
+                
+                {balance_html}
+
+                <hr style="border-color: #444; margin: 20px 0;">
+                <p style="font-size: 0.9em; color: #888; text-align: center;">
+                    <i>Reporte automático.</i>
+                </p>
+              </body>
+            </html>
+            """
+            
+            msg.attach(MIMEText(html_content, 'html'))
+            
+            # 4. Enviar mail
+            try:
+                server.sendmail(sender, email, msg.as_string())
+                print(f"Email de balance enviado a {user} ({email})")
+            except Exception as e:
+                print(f"Error enviando email a {user} ({email}): {e}")
+                exito = False
+
+
+        # 5. Cerrar conexión
         server.quit()
-        return True
+        return exito
 
     except Exception as e:
-        # Se mantiene el log de error en consola
-        print(f"Error enviando email: {e}")
+        print(f"Error crítico en el proceso de envío de email: {e}")
         return False
 
 # ------------------ CONSTANTES Y ESTRUCTURAS ------------------
