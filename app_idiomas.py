@@ -51,7 +51,7 @@ def sheets_batch_get(spreadsheet_id, ranges):
     """Llama a Sheets API para obtener múltiples rangos."""
     try:
         # 1. Autenticación con credenciales de servicio
-        credentials_dict = dict(st.secrets["gcp_service_account"])
+        credentials_dict = dict(st.secrets["service_account"])
         credentials = service_account.Credentials.from_service_account_info(credentials_dict)
         
         # 2. Crea la sesión autorizada
@@ -80,7 +80,7 @@ def batch_write(updates):
         return
         
     try:
-        credentials_dict = dict(st.secrets["gcp_service_account"])
+        credentials_dict = dict(st.secrets["service_account"])
         credentials = service_account.Credentials.from_service_account_info(credentials_dict)
         authed_session = AuthorizedSession(credentials)
 
