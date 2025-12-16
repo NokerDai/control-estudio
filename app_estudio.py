@@ -291,10 +291,15 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
                 {balance_html}
 
                 <hr style="border-color: #444; margin: 20px 0;">
-                <p style="font-size: 0.9em; color: #888; text-align: center;">
-                    <i>Se envía automáticamente cuando alguno entra por primera vez en el día.</i><br>
-                    <i>Se activa de 5:00 a 22:00.</i>
-                </p>
+                <div style="
+                    max-width: 350px; 
+                    margin: 0 auto; 
+                    text-align: center;
+                ">
+                    <p style="font-size: 0.9em; color: #888; text-align: center;">
+                        <i>Se envía automáticamente cuando alguno entra por primera vez en el día (5:00 a 22:00).</i><br>
+                    </p>
+                </div>
             </body>
             </html>
             """
