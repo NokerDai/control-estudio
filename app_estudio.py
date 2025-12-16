@@ -248,11 +248,13 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
 
             # 3. Generar contenido personalizado
             balance_html = format_balance_html(balance_raw, user)
+            now = _argentina_now_global()
+            fecha_hora = now.strftime("%d/%m %H:%M")
 
             msg = MIMEMultipart()
             msg['From'] = sender
             msg['To'] = email # Un solo destinatario por correo
-            msg['Subject'] = f"📊 Tu Balance Acumulado - {date.today().strftime('%d/%m')}" 
+            msg['Subject'] = f"📊 Tu Balance Acumulado - {fecha_hora}" 
 
             # Contenido simplificado sin mencionar al otro usuario.
             html_content = f"""
@@ -276,7 +278,7 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
                     text-align: center;
                 ">
                     <p style="font-size: 0.9em; color: #888; text-align: center;">
-                        <i>Se envía automáticamente cuando alguno entra por primera vez en el día (5:00 a 22:00).</i><br>
+                        <i>Se envía automáticamente cuando alguno entra por primera vez cada 2 horas de 7:00 a 22:00.</i><br>
                     </p>
                 </div>
             </body>
