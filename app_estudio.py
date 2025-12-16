@@ -145,9 +145,9 @@ def pedir_rerun():
 @st.cache_resource
 def get_sheets_session():
     try:
-        key_dict = json.loads(st.secrets["textkey"])
+        key_dict = json.loads(st.secrets["service_account"])
     except Exception as e:
-        st.error(f"Error leyendo st.secrets['textkey']: {e}")
+        st.error(f"Error leyendo st.secrets['service_account']")
         st.stop()
     try:
         creds = service_account.Credentials.from_service_account_info(
@@ -156,7 +156,7 @@ def get_sheets_session():
         )
         return AuthorizedSession(creds)
     except Exception as e:
-        st.error(f"Error creando credenciales: {e}")
+        st.error(f"Error creando credenciales")
         st.stop()
 
 session = get_sheets_session()
@@ -216,15 +216,10 @@ def fetch_anki_stats(USUARIO_ACTUAL):
 def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
     """Calcula los saldos y envía un correo personalizado a cada destinatario."""
     try:
-        email_config = st.secrets.get("email")
-        if not email_config:
-            print("No hay configuración de email en secrets.")
-            return False
-
-        sender = email_config["sender"]
-        password = email_config["password"]
+        sender = st.secrets["sender"]
+        password = st.secrets["password_mail"]
         # Asumimos que la lista de recipients es: [email_facundo, email_ivan]
-        recipients = email_config["recipients"]
+        recipients = st.secrets["recipients"]
 
         # Mapa de usuario a email
         # Asumiendo que Facundo es el primero y Iván el segundo en la lista de secrets.toml
@@ -760,7 +755,7 @@ def main():
 
             # --- MANIFIESTO ---
             with st.expander("ℹ️ No pensar, actuar."):
-                md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
+                md_content = st.secrets["facundo_md"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ivan_md"]
                 st.markdown(md_content)
 
             st.subheader("Materias")

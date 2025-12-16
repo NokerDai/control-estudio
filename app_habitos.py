@@ -28,7 +28,7 @@ def check_password():
     st.title("🔒 Acceso protegido")
     password = st.text_input("Contraseña:", type="password")
     if st.button("Entrar"):
-        if password == st.secrets["auth"]["password"]:
+        if password == st.secrets["password"]:
             st.session_state.pw_correct = True
             st.rerun()
         else:
@@ -63,13 +63,12 @@ def run():
     # -------------------------------------------------------------------
     # CONFIG DESDE SECRETS
     # -------------------------------------------------------------------
-    _gcp_secrets = st.secrets.get("gcp", {}) if hasattr(st, "secrets") else {}
 
-    GOOGLE_SHEET_NAME = _gcp_secrets.get("google_sheet_name", "Tiempo de Estudio")
-    WORKSHEET_NAME = _gcp_secrets.get("worksheet_name", "F. Extra")
-    BOUNDARY_COLUMN = _gcp_secrets.get("boundary_column", "Extracurricular")
+    GOOGLE_SHEET_NAME = st.secrets["google_sheet_name"]
+    WORKSHEET_NAME = st.secrets["worksheet_name"]
+    BOUNDARY_COLUMN = st.secrets["boundary_column"]
     
-    STREAK_HABIT_NAME = _gcp_secrets.get("streak_habit_name")
+    STREAK_HABIT_NAME = st.secrets["streak_habit_name"]
     
     # -------------------------------------------------------------------
     # CONEXIÓN A GOOGLE SHEETS
@@ -79,20 +78,18 @@ def run():
         try:
             # 1) Intentar desde secrets
             service_account_data = None
-            if "service_account" in _gcp_secrets:
-                sa = _gcp_secrets["service_account"]
-                if isinstance(sa, str):
-                    service_account_data = json.loads(sa)
-                elif isinstance(sa, dict):
-                    service_account_data = sa
+            sa = st.secrets["service_account"]
+            if isinstance(sa, str):
+                service_account_data = json.loads(sa)
+            elif isinstance(sa, dict):
+                service_account_data = sa
 
             if service_account_data:
                 gc = gspread.service_account_from_dict(service_account_data)
                 spreadsheet = gc.open(GOOGLE_SHEET_NAME)
                 worksheet = spreadsheet.worksheet(WORKSHEET_NAME)
                 return worksheet
-
-            st.warning("No hay credenciales en secrets. Agregá [gcp].service_account.")
+            
             return None
 
         except Exception as e:
@@ -192,7 +189,7 @@ def run():
     def load_habits():
         """Carga todos los hábitos, pero filtra el hábito de racha para el grid."""
         try:
-            raw_habits = _gcp_secrets.get("habits", [])
+            raw_habits = st.secrets["habits"]
             if isinstance(raw_habits, list):
                 st.session_state.all_habits = raw_habits
                 return [h for h in raw_habits if h["name"] != STREAK_HABIT_NAME]
@@ -328,10 +325,10 @@ def run():
     # Cargar hábitos desde secrets
     if 'habits' not in st.session_state:
         st.session_state.habits = load_habits()
-        st.session_state.all_habits = _gcp_secrets.get("habits", [])
+        st.session_state.all_habits = st.secrets["habits"]
 
     if 'all_habits' not in st.session_state:
-        st.session_state.all_habits = _gcp_secrets.get("habits", [])
+        st.session_state.all_habits = st.secrets["habits"]
 
     setup_daily_state(sheet)
 
