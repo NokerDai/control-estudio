@@ -4,7 +4,7 @@ import app_habitos
 import app_idiomas 
 from datetime import datetime
 try:
-    # Necesitamos el ID de la sesión para el lock
+    # Necesitamos el ID de la sesión para el loc
     from streamlit.runtime.scriptrunner import get_script_run_ctx
 except ImportError:
     def get_script_run_ctx():
