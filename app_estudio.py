@@ -755,8 +755,6 @@ def main():
             with st.expander("ℹ️ No pensar, actuar."):
                 md_content = st.secrets["facundo_md"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ivan_md"]
                 st.markdown(md_content)
-
-        st.subheader("Materias")
         
         # --- Actualizar Placeholders de Materias y Botones ---
         mis_materias = USERS[USUARIO_ACTUAL]
