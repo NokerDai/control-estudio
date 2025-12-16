@@ -53,7 +53,7 @@ def parse_datetime(dt_str):
     # Si logramos parsear, añadimos la zona horaria (Buenos Aires)
     tz = _get_tzinfo()
     if tz:
-        # Usamos .replace(tzinfo=tz) o .localize(dt) dependiendo si usamos zoneinfo o pytz
+        # Usamos .replace(tzinfo=tz) o .localize(dt)
         if hasattr(tz, 'localize'):
              return tz.localize(dt)
         return dt.replace(tzinfo=tz)
@@ -63,7 +63,8 @@ def parse_datetime(dt_str):
 SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
 ]
-SPREADSHEET_ID = st.secrets["spreadsheet_id_idiomas"] 
+# CORRECCIÓN FINAL: Usamos "sheet_id", que es la clave que existe en el secrets.
+SPREADSHEET_ID = st.secrets["sheet_id"] 
 
 # ------------------ CONSTANTES Y UTILS ------------------
 HOJA_ESTUDIO = "Estudio"
@@ -72,6 +73,7 @@ USUARIO_ACTUAL = None # Se usa como variable global para la sesión
 # CORRECCIÓN DE SANITIZE_KEY: Convertir a minúsculas
 def sanitize_key(text):
     """Sanitiza el texto y lo convierte a minúsculas para usarlo como clave."""
+    # Asume que el problema es la capitalización de nombres de usuario.
     return re.sub(r'[^a-zA-Z0-9_]', '', text).lower()
 
 def replace_row_in_range(cell_range, new_row):
@@ -95,9 +97,10 @@ def replace_row_in_range(cell_range, new_row):
 def get_service_account_credentials():
     try:
         # Load from streamlit secrets
+        # Usamos la clave correcta para las credenciales de servicio.
         info = st.secrets["service_account"] 
 
-        # CORRECCIÓN CLAVE: Si es un string (lo que causa el error 'no attribute keys'),
+        # CORRECCIÓN: Si es un string (que causa el error 'no attribute keys'),
         # lo parseamos a diccionario.
         if isinstance(info, str):
             info = json.loads(info)
@@ -247,7 +250,6 @@ def segundos_a_hms(total_segundos):
 @st.cache_data(ttl=timedelta(minutes=5), show_spinner=False)
 def get_time_sheet():
     """Obtiene los valores de la hoja de 'Estudio' para leer el tiempo actual."""
-    # Usamos un rango fijo ya que la app_estudio usa la fila dinámica
     response = google_sheets_api_call(
         'get',
         f'values/{HOJA_ESTUDIO}!A1:Z100', 
@@ -259,11 +261,7 @@ def get_time_sheet():
     return response['values']
 
 def get_time_row():
-    # NOTA: En la lógica real de app_estudio.py, la fila es dinámica
-    # (TIME_ROW = FILA_BASE + delta). Esta función aquí asume que
-    # esta hoja de idiomas tiene una columna 'Fecha' para encontrar la fila
-    # del día, como se hacía en versiones anteriores.
-    
+    """Busca la fila que corresponde al día de hoy para registro de tiempo."""
     now_date_str = ahora_str().split(' ')[0] # YYYY-MM-DD
     time_sheet = get_time_sheet()
     
@@ -444,25 +442,23 @@ def main():
     
     st.title("🌎 Seguimiento de Idiomas")
     
-    # -----------------------------------------------------------------
-    # CORRECCIÓN: Normalizar la clave de usuario en la sesión
-    # -----------------------------------------------------------------
+    # CORRECCIÓN PARA EL KEYERROR: Normalizar la clave de usuario en la sesión
     if "usuario_seleccionado" in st.session_state and st.session_state.usuario_seleccionado:
-        current_user_val = st.session_state.usuario_seleccionado # Ej: "Facundo" (capitalizado)
+        current_user_val = st.session_state.usuario_seleccionado 
         
-        # 1. Verificamos si la clave actual es inválida (causando el KeyError)
+        # Verificamos si la clave actual es inválida (ej: "Facundo" en lugar de "facundo")
         if current_user_val not in st.session_state.user_options:
-            # 2. Intentamos encontrar la clave correcta (ej: 'facundo')
+            # Intentamos encontrar la clave correcta (sanitizada/minúscula)
             found_key = next((
                 key for key in st.session_state.user_options.keys() 
                 if key == sanitize_key(current_user_val) 
             ), None)
             
             if found_key:
-                # 3. Actualizamos la sesión con la clave sanitizada (minúscula)
+                # Actualizamos la sesión con la clave sanitizada (minúscula)
                 st.session_state.usuario_seleccionado = found_key
             else:
-                # 4. Si aún no se encuentra, forzamos la selección manual
+                # Si no se encuentra, forzamos la selección manual
                 st.session_state.usuario_seleccionado = None
     
     # Selección de Usuario (Si no está seleccionado o se reseteó por ser inválido)
@@ -491,7 +487,6 @@ def main():
                  st.stop()
         else:
             st.stop()
-    # -----------------------------------------------------------------
             
     # A partir de aquí, USUARIO_ACTUAL es la clave sanitizada (ej: 'facundo').
     USUARIO_ACTUAL = st.session_state.usuario_seleccionado
