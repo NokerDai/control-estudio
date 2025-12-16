@@ -559,19 +559,36 @@ def main():
 
     # ------------------ LOGICA ENVIO EMAIL DIARIO ------------------
     now = _argentina_now_global()
-    today_str = now.strftime("%Y-%m-%d")
-    
-    # Chequeamos hora (7 AM a 10 PM) y si ya se mandó hoy
-    if 7 <= now.hour < 22:
-        if last_mail_date_str != today_str:
-            # Enviamos el mail
-            exito = enviar_reporte_email(datos, resumen_marcas, balance_val_raw)
-            if exito:
-                st.toast(f"📧 Reporte diario enviado ({today_str})")
-                # Actualizamos la celda de la fecha
-                batch_write([(RANGO_FECHA_MAIL, today_str)])
-            else:
-                pass # Falló silenciosamente o lo logueamos en consola
+
+    HORA_INICIO = 7
+    HORA_FIN = 22
+    INTERVALO_HORAS = 2
+
+    def puede_enviar_mail(now, last_mail_str):
+        # Fuera del horario permitido
+        if not (HORA_INICIO <= now.hour < HORA_FIN):
+            return False
+
+        # Nunca se envió mail
+        if not last_mail_str or str(last_mail_str).strip() == "":
+            return True
+
+        try:
+            last_dt = parse_datetime(last_mail_str)
+        except Exception:
+            # Si el formato es inválido, permitimos enviar
+            return True
+
+        # Diferencia en horas
+        diff = now - last_dt
+        return diff >= timedelta(hours=INTERVALO_HORAS)
+
+    # --- LÓGICA FINAL ---
+    if puede_enviar_mail(now, last_mail_date_str):
+        exito = enviar_reporte_email(datos, resumen_marcas, balance_val_raw)
+        if exito:
+            st.toast("📧 Reporte enviado")
+            batch_write([(RANGO_FECHA_MAIL, ahora_str())])
     # ----------------------------------------------------------------
 
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
