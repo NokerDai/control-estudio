@@ -247,6 +247,12 @@ USERS = {
     }
 }
 
+# Rangos para Rate y Objetivo se mantienen en la hoja 'marcas' (se asume que son los mismos)
+RANGO_RATE_FACU = f"'{SHEET_MARCAS}'!C{TIME_ROW}"
+RANGO_RATE_IVAN = f"'{SHEET_MARCAS}'!B{TIME_ROW}"
+RANGO_OBJ_FACU = f"'{SHEET_MARCAS}'!P{TIME_ROW}"
+RANGO_OBJ_IVAN = f"'{SHEET_MARCAS}'!O{TIME_ROW}"
+
 # ------------------ CARGA UNIFICADA (cacheada) ------------------
 @st.cache_data()
 def cargar_datos_unificados():
@@ -257,6 +263,10 @@ def cargar_datos_unificados():
         for m, info in materias.items():
             all_ranges.append(info["est"]); mapa_indices["materias"][(user, m, "est")] = idx; idx += 1
             all_ranges.append(info["time"]); mapa_indices["materias"][(user, m, "time")] = idx; idx += 1
+    all_ranges.append(RANGO_RATE_FACU); mapa_indices["rates"]["Facundo"] = idx; idx += 1
+    all_ranges.append(RANGO_RATE_IVAN); mapa_indices["rates"]["Iván"] = idx; idx += 1
+    all_ranges.append(RANGO_OBJ_FACU); mapa_indices["objs"]["Facundo"] = idx; idx += 1
+    all_ranges.append(RANGO_OBJ_IVAN); mapa_indices["objs"]["Iván"] = idx; idx += 1
     all_ranges.append(WEEK_RANGE); mapa_indices["week"] = idx; idx += 1
     
     # Agregamos la fecha del mail al batch
