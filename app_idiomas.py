@@ -77,8 +77,8 @@ def get_today_argentina():
 # ------------------ CONSTANTES ------------------
 
 # Google Sheets Configuración (de secrets)
-SHEET_ID = st.secrets.get("sheet_id")
-CREDS_JSON = st.secrets.get("service_account")
+SHEET_ID = st.secrets["sheet_id"]
+CREDS_JSON = st.secrets["service_account"]
 
 # Usuario actual (Se obtiene dinámicamente)
 def get_current_user():
