@@ -4,6 +4,7 @@ from datetime import datetime, date
 import streamlit as st
 from google.oauth2 import service_account
 from requests.exceptions import RequestException
+import json
 
 # Librerías de Google Sheets
 import gspread
@@ -152,14 +153,27 @@ def get_client():
         return None
         
     try:
+        # --- MODIFICACIÓN CLAVE ---
+        # 1. Si CREDS_JSON es una cadena, la parseamos a un diccionario.
+        #    Si ya es un diccionario (por una configuración previa o diferente), no se toca.
+        if isinstance(CREDS_JSON, str):
+            creds_info = json.loads(CREDS_JSON)
+        else:
+            creds_info = CREDS_JSON
+        # --- FIN MODIFICACIÓN CLAVE ---
+
         creds = service_account.Credentials.from_service_account_info(
-            CREDS_JSON,
+            creds_info, # Usamos el diccionario parsedo/cargado
             scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
         )
         client = gspread.authorize(creds)
         return client
     except Exception as e:
-        st.error(f"Error al inicializar Google Sheets: {e}")
+        # Se añade 'json.JSONDecodeError' al manejo de excepciones
+        if isinstance(e, json.JSONDecodeError):
+            st.error(f"Error al inicializar Google Sheets: No se pudo decodificar el JSON de credenciales. Revisa el formato de service_account en tus secrets.")
+        else:
+            st.error(f"Error al inicializar Google Sheets: {e}")
         return None
 
 @st.cache_resource(ttl=3600)
