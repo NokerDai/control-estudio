@@ -53,22 +53,26 @@ def parse_datetime(dt_str):
     # Si logramos parsear, añadimos la zona horaria (Buenos Aires)
     tz = _get_tzinfo()
     if tz:
-        return tz.localize(dt)
+        # Usamos .replace(tzinfo=tz) o .localize(dt) dependiendo si usamos zoneinfo o pytz
+        if hasattr(tz, 'localize'):
+             return tz.localize(dt)
+        return dt.replace(tzinfo=tz)
     return dt # Retornar sin TZ si no se pudo obtener
 
 # ------------------ GOOGLE SHEETS API CONFIG ------------------
-# 1. CORRECCIÓN: Usar SCOPES en lugar de SCOPES_IDIOMAS.
 SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
 ]
-SPREADSHEET_ID = st.secrets["sheet_id"] 
+SPREADSHEET_ID = st.secrets["spreadsheet_id_idiomas"] 
 
 # ------------------ CONSTANTES Y UTILS ------------------
 HOJA_ESTUDIO = "Estudio"
 USUARIO_ACTUAL = None # Se usa como variable global para la sesión
 
+# CORRECCIÓN DE SANITIZE_KEY: Convertir a minúsculas
 def sanitize_key(text):
-    return re.sub(r'[^a-zA-Z0-9_]', '', text)
+    """Sanitiza el texto y lo convierte a minúsculas para usarlo como clave."""
+    return re.sub(r'[^a-zA-Z0-9_]', '', text).lower()
 
 def replace_row_in_range(cell_range, new_row):
     """Reemplaza el número de fila en un rango A1 (ej: 'B2') con el nuevo número."""
@@ -91,10 +95,9 @@ def replace_row_in_range(cell_range, new_row):
 def get_service_account_credentials():
     try:
         # Load from streamlit secrets
-        # 2. CORRECCIÓN: Usar la clave correcta 'service_account'
         info = st.secrets["service_account"] 
 
-        # 3. CORRECCIÓN CLAVE: Si es un string (que causa el error 'no attribute keys'),
+        # CORRECCIÓN CLAVE: Si es un string (lo que causa el error 'no attribute keys'),
         # lo parseamos a diccionario.
         if isinstance(info, str):
             info = json.loads(info)
@@ -105,7 +108,6 @@ def get_service_account_credentials():
         )
         return creds
     except Exception as e:
-        # Este error es el que estabas viendo. Con las correcciones, debería solucionarse.
         st.error(f"Error al cargar credenciales de GCP: {e}")
         st.stop()
         
@@ -117,7 +119,6 @@ def get_authorized_session():
         authed_session = AuthorizedSession(creds)
         return authed_session
     except Exception as e:
-        # El error 'invalid_scope' original aparece aquí
         st.error(f"Error al obtener sesión autorizada (revisa SCOPES o credenciales): {e}")
         st.stop()
 
@@ -151,7 +152,6 @@ def google_sheets_api_call(method, api_path, params=None, body=None):
 
 def pedir_rerun():
     # Helper para forzar la actualización después de una acción
-    # Necesario para que Streamlit refresque la interfaz y las variables de sesión
     time.sleep(0.1) # Pequeña pausa
     st.rerun()
 
@@ -180,8 +180,8 @@ def cargar_configuracion_de_usuarios():
         if not row or not row[0]: # Si la fila está vacía o el nombre de usuario falta
             continue
 
-        user_name = row[0].strip()
-        user_key = sanitize_key(user_name)
+        user_name = row[0].strip() # Ej: "Facundo"
+        user_key = sanitize_key(user_name) # Ej: "facundo" (en minúsculas por la corrección)
         USERS_CONFIG[user_key] = {}
         
         # Procesar las materias o idiomas para el usuario
@@ -203,6 +203,7 @@ def cargar_configuracion_de_usuarios():
 
 # ------------------ FUNCIONES DE LA APP ------------------
 def get_user_options():
+    # Retorna un diccionario {clave_sanitizada: Nombre Visible}
     USERS = cargar_configuracion_de_usuarios()
     return {user_key: USERS[user_key]['name'] for user_key in USERS}
 
@@ -246,9 +247,10 @@ def segundos_a_hms(total_segundos):
 @st.cache_data(ttl=timedelta(minutes=5), show_spinner=False)
 def get_time_sheet():
     """Obtiene los valores de la hoja de 'Estudio' para leer el tiempo actual."""
+    # Usamos un rango fijo ya que la app_estudio usa la fila dinámica
     response = google_sheets_api_call(
         'get',
-        f'values/{HOJA_ESTUDIO}!A1:Z100', # Rango amplio, ajusta si es necesario
+        f'values/{HOJA_ESTUDIO}!A1:Z100', 
         params={'majorDimension': 'ROWS'}
     )
     if not response or 'values' not in response:
@@ -257,7 +259,11 @@ def get_time_sheet():
     return response['values']
 
 def get_time_row():
-    """Busca la fila que corresponde al día de hoy para registro de tiempo."""
+    # NOTA: En la lógica real de app_estudio.py, la fila es dinámica
+    # (TIME_ROW = FILA_BASE + delta). Esta función aquí asume que
+    # esta hoja de idiomas tiene una columna 'Fecha' para encontrar la fila
+    # del día, como se hacía en versiones anteriores.
+    
     now_date_str = ahora_str().split(' ')[0] # YYYY-MM-DD
     time_sheet = get_time_sheet()
     
@@ -276,12 +282,10 @@ def get_time_row():
             fila_vacia = i + 1
             fecha_celda = f'{HOJA_ESTUDIO}!A{fila_vacia}'
             batch_write([(fecha_celda, now_date_str)])
-            # Forzar una invalidación del caché de la hoja para que la próxima
-            # vez que se pida, ya tenga la fecha de hoy
+            # Forzar una invalidación del caché de la hoja 
             get_time_sheet.clear() 
             return fila_vacia
             
-    # Si la hoja está llena (100 filas)
     st.warning("La hoja de tiempo está llena o el rango de búsqueda es insuficiente.")
     return None
 
@@ -370,14 +374,13 @@ def start_study_session(idioma):
     st.session_state.tiempo_inicio_idiomas = ahora_str() # Guardar como string
     
     # El tiempo acumulado actual del idioma
-    USERS = cargar_configuracion_de_usuarios()
+    # Se usa la clave sanitizada (minúscula) para acceder
     idioma_key = sanitize_key(idioma)
     
     # Obtener el tiempo de la hoja para inicializar el contador
     current_times = get_user_current_status(st.session_state.usuario_seleccionado)
     st.session_state.tiempo_actual_idiomas = current_times.get(idioma_key, 0)
     
-    # Registrar el inicio en la fila del día (por ahora, solo actualizamos el total al finalizar)
     pass
 
 def stop_study_session(idioma):
@@ -441,22 +444,58 @@ def main():
     
     st.title("🌎 Seguimiento de Idiomas")
     
-    # Selección de Usuario (Igual que app_estudio)
+    # -----------------------------------------------------------------
+    # CORRECCIÓN: Normalizar la clave de usuario en la sesión
+    # -----------------------------------------------------------------
+    if "usuario_seleccionado" in st.session_state and st.session_state.usuario_seleccionado:
+        current_user_val = st.session_state.usuario_seleccionado # Ej: "Facundo" (capitalizado)
+        
+        # 1. Verificamos si la clave actual es inválida (causando el KeyError)
+        if current_user_val not in st.session_state.user_options:
+            # 2. Intentamos encontrar la clave correcta (ej: 'facundo')
+            found_key = next((
+                key for key in st.session_state.user_options.keys() 
+                if key == sanitize_key(current_user_val) 
+            ), None)
+            
+            if found_key:
+                # 3. Actualizamos la sesión con la clave sanitizada (minúscula)
+                st.session_state.usuario_seleccionado = found_key
+            else:
+                # 4. Si aún no se encuentra, forzamos la selección manual
+                st.session_state.usuario_seleccionado = None
+    
+    # Selección de Usuario (Si no está seleccionado o se reseteó por ser inválido)
     if not st.session_state.usuario_seleccionado:
-        user_selection = st.selectbox(
+        # Obtenemos los nombres visibles
+        visible_options = [""] + list(st.session_state.user_options.values())
+        
+        user_name_selected = st.selectbox(
             "Selecciona tu usuario:",
-            options=[""] + list(st.session_state.user_options.keys()),
-            format_func=lambda x: st.session_state.user_options.get(x, "Seleccionar..."),
-            key="idiomas_user_select"
+            options=visible_options,
+            key="idiomas_user_select_name"
         )
-        if user_selection:
-            st.session_state.usuario_seleccionado = user_selection
-            st.rerun()
+        
+        if user_name_selected:
+            # Buscamos la CLAVE (sanitizada) a partir del nombre visible
+            user_key = next((
+                key for key, name in st.session_state.user_options.items() 
+                if name == user_name_selected
+            ), None)
+            
+            if user_key:
+                st.session_state.usuario_seleccionado = user_key # Guarda la CLAVE sanitizada (ej: 'facundo')
+                st.rerun()
+            else:
+                 st.error("No se encontró la clave de usuario. Algo salió mal.")
+                 st.stop()
         else:
             st.stop()
+    # -----------------------------------------------------------------
             
+    # A partir de aquí, USUARIO_ACTUAL es la clave sanitizada (ej: 'facundo').
     USUARIO_ACTUAL = st.session_state.usuario_seleccionado
-    user_name = st.session_state.user_options[USUARIO_ACTUAL]
+    user_name = st.session_state.user_options[USUARIO_ACTUAL] 
     st.sidebar.markdown(f"**Usuario:** {user_name}")
     
     # Lógica del cronómetro
