@@ -217,7 +217,7 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
     """Calcula los saldos y envía un correo personalizado a cada destinatario."""
     try:
         sender = st.secrets["sender"]
-        password = st.secrets["password"]
+        password = st.secrets["password_mail"]
         # Asumimos que la lista de recipients es: [email_facundo, email_ivan]
         recipients = st.secrets["recipients"]
 
