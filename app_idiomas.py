@@ -70,7 +70,7 @@ def init_sheets_service():
     """Inicializa la sesión autenticada con Google Sheets."""
     try:
         # Carga la configuración de Firebase/Google Sheets desde st.secrets
-        creds_json = st.secrets["gcp_service_account"]
+        creds_json = st.secrets["service_account"]
         creds = service_account.Credentials.from_service_account_info(creds_json)
         
         # Configura el alcance para Google Sheets
