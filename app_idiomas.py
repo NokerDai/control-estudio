@@ -153,9 +153,8 @@ def get_client():
         return None
         
     try:
-        # --- MODIFICACIÓN CLAVE ---
+        # --- MODIFICACIÓN CLAVE (MANEJO DE JSON STRING) ---
         # 1. Si CREDS_JSON es una cadena, la parseamos a un diccionario.
-        #    Si ya es un diccionario (por una configuración previa o diferente), no se toca.
         if isinstance(CREDS_JSON, str):
             creds_info = json.loads(CREDS_JSON)
         else:
@@ -169,7 +168,7 @@ def get_client():
         client = gspread.authorize(creds)
         return client
     except Exception as e:
-        # Se añade 'json.JSONDecodeError' al manejo de excepciones
+        # Manejo más específico del error de JSON
         if isinstance(e, json.JSONDecodeError):
             st.error(f"Error al inicializar Google Sheets: No se pudo decodificar el JSON de credenciales. Revisa el formato de service_account en tus secrets.")
         else:
@@ -188,19 +187,37 @@ def get_worksheet(client):
         st.error(f"Error al abrir la hoja de cálculo (ID: {SHEET_ID}): {e}")
         return None
 
+# --- IMPLEMENTACIÓN DE OPCIÓN A: USANDO WORKSHEET.BATCH_GET ---
 def batch_read(ranges):
-    """Lee un conjunto de rangos."""
+    """Lee un conjunto de rangos no contiguos de forma eficiente."""
     client = get_client()
-    if not client: return []
+    if not client: return [''] * len(ranges)
     
     try:
-        # Usamos el método get_range de gspread que usa la API v4
-        result = client.open_by_key(SHEET_ID).sheet1.get_values(ranges)
-        # El resultado es una lista de listas, tomamos el primer elemento de cada sublista (el valor)
-        return [item[0] if item else '' for item in result]
+        worksheet = client.open_by_key(SHEET_ID).sheet1 # Hoja1
+        
+        # Usamos batch_get en lugar de get_values para rangos múltiples no contiguos
+        results = worksheet.batch_get(ranges) 
+        
+        final_values = []
+        for result_set in results:
+            # Los resultados de batch_get son una lista de valores
+            # result_set: [['valor']] (para una sola celda) o [['valor1', 'valor2']]
+            
+            # Intentamos obtener el primer valor de la primera fila, si existe
+            if result_set and result_set[0] and result_set[0][0]:
+                final_values.append(result_set[0][0])
+            else:
+                final_values.append('')
+        
+        # El resultado es una lista simple de valores ['valor1', 'valor2', ...]
+        return final_values
+        
     except Exception as e:
         st.error(f"Error al leer rangos {ranges}: {e}")
         return [''] * len(ranges) # Devolvemos vacíos para evitar rotura
+# --- FIN IMPLEMENTACIÓN OPCIÓN A ---
+
 
 def batch_write(updates):
     """Escribe un conjunto de valores en pares (rango, valor)."""
@@ -210,7 +227,7 @@ def batch_write(updates):
     updates_list = [
         {
             'range': range_str,
-            'values': [[value]]
+            'values': [[value]] # Formato requerido: lista de listas
         } for range_str, value in updates
     ]
     
@@ -478,17 +495,24 @@ def main():
                 # Asignar los valores leídos al estado
                 idx = 0
                 for full_name in st.session_state.time_data.keys():
+                    # Usamos 'or "00:00:00"' para manejar celdas vacías
                     st.session_state.time_data[full_name]["daily_hms"] = values[idx] or "00:00:00"
                     st.session_state.time_data[full_name]["total_hms"] = values[idx + 1] or "00:00:00"
                     idx += 2
                     
                 st.session_state.data_loaded = True
-                st.rerun() # Volvemos a cargar la vista con los datos cargados
-                return
+                # No hacemos rerun inmediato aquí, para que el spinner tenga tiempo de mostrarse
                 
             except Exception as e:
-                st.error(f"No se pudieron cargar los datos de la hoja de cálculo: {e}")
+                # El error ya fue reportado en batch_read
+                st.session_state.data_loaded = False 
                 return
+            
+            # Si la carga fue exitosa, forzamos el rerun para mostrar los datos
+            if st.session_state.data_loaded:
+                st.rerun() 
+                return
+
 
     # 4. VISTA: Mostrar las tarjetas por categoría (F. Idiomas / I. Idiomas)
     st.header(f"Lista de Idiomas a Estudiar para {get_current_user()}")
