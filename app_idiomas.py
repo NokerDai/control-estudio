@@ -424,9 +424,6 @@ def main():
     if 'rerun_pending' in st.session_state:
         del st.session_state.rerun_pending
 
-    st.title("🗣️ Sistema de Registro de Idiomas")
-    st.markdown("---")
-
     # 1. Obtener la configuración plana de los idiomas
     # Ahora llamamos sin argumentos, el usuario se obtiene internamente
     language_config = get_user_language_config()
