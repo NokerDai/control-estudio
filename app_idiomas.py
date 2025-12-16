@@ -236,22 +236,16 @@ WEEK_RANGE = f"'{SHEET_MARCAS}'!R{TIME_ROW}"
 # **CAMBIO CLAVE: Nuevas materias, manteniendo las celdas B, C, D, E, F, G, etc.**
 USERS = {
     "Facundo": {
-        "Inglés":    {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"},
-        "Alemán":    {"time": f"'{SHEET_FACUNDO}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!C{MARCAS_ROW}"},
-        "Francés":   {"time": f"'{SHEET_FACUNDO}'!D{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!D{MARCAS_ROW}"},
-        "Portugués": {"time": f"'{SHEET_FACUNDO}'!E{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!E{MARCAS_ROW}"},
+        "Alemán":    {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"},
+        "Chino":    {"time": f"'{SHEET_FACUNDO}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!C{MARCAS_ROW}"},
+        "Inglés":   {"time": f"'{SHEET_FACUNDO}'!D{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!D{MARCAS_ROW}"},
     },
     "Iván": {
-        "Japonés":  {"time": f"'{SHEET_IVAN}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!F{MARCAS_ROW}"},
-        "Coreano":  {"time": f"'{SHEET_IVAN}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!G{MARCAS_ROW}"},
+        "Inglés":  {"time": f"'{SHEET_IVAN}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!F{MARCAS_ROW}"},
+        "Alemán":  {"time": f"'{SHEET_IVAN}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!G{MARCAS_ROW}"},
+        "Portugués":   {"time": f"'{SHEET_IVAN}'!D{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!D{MARCAS_ROW}"},
     }
 }
-
-# Rangos para Rate y Objetivo se mantienen en la hoja 'marcas' (se asume que son los mismos)
-RANGO_RATE_FACU = f"'{SHEET_MARCAS}'!C{TIME_ROW}"
-RANGO_RATE_IVAN = f"'{SHEET_MARCAS}'!B{TIME_ROW}"
-RANGO_OBJ_FACU = f"'{SHEET_MARCAS}'!P{TIME_ROW}"
-RANGO_OBJ_IVAN = f"'{SHEET_MARCAS}'!O{TIME_ROW}"
 
 # ------------------ CARGA UNIFICADA (cacheada) ------------------
 @st.cache_data()
@@ -263,10 +257,6 @@ def cargar_datos_unificados():
         for m, info in materias.items():
             all_ranges.append(info["est"]); mapa_indices["materias"][(user, m, "est")] = idx; idx += 1
             all_ranges.append(info["time"]); mapa_indices["materias"][(user, m, "time")] = idx; idx += 1
-    all_ranges.append(RANGO_RATE_FACU); mapa_indices["rates"]["Facundo"] = idx; idx += 1
-    all_ranges.append(RANGO_RATE_IVAN); mapa_indices["rates"]["Iván"] = idx; idx += 1
-    all_ranges.append(RANGO_OBJ_FACU); mapa_indices["objs"]["Facundo"] = idx; idx += 1
-    all_ranges.append(RANGO_OBJ_IVAN); mapa_indices["objs"]["Iván"] = idx; idx += 1
     all_ranges.append(WEEK_RANGE); mapa_indices["week"] = idx; idx += 1
     
     # Agregamos la fecha del mail al batch
