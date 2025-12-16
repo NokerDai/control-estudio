@@ -61,7 +61,7 @@ def parse_datetime(dt_str):
 SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
 ]
-SPREADSHEET_ID = st.secrets["spreadsheet_id_idiomas"] 
+SPREADSHEET_ID = st.secrets["sheet_id"] 
 
 # ------------------ CONSTANTES Y UTILS ------------------
 HOJA_ESTUDIO = "Estudio"
