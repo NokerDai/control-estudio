@@ -445,44 +445,20 @@ def main():
         if usuario_estudiando and inicio_dt is not None:
             tiempo_anadido_seg = int((_argentina_now_global() - inicio_dt).total_seconds())
 
-            # ------------------ ANKI STATS ------------------
-            anki_data = fetch_anki_stats(USUARIO_ACTUAL)
-            C_MATURE, C_YOUNG, C_OTHER = "#31A354", "#74C476", "#BDBDBD"
-            
-            if anki_data:
-                with st.expander("Anki"):
-                    for deck_name, stats in anki_data.items():
-                        if isinstance(stats, dict) and 'total' not in stats:
-                            st.markdown(f"## {deck_name}", unsafe_allow_html=True)
-                            for subdeck_name, sub_stats in stats.items():
-                                if not isinstance(sub_stats, dict): continue
-                                a_total = sub_stats.get("total", 0)
-                                a_young = sub_stats.get("young", 0)
-                                a_mature = sub_stats.get("mature", 0)
-                                a_other = max(0, a_total - a_mature - a_young)
-                                if a_total > 0:
-                                    p_mat = (a_mature / a_total) * 100
-                                    p_you = (a_young / a_total) * 100
-                                    p_oth = (a_other / a_total) * 100
-                                else:
-                                    p_mat, p_you, p_oth = 0, 0, 0
-                                st.markdown(f"**{subdeck_name}** <span style='color:#888; font-size:0.8em;'>({a_total} cartas)</span>", unsafe_allow_html=True)
-                                st.markdown(f"""
-                                    <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 2px; color: #ccc;">
-                                        <span style="color: {C_MATURE};">Maduras: {a_mature} ({p_mat:.0f}%)</span>
-                                        <span style="color: {C_YOUNG};">Jóvenes: {a_young} ({p_you:.0f}%)</span>
-                                        <span style="color: {C_OTHER};">Otros: {a_other}</span>
-                                    </div>
-                                    <div style="width: 100%; height: 15px; border-radius: 5px; overflow: hidden; display: flex; border: 1px solid #444; margin-bottom: 15px;">
-                                        <div title="Mature" style="background-color: {C_MATURE}; width: {p_mat}%; height: 100%;"></div>
-                                        <div title="Young" style="background-color: {C_YOUNG}; width: {p_you}%; height: 100%;"></div>
-                                        <div title="Otros" style="background-color: {C_OTHER}; width: {p_oth}%; height: 100%;"></div>
-                                    </div>
-                                """, unsafe_allow_html=True)
-                        elif isinstance(stats, dict) and 'total' in stats: 
-                            a_total = stats.get("total", 0)
-                            a_young = stats.get("young", 0)
-                            a_mature = stats.get("mature", 0)
+        # ------------------ ANKI STATS ------------------
+        anki_data = fetch_anki_stats(USUARIO_ACTUAL)
+        C_MATURE, C_YOUNG, C_OTHER = "#31A354", "#74C476", "#BDBDBD"
+        
+        if anki_data:
+            with st.expander("Anki"):
+                for deck_name, stats in anki_data.items():
+                    if isinstance(stats, dict) and 'total' not in stats:
+                        st.markdown(f"## {deck_name}", unsafe_allow_html=True)
+                        for subdeck_name, sub_stats in stats.items():
+                            if not isinstance(sub_stats, dict): continue
+                            a_total = sub_stats.get("total", 0)
+                            a_young = sub_stats.get("young", 0)
+                            a_mature = sub_stats.get("mature", 0)
                             a_other = max(0, a_total - a_mature - a_young)
                             if a_total > 0:
                                 p_mat = (a_mature / a_total) * 100
@@ -490,12 +466,12 @@ def main():
                                 p_oth = (a_other / a_total) * 100
                             else:
                                 p_mat, p_you, p_oth = 0, 0, 0
-                            st.markdown(f"**{deck_name}** <span style='color:#888; font-size:0.8em;'>({a_total} cartas)</span>", unsafe_allow_html=True)
+                            st.markdown(f"**{subdeck_name}** <span style='color:#888; font-size:0.8em;'>({a_total} cartas)</span>", unsafe_allow_html=True)
                             st.markdown(f"""
                                 <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 2px; color: #ccc;">
-                                    <span style="color: {C_MATURE};">Mat: {a_mature} ({p_mat:.0f}%)</span>
-                                    <span style="color: {C_YOUNG};">Yng: {a_young} ({p_you:.0f}%)</span>
-                                    <span style="color: {C_OTHER};">Oth: {a_other}</span>
+                                    <span style="color: {C_MATURE};">Maduras: {a_mature} ({p_mat:.0f}%)</span>
+                                    <span style="color: {C_YOUNG};">Jóvenes: {a_young} ({p_you:.0f}%)</span>
+                                    <span style="color: {C_OTHER};">Otros: {a_other}</span>
                                 </div>
                                 <div style="width: 100%; height: 15px; border-radius: 5px; overflow: hidden; display: flex; border: 1px solid #444; margin-bottom: 15px;">
                                     <div title="Mature" style="background-color: {C_MATURE}; width: {p_mat}%; height: 100%;"></div>
@@ -503,6 +479,30 @@ def main():
                                     <div title="Otros" style="background-color: {C_OTHER}; width: {p_oth}%; height: 100%;"></div>
                                 </div>
                             """, unsafe_allow_html=True)
+                    elif isinstance(stats, dict) and 'total' in stats: 
+                        a_total = stats.get("total", 0)
+                        a_young = stats.get("young", 0)
+                        a_mature = stats.get("mature", 0)
+                        a_other = max(0, a_total - a_mature - a_young)
+                        if a_total > 0:
+                            p_mat = (a_mature / a_total) * 100
+                            p_you = (a_young / a_total) * 100
+                            p_oth = (a_other / a_total) * 100
+                        else:
+                            p_mat, p_you, p_oth = 0, 0, 0
+                        st.markdown(f"**{deck_name}** <span style='color:#888; font-size:0.8em;'>({a_total} cartas)</span>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 2px; color: #ccc;">
+                                <span style="color: {C_MATURE};">Mat: {a_mature} ({p_mat:.0f}%)</span>
+                                <span style="color: {C_YOUNG};">Yng: {a_young} ({p_you:.0f}%)</span>
+                                <span style="color: {C_OTHER};">Oth: {a_other}</span>
+                            </div>
+                            <div style="width: 100%; height: 15px; border-radius: 5px; overflow: hidden; display: flex; border: 1px solid #444; margin-bottom: 15px;">
+                                <div title="Mature" style="background-color: {C_MATURE}; width: {p_mat}%; height: 100%;"></div>
+                                <div title="Young" style="background-color: {C_YOUNG}; width: {p_you}%; height: 100%;"></div>
+                                <div title="Otros" style="background-color: {C_OTHER}; width: {p_oth}%; height: 100%;"></div>
+                            </div>
+                        """, unsafe_allow_html=True)
         
         # --- Actualizar Placeholders de Materias y Botones ---
         mis_materias = USERS[USUARIO_ACTUAL]
