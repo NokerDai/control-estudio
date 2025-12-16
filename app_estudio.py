@@ -145,9 +145,9 @@ def pedir_rerun():
 @st.cache_resource
 def get_sheets_session():
     try:
-        key_dict = json.loads(st.secrets["service_account"])
+        key_dict = json.loads(st.secrets["textkey"])
     except Exception as e:
-        st.error(f"Error leyendo st.secrets['service_account']: {e}")
+        st.error(f"Error leyendo st.secrets['textkey']: {e}")
         st.stop()
     try:
         creds = service_account.Credentials.from_service_account_info(
@@ -197,14 +197,34 @@ def sheets_batch_update(spreadsheet_id, updates):
     except RequestException as e:
         raise RuntimeError(f"Error HTTP en batchUpdate al escribir en la hoja: {e}")
 
+# ------------------ ANKI HELPERS ------------------
+@st.cache_data(ttl=300) 
+def fetch_anki_stats(USUARIO_ACTUAL):
+    try:
+        DRIVE_JSON_ID = st.secrets["ID_DEL_JSON_FACUNDO"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ID_DEL_JSON_IVAN"]
+        URL = f"https://drive.google.com/uc?id={DRIVE_JSON_ID}"
+    except KeyError:
+        return None
+    try:
+        response = requests.get(URL)
+        response.raise_for_status()
+        return response.json()
+    except Exception:
+        return None
+
 # ------------------ EMAIL HELPERS ------------------
 def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
     """Calcula los saldos y envía un correo personalizado a cada destinatario."""
     try:
-        sender = st.secrets["sender"]
-        password = st.secrets["password_mail"]
+        email_config = st.secrets.get("email")
+        if not email_config:
+            print("No hay configuración de email en secrets.")
+            return False
+
+        sender = email_config["sender"]
+        password = email_config["password"]
         # Asumimos que la lista de recipients es: [email_facundo, email_ivan]
-        recipients = st.secrets["recipients"]
+        recipients = email_config["recipients"]
 
         # Mapa de usuario a email
         # Asumiendo que Facundo es el primero y Iván el segundo en la lista de secrets.toml
@@ -679,9 +699,68 @@ def main():
                     </div>
                 """, unsafe_allow_html=True)
 
+            # ------------------ ANKI STATS ------------------
+            anki_data = fetch_anki_stats(USUARIO_ACTUAL)
+            C_MATURE, C_YOUNG, C_OTHER = "#31A354", "#74C476", "#BDBDBD"
+            
+            if anki_data:
+                with st.expander("Anki"):
+                    for deck_name, stats in anki_data.items():
+                        if isinstance(stats, dict) and 'total' not in stats:
+                            st.markdown(f"## {deck_name}", unsafe_allow_html=True)
+                            for subdeck_name, sub_stats in stats.items():
+                                if not isinstance(sub_stats, dict): continue
+                                a_total = sub_stats.get("total", 0)
+                                a_young = sub_stats.get("young", 0)
+                                a_mature = sub_stats.get("mature", 0)
+                                a_other = max(0, a_total - a_mature - a_young)
+                                if a_total > 0:
+                                    p_mat = (a_mature / a_total) * 100
+                                    p_you = (a_young / a_total) * 100
+                                    p_oth = (a_other / a_total) * 100
+                                else:
+                                    p_mat, p_you, p_oth = 0, 0, 0
+                                st.markdown(f"**{subdeck_name}** <span style='color:#888; font-size:0.8em;'>({a_total} cartas)</span>", unsafe_allow_html=True)
+                                st.markdown(f"""
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 2px; color: #ccc;">
+                                        <span style="color: {C_MATURE};">Maduras: {a_mature} ({p_mat:.0f}%)</span>
+                                        <span style="color: {C_YOUNG};">Jóvenes: {a_young} ({p_you:.0f}%)</span>
+                                        <span style="color: {C_OTHER};">Otros: {a_other}</span>
+                                    </div>
+                                    <div style="width: 100%; height: 15px; border-radius: 5px; overflow: hidden; display: flex; border: 1px solid #444; margin-bottom: 15px;">
+                                        <div title="Mature" style="background-color: {C_MATURE}; width: {p_mat}%; height: 100%;"></div>
+                                        <div title="Young" style="background-color: {C_YOUNG}; width: {p_you}%; height: 100%;"></div>
+                                        <div title="Otros" style="background-color: {C_OTHER}; width: {p_oth}%; height: 100%;"></div>
+                                    </div>
+                                """, unsafe_allow_html=True)
+                        elif isinstance(stats, dict) and 'total' in stats: 
+                            a_total = stats.get("total", 0)
+                            a_young = stats.get("young", 0)
+                            a_mature = stats.get("mature", 0)
+                            a_other = max(0, a_total - a_mature - a_young)
+                            if a_total > 0:
+                                p_mat = (a_mature / a_total) * 100
+                                p_you = (a_young / a_total) * 100
+                                p_oth = (a_other / a_total) * 100
+                            else:
+                                p_mat, p_you, p_oth = 0, 0, 0
+                            st.markdown(f"**{deck_name}** <span style='color:#888; font-size:0.8em;'>({a_total} cartas)</span>", unsafe_allow_html=True)
+                            st.markdown(f"""
+                                <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 2px; color: #ccc;">
+                                    <span style="color: {C_MATURE};">Mat: {a_mature} ({p_mat:.0f}%)</span>
+                                    <span style="color: {C_YOUNG};">Yng: {a_young} ({p_you:.0f}%)</span>
+                                    <span style="color: {C_OTHER};">Oth: {a_other}</span>
+                                </div>
+                                <div style="width: 100%; height: 15px; border-radius: 5px; overflow: hidden; display: flex; border: 1px solid #444; margin-bottom: 15px;">
+                                    <div title="Mature" style="background-color: {C_MATURE}; width: {p_mat}%; height: 100%;"></div>
+                                    <div title="Young" style="background-color: {C_YOUNG}; width: {p_you}%; height: 100%;"></div>
+                                    <div title="Otros" style="background-color: {C_OTHER}; width: {p_oth}%; height: 100%;"></div>
+                                </div>
+                            """, unsafe_allow_html=True)
+
             # --- MANIFIESTO ---
             with st.expander("ℹ️ No pensar, actuar."):
-                md_content = st.secrets["facundo_md"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ivan_md"]
+                md_content = st.secrets["md"]["facundo"] if USUARIO_ACTUAL == "Facundo" else st.secrets["md"]["ivan"]
                 st.markdown(md_content)
 
             st.subheader("Materias")
