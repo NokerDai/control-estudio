@@ -94,12 +94,18 @@ def get_service_account_credentials():
         # 2. CORRECCIÓN: Usar la clave correcta 'service_account'
         info = st.secrets["service_account"] 
 
+        # 3. CORRECCIÓN CLAVE: Si es un string (que causa el error 'no attribute keys'),
+        # lo parseamos a diccionario.
+        if isinstance(info, str):
+            info = json.loads(info)
+
         # Create credentials object
         creds = service_account.Credentials.from_service_account_info(
             info, scopes=SCOPES
         )
         return creds
     except Exception as e:
+        # Este error es el que estabas viendo. Con las correcciones, debería solucionarse.
         st.error(f"Error al cargar credenciales de GCP: {e}")
         st.stop()
         
@@ -111,14 +117,12 @@ def get_authorized_session():
         authed_session = AuthorizedSession(creds)
         return authed_session
     except Exception as e:
-        # Este error es el que estabas viendo. Con las correcciones, debería solucionarse.
+        # El error 'invalid_scope' original aparece aquí
         st.error(f"Error al obtener sesión autorizada (revisa SCOPES o credenciales): {e}")
         st.stop()
 
 # Funciones auxiliares de la API
 def google_sheets_api_call(method, api_path, params=None, body=None):
-    # ... (contenido de esta función)
-    # [Mantener el cuerpo original de esta función]
     authed_session = get_authorized_session()
     base_url = "https://sheets.googleapis.com/v4/spreadsheets/"
     url = f"{base_url}{SPREADSHEET_ID}/{api_path}"
@@ -199,7 +203,6 @@ def cargar_configuracion_de_usuarios():
 
 # ------------------ FUNCIONES DE LA APP ------------------
 def get_user_options():
-    # ... (contenido de esta función)
     USERS = cargar_configuracion_de_usuarios()
     return {user_key: USERS[user_key]['name'] for user_key in USERS}
 
@@ -374,16 +377,8 @@ def start_study_session(idioma):
     current_times = get_user_current_status(st.session_state.usuario_seleccionado)
     st.session_state.tiempo_actual_idiomas = current_times.get(idioma_key, 0)
     
-    # Registrar el inicio en la fila del día
-    target_row = get_time_row()
-    if target_row:
-        # Se asume que en USERS la celda 'time' es la celda de la suma total (ej: C2)
-        # Queremos escribir en la celda de tiempo del día de hoy.
-        # En la hoja de estudio, hay una columna 'Inglés (Hora Inicio)', 'Inglés (Duración)', etc.
-        # Esto requiere una lógica de mapeo más compleja. Por simplicidad, 
-        # y asumiendo que solo se registra la duración diaria en la celda de tiempo, 
-        # actualizamos el tiempo total al finalizar.
-        pass
+    # Registrar el inicio en la fila del día (por ahora, solo actualizamos el total al finalizar)
+    pass
 
 def stop_study_session(idioma):
     """Finaliza la sesión de estudio, calcula el tiempo y lo registra."""
@@ -442,7 +437,7 @@ def stop_study_session(idioma):
 def main():
     init_session_state()
     USERS = cargar_configuracion_de_usuarios()
-    global USUARIO_ACTUAL # Para usarlo en la corrección
+    global USUARIO_ACTUAL
     
     st.title("🌎 Seguimiento de Idiomas")
     
