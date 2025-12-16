@@ -567,8 +567,8 @@ def main():
     now = _argentina_now_global()
     today_str = now.strftime("%Y-%m-%d")
     
-    # Chequeamos hora (5 AM a 10 PM) y si ya se mandó hoy
-    if 5 <= now.hour < 22:
+    # Chequeamos hora (7 AM a 10 PM) y si ya se mandó hoy
+    if 7 <= now.hour < 22:
         if last_mail_date_str != today_str:
             # Enviamos el mail
             exito = enviar_reporte_email(datos, resumen_marcas, balance_val_raw)
