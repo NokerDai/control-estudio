@@ -234,8 +234,8 @@ def get_time_row():
 TIME_ROW = get_time_row()
 
 try:
-    IDIOMAS_FACUNDO = st.secrets["idiomas"]["facundo"]
-    IDIOMAS_IVAN = st.secrets["idiomas"]["ivan"]
+    IDIOMAS_FACUNDO = st.secrets["facundo_idiomas"]
+    IDIOMAS_IVAN = st.secrets["ivan_idiomas"]
 except Exception:
     IDIOMAS_FACUNDO = ["Inglés", "Alemán"]
     IDIOMAS_IVAN = ["Japonés", "Francés"]

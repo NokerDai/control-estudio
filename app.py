@@ -28,7 +28,7 @@ if "password" in query_params and not st.session_state.authenticated:
     
     if st.button("Entrar"):
         # Verificamos contra los secrets (asumiendo que están en [auth] password)
-        if password_input == st.secrets["auth"]["password"]:
+        if password_input == st.secrets["password"]:
             st.session_state.authenticated = True
             # Bypass para que app_habitos no pida password de nuevo
             st.session_state.pw_correct = True 
@@ -85,7 +85,7 @@ if show_sidebar:
     elif "usuario_seleccionado" in st.session_state:
         # Opción para cambiar de usuario si no está logueado
         st.sidebar.markdown("---")
-        if st.sidebar.button(f"Cambiar de Usuario ({st.session_state.usuario_seleccionado})"):
+        if st.sidebar.button(f"Cambiar de Usuario"):
             del st.session_state["usuario_seleccionado"]
             st.session_state.current_page = "estudio" # Volvemos a la selección
             st.rerun()
