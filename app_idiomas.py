@@ -33,8 +33,6 @@ def cargar_estilos():
         h2 { font-size: 2rem !important; }
         h3 { font-size: 1.5rem !important; }
 
-        /* Estilo de la tarjeta (uso de border=True en container) */
-        
         /* Estilo para el botón de empezar/terminar */
         .stButton>button {
             border-radius: 10px;
@@ -90,54 +88,65 @@ def get_current_user():
     return st.session_state.current_user
     
 
-# Materias anidadas por categoría
-# "Nombre_Categoria": {
-#   "Nombre_Idioma": {
-#     "time": "'Hoja1'!<columna>", # Rango de la columna para tiempo diario (Ej: C, E, G, I...)
-#     "total": "'Hoja1'!<celda>"    # Celda del tiempo total (Ej: D3, F3, H3, J3...)
-#   }
-# }
-MATERIAS_IDIOMAS = {
-    "F. Idiomas": {
-        "Inglés": {
-            "time": "'Hoja1'!C",  # Columna C para tiempo diario
-            "total": "'Hoja1'!D3" # Celda D3 para total acumulado
+# Materias anidadas por CATEGORÍA Y USUARIO
+# Esta es la nueva estructura para definir qué idiomas ve cada usuario y qué rangos usa.
+USUARIOS_IDIOMAS = {
+    # CONFIGURACIÓN PARA FACUNDO
+    "Facundo": {
+        "F. Idiomas": {
+            "Inglés": {
+                "time": "'Hoja1'!C",
+                "total": "'Hoja1'!D3"
+            },
+            "Alemán": {
+                "time": "'Hoja1'!E",
+                "total": "'Hoja1'!F3"
+            }
         },
-        "Alemán": {
-            "time": "'Hoja1'!E",  # Columna E para tiempo diario
-            "total": "'Hoja1'!F3" # Celda F3 para total acumulado
-        }
-        # Agregar más idiomas en Fundamentos según sea necesario
     },
-    "I. Idiomas": {
-        "Japonés": {
-            "time": "'Hoja1'!G",  # Columna G para tiempo diario
-            "total": "'Hoja1'!H3" # Celda H3 para total acumulado
+    # CONFIGURACIÓN PARA IVÁN
+    "Ivan": {
+        "I. Idiomas": {
+            "Japonés": {
+                "time": "'Hoja1'!G",
+                "total": "'Hoja1'!H3"
+            },
+            "Chino": {
+                "time": "'Hoja1'!I",
+                "total": "'Hoja1'!J3"
+            }
         },
-        "Chino": {
-            "time": "'Hoja1'!I",  # Columna I para tiempo diario
-            "total": "'Hoja1'!J3" # Celda J3 para total acumulado
+    },
+    # CONFIGURACIÓN PARA AGUSTIN (si quieres mantenerla como fallback)
+    "Agustin": {
+        "Mis Idiomas": {
+            "Inglés": {
+                "time": "'Hoja1'!C",
+                "total": "'Hoja1'!D3"
+            },
         }
-        # Agregar más idiomas en Inmersión según sea necesario
     }
 }
 
-# La lógica simplifica el acceso a las celdas usando solo el nombre del idioma
-# Esta función combina la configuración de usuario y la de idiomas para facilitar el acceso
 def get_user_language_config():
-    """Combina todas las configuraciones de idiomas en un diccionario plano 'Idioma': {time: ..., total: ...}
-       para el usuario actual. Asume que MATERIAS_IDIOMAS es para el usuario 'Agustin'."""
-    config = {}
+    """Obtiene la configuración de idiomas específica para el usuario actual.
+    
+    Returns:
+        tuple: (config_plana, config_por_categoria)
+    """
+    config_plana = {}
     current_user = get_current_user()
 
-    # Actualmente, MATERIAS_IDIOMAS solo tiene configuración para 'Agustin' de forma implícita.
-    if current_user == "Agustin": 
-        for category, languages in MATERIAS_IDIOMAS.items():
-            for lang, ranges in languages.items():
-                # La clave única para el estado de sesión será "Categoría: Idioma"
-                full_name = f"{category}: {lang}"
-                config[full_name] = ranges
-    return config
+    # Obtener las categorías de idiomas para el usuario actual
+    user_languages = USUARIOS_IDIOMAS.get(current_user, {})
+    
+    for category, languages in user_languages.items():
+        for lang, ranges in languages.items():
+            # La clave única para el estado de sesión será "Categoría: Idioma"
+            full_name = f"{category}: {lang}"
+            config_plana[full_name] = ranges
+            
+    return config_plana, user_languages
 
 # FILA DE INICIO PARA EL REGISTRO DIARIO
 TIME_RANGE_START_ROW = 170 
@@ -154,7 +163,7 @@ def get_client():
         
     try:
         # --- MODIFICACIÓN CLAVE (MANEJO DE JSON STRING) ---
-        # 1. Si CREDS_JSON es una cadena, la parseamos a un diccionario.
+        # Si CREDS_JSON es una cadena, la parseamos a un diccionario.
         if isinstance(CREDS_JSON, str):
             creds_info = json.loads(CREDS_JSON)
         else:
@@ -175,34 +184,20 @@ def get_client():
             st.error(f"Error al inicializar Google Sheets: {e}")
         return None
 
-@st.cache_resource(ttl=3600)
-def get_worksheet(client):
-    """Obtiene la hoja de cálculo por ID."""
-    if not client: return None
-    try:
-        spreadsheet = client.open_by_key(SHEET_ID)
-        worksheet = spreadsheet.worksheet("Hoja1") # Asumiendo que usamos "Hoja1"
-        return worksheet
-    except Exception as e:
-        st.error(f"Error al abrir la hoja de cálculo (ID: {SHEET_ID}): {e}")
-        return None
-
-# --- IMPLEMENTACIÓN DE OPCIÓN A: USANDO WORKSHEET.BATCH_GET ---
 def batch_read(ranges):
-    """Lee un conjunto de rangos no contiguos de forma eficiente."""
+    """Lee un conjunto de rangos no contiguos de forma eficiente (Opción A)."""
     client = get_client()
     if not client: return [''] * len(ranges)
     
     try:
         worksheet = client.open_by_key(SHEET_ID).sheet1 # Hoja1
         
-        # Usamos batch_get en lugar de get_values para rangos múltiples no contiguos
+        # Usamos batch_get para rangos múltiples no contiguos
         results = worksheet.batch_get(ranges) 
         
         final_values = []
         for result_set in results:
-            # Los resultados de batch_get son una lista de valores
-            # result_set: [['valor']] (para una sola celda) o [['valor1', 'valor2']]
+            # result_set: [['valor']] (para una sola celda)
             
             # Intentamos obtener el primer valor de la primera fila, si existe
             if result_set and result_set[0] and result_set[0][0]:
@@ -216,7 +211,6 @@ def batch_read(ranges):
     except Exception as e:
         st.error(f"Error al leer rangos {ranges}: {e}")
         return [''] * len(ranges) # Devolvemos vacíos para evitar rotura
-# --- FIN IMPLEMENTACIÓN OPCIÓN A ---
 
 
 def batch_write(updates):
@@ -240,8 +234,9 @@ def batch_write(updates):
         # No propagamos, solo mostramos el error
 
 def replace_row_in_range(range_template, row_number):
-    """Reemplaza el marcador de rango con el número de fila."""
-    # range_template es algo como "'Hoja1'!C"
+    """Reemplaza el marcador de rango con el número de fila.
+       Ej: "'Hoja1'!C" + "170" -> "'Hoja1'!C170"
+    """
     return range_template + str(row_number)
 
 
@@ -293,8 +288,7 @@ def segundos_a_hms(total_segundos):
 # ------------------ LÓGICA DE ESTADO Y CALLBACKS ------------------
 
 def pedir_rerun():
-    """Limpia el estado de sesión si se debe recargar la app."""
-    # NO borramos los estados de tiempo/total, solo el estado del temporizador
+    """Fuerza la recarga de la aplicación después de una acción."""
     if 'rerun_pending' not in st.session_state:
         st.session_state.rerun_pending = True
         st.rerun()
@@ -347,8 +341,8 @@ def stop_study():
     study_duration = time.time() - start_time - pause_time
     study_duration = max(0, int(study_duration)) # Aseguramos que no sea negativo
     
-    # Obtener configuración del idioma (usando la función sin argumentos)
-    lang_config = get_user_language_config()
+    # Obtener configuración del idioma
+    lang_config, _ = get_user_language_config()
     if full_materia_name not in lang_config:
         st.error(f"Error: Configuración de idioma '{full_materia_name}' no encontrada para el usuario {get_current_user()}.")
         pedir_rerun()
@@ -439,26 +433,29 @@ def main():
     """Función principal de la aplicación de idiomas."""
     cargar_estilos()
 
-    # Si hay un estudio en curso, mostrar el temporizador y detener la ejecución
+    # Verificar si hay un estudio en curso y mostrar el temporizador
     if st.session_state.get("materia_estudiando"):
         display_timer(st.session_state.materia_estudiando)
         
-        # Si no está pausado, recargar cada 10 segundos
+        # Si no está pausado, recargar para actualizar el tiempo
         if not st.session_state.get("is_paused", False):
             time.sleep(10)
             st.rerun()
         
-        # Si está pausado, no hacemos rerun automático, esperamos acción del usuario
         return
 
     # Reiniciar estado de rerun_pending si existe
     if 'rerun_pending' in st.session_state:
         del st.session_state.rerun_pending
 
-    # 1. Obtener la configuración plana de los idiomas
-    # Ahora llamamos sin argumentos, el usuario se obtiene internamente
-    language_config = get_user_language_config()
+    # 1. Obtener la configuración plana y las categorías para el usuario actual
+    language_config, user_language_categories = get_user_language_config()
     
+    # Si el usuario no tiene idiomas definidos, mostramos un error
+    if not language_config:
+        st.error(f"No hay idiomas configurados para el usuario: {get_current_user()}.")
+        return
+
     # 2. Inicializar o cargar datos
     if "data_loaded" not in st.session_state:
         st.session_state.data_loaded = False
@@ -501,7 +498,6 @@ def main():
                     idx += 2
                     
                 st.session_state.data_loaded = True
-                # No hacemos rerun inmediato aquí, para que el spinner tenga tiempo de mostrarse
                 
             except Exception as e:
                 # El error ya fue reportado en batch_read
@@ -517,12 +513,14 @@ def main():
     # 4. VISTA: Mostrar las tarjetas por categoría (F. Idiomas / I. Idiomas)
     st.header(f"Lista de Idiomas a Estudiar para {get_current_user()}")
     
-    for category, languages in MATERIAS_IDIOMAS.items():
+    # Usamos user_language_categories (filtrado por usuario)
+    for category, languages in user_language_categories.items(): 
         st.subheader(f"🌐 {category}")
         
         # Usamos columnas fluidas para mostrar los idiomas dentro de la categoría
         lang_names = list(languages.keys())
-        cols = st.columns(len(lang_names) if lang_names else 1)
+        # Aseguramos que haya al menos una columna si no hay idiomas, aunque la lista debería estar vacía
+        cols = st.columns(len(lang_names) if lang_names else 1) 
         
         for i, lang_name in enumerate(lang_names):
             full_materia_name = f"{category}: {lang_name}"
