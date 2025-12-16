@@ -2,6 +2,29 @@ import streamlit as st
 import app_estudio
 import app_habitos
 import app_idiomas 
+from datetime import datetime
+try:
+    # Necesitamos el ID de la sesión para el lock
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
+except ImportError:
+    def get_script_run_ctx():
+        return None
+
+def get_current_session_id():
+    """Obtiene el ID único de la sesión de Streamlit actual."""
+    try:
+        ctx = get_script_run_ctx()
+        return ctx.session_id if ctx else "NO_SESSION_ID"
+    except Exception:
+        # Fallback con timestamp si no se puede obtener un ID fijo.
+        return f"FALLBACK_ID_{datetime.now().timestamp()}" 
+
+# Usuarios que requieren lock en Sheets
+RESTRICTED_USERS = ["Facundo", "Iván"]
+
+# ---------------------------------------------------------
+# CÓDIGO ORIGINAL CONTINÚA
+# ---------------------------------------------------------
 
 # 1. Configuración global (Siempre va primero)
 st.set_page_config(
@@ -15,10 +38,33 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "current_page" not in st.session_state:
     st.session_state.current_page = "estudio" 
-# ===> NUEVO ESTADO PARA EL USUARIO SELECCIONADO <===
+# ===> ESTADO PARA EL USUARIO SELECCIONADO <===
 if "usuario_seleccionado" not in st.session_state:
     st.session_state.usuario_seleccionado = None 
 
+
+# ---------------------------------------------------------
+# LÓGICA DE UNREGISTER/LOGOUT (MODIFICADA para liberar lock en Sheets)
+# ---------------------------------------------------------
+USUARIO_ACTUAL = st.session_state.get("usuario_seleccionado")
+SESSION_ID = get_current_session_id()
+
+if USUARIO_ACTUAL is not None:
+    st.sidebar.markdown("---")
+    
+    # Botón explícito para desloguear y liberar el lock
+    if st.sidebar.button("🚪 Desloguear / Cambiar Usuario", use_container_width=True):
+        if USUARIO_ACTUAL in RESTRICTED_USERS:
+            # 1. Liberar el lock en Google Sheets
+            if app_estudio.set_user_lock_status(USUARIO_ACTUAL, ""):
+                st.toast(f"🔒 Lock de {USUARIO_ACTUAL} liberado en Sheets.")
+            else:
+                st.warning("⚠️ Error al liberar el lock de sesión en Sheets.")
+            
+        # 2. Limpiar estado de sesión local
+        st.session_state.usuario_seleccionado = None
+        st.session_state.current_page = "estudio" 
+        st.rerun()
 
 # ---------------------------------------------------------
 # LÓGICA DE LOGIN (Solo si hay ?password en la URL)
@@ -34,53 +80,89 @@ if "password" in query_params and not st.session_state.authenticated:
         # Verificamos contra los secrets (asumiendo que están en [auth] password)
         if password_input == st.secrets["password"]:
             st.session_state.authenticated = True
-            # Bypass para que app_habitos no pida password de nuevo
-            st.session_state.pw_correct = True 
-            # ===> MANTENER: Si entra con password, es Facundo <===
-            st.session_state.usuario_seleccionado = "Facundo" 
-            # Volvemos a la página de inicio (Estudio) pero ya autenticados
-            st.session_state.current_page = "estudio" 
             st.rerun()
         else:
             st.error("Contraseña incorrecta.")
-    
-    # Detenemos la ejecución aquí para que no cargue nada más hasta loguearse
     st.stop()
+    
+# ---------------------------------------------------------
+# SELECCIÓN DE USUARIO (MODIFICADO para bloqueo con Sheets)
+# ---------------------------------------------------------
+
+if st.session_state.usuario_seleccionado is None:
+    st.title("Selección de Usuario")
+    
+    # Obtener lista de usuarios de app_estudio.py
+    try:
+        users_options = list(app_estudio.USERS.keys())
+    except AttributeError:
+        # Fallback si USERS no está cargado/definido en app_estudio
+        users_options = RESTRICTED_USERS + ["otro"] 
+
+    selected = st.selectbox(
+        "¿Quién sos?",
+        options=["Seleccionar..."] + users_options,
+        index=0,
+        key="user_select_box"
+    )
+    
+    if selected != "Seleccionar...":
+        
+        if selected in RESTRICTED_USERS:
+            # Lógica de restricción de sesión usando Google Sheets
+            current_lock_value = app_estudio.get_user_lock_status(selected)
+            current_id = SESSION_ID
+            
+            is_locked_by_other = False
+            if current_lock_value != "":
+                if current_lock_value != current_id:
+                    # El lock está tomado por OTRA sesión. Bloqueamos.
+                    is_locked_by_other = True
+                # else: Lo tomó esta sesión antes (ej. por un refresh), lo mantenemos.
+            
+            if is_locked_by_other:
+                st.error(f"❌ El usuario **{selected}** ya tiene una sesión activa en otra parte. Debe desloguearse primero.")
+                st.stop()
+            else:
+                # 1. Tomar/Revalidar el lock en Google Sheets
+                if app_estudio.set_user_lock_status(selected, current_id):
+                    st.toast(f"✅ Lock de sesión tomado/revalidado para {selected}.")
+                else:
+                    st.error("Error al intentar tomar el lock de sesión. Intenta de nuevo.")
+                    st.stop()
+        
+        # 2. Proceder con el login local (para todos los usuarios)
+        st.session_state.usuario_seleccionado = selected
+        st.rerun()
+            
+    st.stop() 
 
 # ---------------------------------------------------------
-# LÓGICA DE SELECCIÓN DE USUARIO (Antes de la navegación)
+# RE-VALIDACIÓN DEL LOCK EN CADA RERUN (Para usuarios restringidos)
 # ---------------------------------------------------------
-if st.session_state.usuario_seleccionado is None:
-    def set_user_and_rerun(u):
-        st.session_state["usuario_seleccionado"] = u
+# Si el usuario es restringido y ya está logueado, verificamos que el lock en Sheets
+# siga siendo el de esta sesión (SESSION_ID).
+if USUARIO_ACTUAL in RESTRICTED_USERS:
+    current_lock_value = app_estudio.get_user_lock_status(USUARIO_ACTUAL)
+    
+    if current_lock_value != SESSION_ID:
+        # Esto significa que el lock fue liberado o tomado por otra sesión.
+        
+        # 1. Liberar el lock en Sheets si por alguna razón esta sesión aún lo tenía
+        if current_lock_value == SESSION_ID:
+            app_estudio.set_user_lock_status(USUARIO_ACTUAL, "")
+
+        # 2. Desloguear esta sesión por seguridad
+        st.session_state.usuario_seleccionado = None
+        st.session_state.current_page = "estudio" 
+        st.warning(f"⚠️ Sesión de **{USUARIO_ACTUAL}** invalidada. El lock de Sheets fue modificado externamente.")
         st.rerun()
 
-    # Lógica de detección de usuario por query params (igual que antes)
-    if "f" in query_params: set_user_and_rerun("Facundo")
-    if "i" in query_params: set_user_and_rerun("Iván")
-    if "user" in query_params:
-        try:
-            uval = query_params["user"][0].lower() if isinstance(query_params["user"], (list, tuple)) else str(query_params["user"]).lower()
-        except:
-            uval = str(query_params["user"]).lower()
-        if uval in ["facu", "facundo"]: set_user_and_rerun("Facundo")
-        if uval in ["ivan", "iván", "iva"]: set_user_and_rerun("Iván")
-
-    if st.session_state.usuario_seleccionado is None:
-        st.markdown("<h1 style='text-align: center; margin-bottom: 30px;'>¿Quién sos?</h1>", unsafe_allow_html=True)
-        if st.button("👤 Facundo", use_container_width=True):
-            set_user_and_rerun("Facundo")
-        st.write("")
-        if st.button("👤 Iván", use_container_width=True):
-            set_user_and_rerun("Iván")
-        st.stop()
-
 # ---------------------------------------------------------
-# BARRA LATERAL (Lógica de Navegación)
+# NAVEGACIÓN EN SIDEBAR
 # ---------------------------------------------------------
 
-# Navegación siempre visible para todos los usuarios
-st.sidebar.header("Navegación")
+st.sidebar.header(f"Hola, {st.session_state.usuario_seleccionado}!")
 
 # --- Botón para ir a ESTUDIO ---
 # Solo se muestra si NO estamos en la página "estudio"
@@ -89,7 +171,7 @@ if st.session_state.current_page != "estudio":
         st.session_state.current_page = "estudio"
         st.rerun()
 
-# --- Botón para ir a IDIOMAS (NUEVO BLOQUE) ---
+# --- Botón para ir a IDIOMAS ---
 # Solo se muestra si NO estamos en la página "idiomas"
 if st.session_state.current_page != "idiomas":
     if st.sidebar.button("🌎 Idiomas", use_container_width=True):
@@ -118,9 +200,8 @@ if st.session_state.current_page == "habitos" and st.session_state.authenticated
 
 # 2. Si eligió "idiomas" (Autenticado o no), mostramos Idiomas
 elif st.session_state.current_page == "idiomas":
-    # El archivo app_idiomas.py no requiere autenticación
-    app_idiomas.main() 
+    app_idiomas.main()
 
-# 3. En cualquier otro caso (Usuario normal, Admin que eligió Estudio), mostramos Estudio
-else: # st.session_state.current_page == "estudio"
+# 3. Por defecto (o si eligió "estudio"), mostramos Estudio
+else:
     app_estudio.main()

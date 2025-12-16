@@ -310,6 +310,10 @@ SHEET_IVAN = "I. Física"
 SHEET_MARCAS = "marcas"
 RANGO_FECHA_MAIL = f"'{SHEET_MARCAS}'!M1" 
 
+# NUEVOS RANGOS PARA EL LOCK DE SESIÓN (Se asume N37 y O37 en la hoja 'marcas')
+RANGO_LOCK_IVAN = f"'{SHEET_MARCAS}'!N37"
+RANGO_LOCK_FACUNDO = f"'{SHEET_MARCAS}'!O37"
+
 def get_time_row():
     hoy = _argentina_now_global().date()
     delta = (hoy - FECHA_BASE).days
@@ -418,6 +422,44 @@ def batch_write(updates):
     except Exception as e:
         st.error(f"Error escribiendo Google Sheets: {e}")
         st.stop()
+        
+# ------------------ FUNCIONES DE LOCKEO DE SESIÓN (NUEVO) ------------------
+
+def get_lock_range(user):
+    """Devuelve el rango de la celda de lock para un usuario restringido."""
+    if user == "Facundo":
+        return RANGO_LOCK_FACUNDO
+    elif user == "Iván":
+        return RANGO_LOCK_IVAN
+    return None
+
+@st.cache_data(ttl=2) # Cacheamos por un corto tiempo (2 segundos)
+def get_user_lock_status(user):
+    """Lee el valor del lock de sesión desde Google Sheets."""
+    range_str = get_lock_range(user)
+    if not range_str: return ""
+    try:
+        res = sheets_batch_get(st.secrets["sheet_id"], [range_str])
+        vr = res.get("valueRanges", [{}])[0]
+        # Devuelve el contenido de la celda (será el ID de sesión o "")
+        return str(vr.get("values", [[""]])[0][0] if vr.get("values") else "").strip()
+    except Exception as e:
+        st.error(f"Error leyendo estado de lock para {user}: {e}")
+        return "ERROR_READING_LOCK"
+
+def set_user_lock_status(user, lock_value):
+    """Escribe un valor (ID de sesión para lock, o "" para unlock) en Google Sheets."""
+    range_str = get_lock_range(user)
+    if not range_str: return False
+    try:
+        # Escribir el valor (el ID de sesión para bloquear, o "" para liberar)
+        sheets_batch_update(st.secrets["sheet_id"], [(range_str, lock_value)])
+        # Limpiar caché de lectura para que el próximo get obtenga el nuevo valor
+        get_user_lock_status.clear()
+        return True
+    except Exception as e:
+        st.error(f"Error escribiendo estado de lock para {user}: {e}")
+        return False
 
 def start_materia_callback(usuario, materia):
     try:
