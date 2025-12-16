@@ -15,6 +15,10 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "current_page" not in st.session_state:
     st.session_state.current_page = "estudio" 
+# ===> NUEVO ESTADO PARA EL USUARIO SELECCIONADO <===
+if "usuario_seleccionado" not in st.session_state:
+    st.session_state.usuario_seleccionado = None 
+
 
 # ---------------------------------------------------------
 # LÓGICA DE LOGIN (Solo si hay ?password en la URL)
@@ -32,7 +36,7 @@ if "password" in query_params and not st.session_state.authenticated:
             st.session_state.authenticated = True
             # Bypass para que app_habitos no pida password de nuevo
             st.session_state.pw_correct = True 
-            # ===> AÑADIR ESTA LÍNEA <===
+            # ===> MANTENER: Si entra con password, es Facundo <===
             st.session_state.usuario_seleccionado = "Facundo" 
             # Volvemos a la página de inicio (Estudio) pero ya autenticados
             st.session_state.current_page = "estudio" 
@@ -42,6 +46,34 @@ if "password" in query_params and not st.session_state.authenticated:
     
     # Detenemos la ejecución aquí para que no cargue nada más hasta loguearse
     st.stop()
+
+# ---------------------------------------------------------
+# LÓGICA DE SELECCIÓN DE USUARIO (Antes de la navegación)
+# ---------------------------------------------------------
+if st.session_state.usuario_seleccionado is None:
+    def set_user_and_rerun(u):
+        st.session_state["usuario_seleccionado"] = u
+        st.rerun()
+
+    # Lógica de detección de usuario por query params (igual que antes)
+    if "f" in query_params: set_user_and_rerun("Facundo")
+    if "i" in query_params: set_user_and_rerun("Iván")
+    if "user" in query_params:
+        try:
+            uval = query_params["user"][0].lower() if isinstance(query_params["user"], (list, tuple)) else str(query_params["user"]).lower()
+        except:
+            uval = str(query_params["user"]).lower()
+        if uval in ["facu", "facundo"]: set_user_and_rerun("Facundo")
+        if uval in ["ivan", "iván", "iva"]: set_user_and_rerun("Iván")
+
+    if st.session_state.usuario_seleccionado is None:
+        st.markdown("<h1 style='text-align: center; margin-bottom: 30px;'>¿Quién sos?</h1>", unsafe_allow_html=True)
+        if st.button("👤 Facundo", use_container_width=True):
+            set_user_and_rerun("Facundo")
+        st.write("")
+        if st.button("👤 Iván", use_container_width=True):
+            set_user_and_rerun("Iván")
+        st.stop()
 
 # ---------------------------------------------------------
 # BARRA LATERAL (Lógica de Navegación)

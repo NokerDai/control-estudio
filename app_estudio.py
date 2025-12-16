@@ -501,38 +501,13 @@ def main():
     if st.session_state.get("_do_rerun", False):
         st.session_state["_do_rerun"] = False
         st.rerun()
-
-    try:
-        params = st.query_params
-    except Exception:
-        params = st.experimental_get_query_params()
-
-    if "usuario_seleccionado" not in st.session_state:
-        def set_user_and_rerun(u):
-            st.session_state["usuario_seleccionado"] = u
-            st.rerun()
-
-        if "f" in params: set_user_and_rerun("Facundo")
-        if "i" in params: set_user_and_rerun("Iván")
-        if "user" in params:
-            try:
-                uval = params["user"][0].lower() if isinstance(params["user"], (list, tuple)) else str(params["user"]).lower()
-            except:
-                uval = str(params["user"]).lower()
-            if uval in ["facu", "facundo"]: set_user_and_rerun("Facundo")
-            if uval in ["ivan", "iván", "iva"]: set_user_and_rerun("Iván")
-
-        if "usuario_seleccionado" not in st.session_state:
-            st.markdown("<h1 style='text-align: center; margin-bottom: 30px;'>¿Quién sos?</h1>", unsafe_allow_html=True)
-            if st.button("👤 Facundo", use_container_width=True):
-                st.session_state["usuario_seleccionado"] = "Facundo"
-                st.rerun()
-            st.write("")
-            if st.button("👤 Iván", use_container_width=True):
-                st.session_state["usuario_seleccionado"] = "Iván"
-                st.rerun()
-            st.stop()
-
+        
+    # Ahora la sesión debe tener el usuario_seleccionado
+    if "usuario_seleccionado" not in st.session_state or st.session_state["usuario_seleccionado"] not in ["Facundo", "Iván"]:
+        # Esto no debería pasar si app.py funciona, pero es un fallback.
+        st.error("Error: Usuario no seleccionado en la sesión. Reinicia la aplicación.")
+        st.stop()
+        
     # --- Carga de datos ---
     datos_globales = cargar_datos_unificados()
     datos = datos_globales["users_data"]
