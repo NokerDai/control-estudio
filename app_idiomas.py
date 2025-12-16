@@ -1,5 +1,5 @@
 import re
-import json
+import json # Necesario para parsear el JSON de credenciales
 import time
 from datetime import datetime, date, timedelta, time as dt_time
 import streamlit as st
@@ -46,11 +46,33 @@ def parse_datetime(dt_str):
     return dt
 
 # ------------------ GOOGLE SHEETS AUTH & HELPERS ------------------
+def _get_credentials_dict():
+    """Lee la clave 'service_account' como un string y lo parsea como JSON."""
+    try:
+        raw_credentials_json = st.secrets["service_account"] 
+        # Cuidado con el formato que usa Streamlit para cadenas largas en secrets.toml
+        # Si Streamlit lo lee como una cadena multilinea simple, json.loads funcionará.
+        if isinstance(raw_credentials_json, str):
+            # Intentar cargar el JSON
+            return json.loads(raw_credentials_json)
+        # Si por alguna razón lo lee como diccionario (e.g., si se usó la sintaxis TOML), lo retornamos.
+        return dict(raw_credentials_json)
+    except json.JSONDecodeError as e:
+        st.error(f"Error: La clave 'service_account' en secrets.toml no es un JSON válido. {e}")
+        st.stop()
+    except KeyError:
+        st.error("Error: Falta la clave 'service_account' o 'sheet_id' en secrets.toml.")
+        st.stop()
+    except Exception as e:
+        st.error(f"Error inesperado al procesar credenciales: {e}")
+        st.stop()
+
+
 def sheets_batch_get(spreadsheet_id, ranges):
     """Llama a Sheets API para obtener múltiples rangos."""
     try:
-        # 1. Autenticación con credenciales de servicio (CORRECCIÓN A "service_account")
-        credentials_dict = dict(st.secrets["service_account"]) 
+        # 1. Obtiene las credenciales parseando el JSON
+        credentials_dict = _get_credentials_dict()
         credentials = service_account.Credentials.from_service_account_info(credentials_dict)
         
         # 2. Crea la sesión autorizada
@@ -70,11 +92,7 @@ def sheets_batch_get(spreadsheet_id, ranges):
         st.error(f"Error de solicitud HTTP a Google Sheets: {e}")
         st.stop()
     except Exception as e:
-        # Si el error es de clave, mostrar un mensaje más útil
-        if "service_account" in str(e):
-            st.error("Error de autenticación: Verifica que la sección '[service_account]' en secrets.toml sea correcta.")
-        else:
-            st.error(f"Error de autenticación o API: {e}")
+        st.error(f"Error de autenticación o API: {e}")
         st.stop()
 
 def batch_write(updates):
@@ -83,8 +101,8 @@ def batch_write(updates):
         return
         
     try:
-        # CORRECCIÓN A "service_account"
-        credentials_dict = dict(st.secrets["service_account"]) 
+        # 1. Obtiene las credenciales parseando el JSON
+        credentials_dict = _get_credentials_dict()
         credentials = service_account.Credentials.from_service_account_info(credentials_dict)
         authed_session = AuthorizedSession(credentials)
 
@@ -107,10 +125,7 @@ def batch_write(updates):
         st.error(f"Error de escritura HTTP a Google Sheets: {e}")
         st.stop()
     except Exception as e:
-        if "service_account" in str(e):
-            st.error("Error de autenticación: Verifica que la sección '[service_account]' en secrets.toml sea correcta.")
-        else:
-            st.error(f"Error de autenticación o API al escribir: {e}")
+        st.error(f"Error de autenticación o API al escribir: {e}")
         st.stop()
 
 # ------------------ TIME FORMAT HELPERS ------------------
@@ -153,13 +168,11 @@ def replace_row_in_range(range_str, new_row):
         return f"{range_str.split('!')[0]}{match.group(1)}{new_row}"
     return range_str
 
-# ------------------ UI HELPERS ------------------
+# ------------------ UI HELPERS (sin cambios) ------------------
 def sanitize_key(text):
-    """Normaliza un texto para usarlo como key de Streamlit."""
     return re.sub(r'[^a-zA-Z0-9_]', '', text).lower()
 
 def pedir_rerun():
-    """Establece un flag para forzar el rerun."""
     st.session_state["_do_rerun"] = True
 
 def cargar_estilos():
@@ -202,11 +215,10 @@ def cargar_estilos():
     """, unsafe_allow_html=True)
 
 def circle(color):
-    """HTML para un círculo de estado simple."""
     return f'<span style="height: 10px; width: 10px; background-color: {color}; border-radius: 50%; display: inline-block;"></span>'
 
 
-# ------------------ CONSTANTES Y ESTRUCTURAS DE IDIOMAS ------------------
+# ------------------ CONSTANTES Y ESTRUCTURAS DE IDIOMAS (sin cambios) ------------------
 FILA_BASE = 170 
 FECHA_BASE = date(2025, 12, 2) 
 SHEET_FACUNDO = "F. Idiomas"
@@ -215,14 +227,12 @@ SHEET_MARCAS = "marcas"
 MARCAS_ROW = 3 
 
 def get_time_row():
-    """Calcula el número de fila actual para el día de hoy."""
     hoy = _argentina_now_global().date()
     delta = (hoy - FECHA_BASE).days
     return FILA_BASE + delta
 
 TIME_ROW = get_time_row()
 
-# Intentar cargar idiomas, con fallback si fallan los secrets de idiomas
 try:
     IDIOMAS_FACUNDO = st.secrets["idiomas"]["facundo"]
     IDIOMAS_IVAN = st.secrets["idiomas"]["ivan"]
@@ -233,11 +243,9 @@ except Exception:
 
 
 def map_idiomas_to_ranges(idiomas, sheet, marcas_row, start_col_idx):
-    """Mapea los idiomas a sus rangos de celda 'time' y 'est'."""
     mapping = {}
     col_idx = start_col_idx 
     for idioma in idiomas:
-        # Columna B es índice 1, C es 2, etc.
         col_letter = chr(ord('A') + col_idx)
         
         mapping[idioma] = {
@@ -247,13 +255,12 @@ def map_idiomas_to_ranges(idiomas, sheet, marcas_row, start_col_idx):
         col_idx += 1
     return mapping
 
-# Asumimos que los idiomas de Facundo usan las primeras columnas
 USERS = {
     "Facundo": map_idiomas_to_ranges(IDIOMAS_FACUNDO, SHEET_FACUNDO, MARCAS_ROW, 1),
     "Iván": map_idiomas_to_ranges(IDIOMAS_IVAN, SHEET_IVAN, MARCAS_ROW, 1 + len(IDIOMAS_FACUNDO)),
 }
 
-# ------------------ CARGA UNIFICADA (cacheada) ------------------
+# ------------------ CARGA UNIFICADA, START/STOP, MAIN (sin cambios en lógica) ------------------
 @st.cache_data(ttl=5) 
 def cargar_datos_unificados():
     all_ranges = []
@@ -270,7 +277,6 @@ def cargar_datos_unificados():
     try:
         res = sheets_batch_get(st.secrets["sheet_id"], all_ranges)
     except Exception as e:
-        # El error ya se maneja en sheets_batch_get
         st.stop()
 
     values = res.get("valueRanges", [])
@@ -311,10 +317,7 @@ def cargar_datos_unificados():
         "users_data": data_usuarios,
     }
 
-# ------------------ START/STOP DE IDIOMA ------------------
-
 def start_idioma_callback(usuario, idioma):
-    """Establece la marca de tiempo de inicio en la celda 'est' del idioma."""
     try:
         info = USERS[usuario][idioma]
         now_str = ahora_str()
@@ -338,7 +341,6 @@ def start_idioma_callback(usuario, idioma):
         pedir_rerun()
         
 def stop_idioma_callback(usuario, idioma):
-    """Calcula y registra el tiempo transcurrido en la celda 'time'."""
     try:
         info = USERS[usuario][idioma]
         inicio = st.session_state.get("inicio_dt_idioma")
@@ -393,7 +395,6 @@ def stop_idioma_callback(usuario, idioma):
             new_secs = parse_time_cell_to_seconds(prev_raw) + segs
             updates.append((time_cell_for_row, segundos_a_hms(new_secs)))
 
-        # Limpiamos el estado ('est')
         updates.append((info["est"], ""))
         batch_write(updates)
         
@@ -405,8 +406,6 @@ def stop_idioma_callback(usuario, idioma):
     finally:
         pedir_rerun()
 
-
-# ------------------ MAIN DE IDIOMAS ------------------
 def main():
     cargar_estilos()
 
@@ -414,7 +413,6 @@ def main():
         st.session_state["_do_rerun"] = False
         st.rerun()
 
-    # --- SELECCIÓN DE USUARIO ---
     if "usuario_seleccionado" not in st.session_state:
         def set_user_and_rerun(u):
             st.session_state["usuario_seleccionado"] = u
@@ -447,7 +445,6 @@ def main():
             st.stop()
 
 
-    # --- Carga de datos ---
     datos_globales = cargar_datos_unificados()
     datos = datos_globales["users_data"]
 
@@ -457,7 +454,6 @@ def main():
     idioma_en_curso = st.session_state.get("idioma_activo")
     inicio_dt = st.session_state.get("inicio_dt_idioma")
 
-    # Relectura de estado si session_state está vacío
     if idioma_en_curso is None:
         for i, est_raw in datos[USUARIO_ACTUAL]["estado"].items():
             if str(est_raw).strip() != "":
@@ -487,7 +483,6 @@ def main():
         if usuario_estudiando and inicio_dt is not None:
             tiempo_anadido_seg = int((_argentina_now_global() - inicio_dt).total_seconds())
 
-        # --- CÁLCULO DE TIEMPO TOTAL ---
         def calcular_total_tiempo(usuario, tiempo_activo_seg_local=0):
             total_min = 0.0
             for idioma, info in USERS[usuario].items():
@@ -501,7 +496,6 @@ def main():
         total_min = calcular_total_tiempo(USUARIO_ACTUAL, tiempo_anadido_seg)
         total_hms = segundos_a_hms(int(total_min * 60))
 
-        # --- Actualizar Placeholder Global de Tiempo Total de Idiomas ---
         with placeholder_total.container():
             st.markdown(f"""
                 <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
@@ -510,7 +504,6 @@ def main():
                 </div>
             """, unsafe_allow_html=True)
 
-            # --- PROGRESO DEL OTRO USUARIO ---
             o_total_min = calcular_total_tiempo(OTRO_USUARIO)
             o_total_hms = segundos_a_hms(int(o_total_min * 60))
 
@@ -532,7 +525,6 @@ def main():
             
             st.subheader(f"Tus idiomas, {USUARIO_ACTUAL}")
         
-        # --- Actualizar Placeholders de Idiomas y Botones ---
         mis_idiomas = USERS[USUARIO_ACTUAL]
         for idioma in mis_idiomas:
 
