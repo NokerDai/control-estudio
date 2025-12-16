@@ -102,20 +102,52 @@ if st.session_state.usuario_seleccionado is None:
             if current_lock_value != "":
                 if current_lock_value != current_id:
                     is_locked_by_other = True
-            
+
+            # === LÓGICA DE FORZAR DESLOGUEO ===
+            # Paso 2: Si la bandera de forzado está activa (desde el click del botón), procedemos al desbloqueo.
+            if st.session_state.get(f"force_unlock_{selected_user}", False):
+                st.session_state.pop(f"force_unlock_{selected_user}") # Limpiamos la bandera
+                
+                if app_estudio.set_user_lock_status(selected_user, ""):
+                    st.toast(f"🚨 Lock forzado y liberado para {selected_user}. ¡Intenta iniciar sesión ahora!")
+                    st.rerun() 
+                    return True # Detiene la ejecución actual
+                else:
+                    st.error("Error al forzar la liberación del lock en Sheets.")
+                    return False
+
+            # Paso 1: Si está bloqueado por otro, mostramos el error y el botón de forzado.
             if is_locked_by_other:
-                st.error(f"❌ El usuario **{selected_user}** ya tiene una sesión activa en otra parte. Debe desloguearse primero.")
-                # st.rerun() # No hacemos rerun aquí, dejamos que el flujo siga hasta el stop()
-                return False 
+                # Usamos columnas para colocar el mensaje de error y el botón uno al lado del otro.
+                col_err, col_btn = st.columns([0.65, 0.35])
+
+                with col_err:
+                    st.error(f"❌ El usuario **{selected_user}** ya tiene una sesión activa en otra parte. Debe desloguearse primero.")
+                
+                with col_btn:
+                    # El nuevo botón "Error" / Forzar deslogueo
+                    # on_click establece una bandera en session_state y fuerza un rerun para ejecutar el Paso 2.
+                    if st.button(
+                        "⚠️ Error", 
+                        key=f"force_unlock_btn_{selected_user}",
+                        help="Usa esto si la otra sesión está congelada y no puede desloguearse.",
+                        use_container_width=True,
+                        on_click=lambda: st.session_state.update({f"force_unlock_{selected_user}": True})
+                    ):
+                        pass
+
+                return False # Bloquear el login y detener el proceso en este punto
+            # =========================================
             else:
-                # Tomar/Revalidar el lock en Google Sheets
+                # Si no está bloqueado, procede a tomar el lock
+                # 1. Tomar/Revalidar el lock en Google Sheets
                 if app_estudio.set_user_lock_status(selected_user, current_id):
                     st.toast(f"✅ Lock de sesión tomado/revalidado para {selected_user}.")
                 else:
                     st.error("Error al intentar tomar el lock de sesión. Intenta de nuevo.")
                     return False
         
-        # Proceder con el login local (para todos los usuarios)
+        # 2. Proceder con el login local (para todos los usuarios)
         st.session_state.usuario_seleccionado = selected_user
         st.rerun()
         return True
@@ -124,15 +156,15 @@ if st.session_state.usuario_seleccionado is None:
     col1, col2 = st.columns(2)
     
     with col1:
+        # Se llama a handle_user_login al presionar
         if st.button("👤 Facundo", key="btn_facundo", use_container_width=True):
             handle_user_login("Facundo")
 
     with col2:
+        # Se llama a handle_user_login al presionar
         if st.button("👤 Iván", key="btn_ivan", use_container_width=True):
             handle_user_login("Iván")
 
-    # Si hay otros usuarios no restringidos, podríamos listarlos aquí o usar un campo de texto
-    
     st.stop() 
 
 # ---------------------------------------------------------
@@ -159,8 +191,6 @@ if USUARIO_ACTUAL in RESTRICTED_USERS:
 # ---------------------------------------------------------
 # NAVEGACIÓN EN SIDEBAR
 # ---------------------------------------------------------
-
-st.sidebar.header("Navegación")
 
 # --- Botón para ir a ESTUDIO ---
 # Solo se muestra si NO estamos en la página "estudio"
