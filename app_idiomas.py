@@ -215,109 +215,6 @@ def fetch_anki_stats(USUARIO_ACTUAL):
     except Exception:
         return None
 
-# ------------------ EMAIL HELPERS ------------------
-def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
-    """Calcula los saldos y envía un correo personalizado a cada destinatario."""
-    try:
-        # Mantenemos las mismas credenciales y destinatarios del mail.
-        sender = st.secrets["sender"]
-        password = st.secrets["password_mail"]
-        recipients = st.secrets["recipients"]
-
-        if len(recipients) < 2:
-            print("Error: Se esperan al menos dos correos en la lista 'recipients'.")
-            return False
-
-        USER_EMAIL_MAP = {
-            "Facundo": recipients[0],
-            "Iván": recipients[1],
-        }
-
-        # --- Lógica de Formato de Balance con Color y Signo ---
-        def format_balance_html(value, user):
-            """Aplica la lógica de signo (Iván: tal cual, Facundo: inverso) y formato con color."""
-            final_value = -value if user == "Facundo" else value
-            
-            if final_value > 0:
-                color = "#00e676" # Verde
-                sign_str = f"+${final_value:.2f}"
-            elif final_value < 0:
-                color = "#ff1744" # Rojo
-                sign_str = f"-${abs(final_value):.2f}"
-            else:
-                color = "#ffffff" # Blanco
-                sign_str = "$0.00"
-
-            # Retorna el valor formateado con HTML para el color
-            return f'<div style="color: {color}; font-size: 2.5rem; font-weight: bold; text-align: center; padding: 20px;">{sign_str}</div>'
-
-        # 2. Abrir conexión SMTP una sola vez
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(sender, password)
-        
-        exito = True
-
-        for user, email in USER_EMAIL_MAP.items():
-            if not email:
-                continue
-
-            # 3. Generar contenido personalizado
-            balance_html = format_balance_html(balance_raw, user)
-
-            msg = MIMEMultipart()
-            msg['From'] = sender
-            msg['To'] = email # Un solo destinatario por correo
-            msg['Subject'] = f"📊 Tu Balance Acumulado de IDIOMAS - {date.today().strftime('%d/%m')}" # Asunto actualizado
-
-            # Contenido simplificado sin mencionar al otro usuario.
-            html_content = f"""
-            <html>
-            <body style="
-                font-family: Arial, sans-serif;
-                background-color: #1e1e1e;
-                color: #ffffff;
-                padding: 20px 0;
-            ">
-                <p style="color: #ccc; text-align: center;">
-                    Este es tu balance actual de idiomas:
-                </p>
-                
-                {balance_html}
-
-                <hr style="border-color: #444; margin: 20px 0;">
-                <div style="
-                    max-width: 350px; 
-                    margin: 0 auto; 
-                    text-align: center;
-                ">
-                    <p style="font-size: 0.9em; color: #888; text-align: center;">
-                        <i>Se envía automáticamente cuando alguno entra por primera vez en el día (5:00 a 22:00).</i><br>
-                    </p>
-                </div>
-            </body>
-            </html>
-            """
-            
-            msg.attach(MIMEText(html_content, 'html'))
-            
-            # 4. Enviar mail
-            try:
-                server.sendmail(sender, email, msg.as_string())
-                print(f"Email de balance de idiomas enviado a {user} ({email})")
-            except Exception as e:
-                print(f"Error enviando email a {user} ({email}): {e}")
-                exito = False
-
-
-        # 5. Cerrar conexión
-        server.quit()
-        return exito
-
-    except Exception as e:
-        print(f"Error crítico en el proceso de envío de email: {e}")
-        return False
-
 # ------------------ CONSTANTES Y ESTRUCTURAS ------------------
 FILA_BASE = 170
 FECHA_BASE = date(2025, 12, 2)
@@ -543,7 +440,7 @@ def main():
             if uval in ["ivan", "iván", "iva"]: set_user_and_rerun("Iván")
 
         if "usuario_seleccionado" not in st.session_state:
-            st.markdown("<h1 style='text-align: center; margin-bottom: 30px;'>¿Quién sos? (Idiomas)</h1>", unsafe_allow_html=True)
+            st.markdown("<h1 style='text-align: center; margin-bottom: 30px;'>¿Quién sos?</h1>", unsafe_allow_html=True)
             if st.button("👤 Facundo", use_container_width=True):
                 st.session_state["usuario_seleccionado"] = "Facundo"
                 st.rerun()
@@ -557,22 +454,6 @@ def main():
     datos_globales = cargar_datos_unificados()
     datos = datos_globales["users_data"]
     resumen_marcas = datos_globales["resumen"]
-    balance_val_raw = datos_globales["balance"]
-    last_mail_date_str = datos_globales["last_mail_date"]
-
-    # ------------------ LOGICA ENVIO EMAIL DIARIO ------------------
-    now = _argentina_now_global()
-    today_str = now.strftime("%Y-%m-%d")
-    
-    if 7 <= now.hour < 22:
-        if last_mail_date_str != today_str:
-            exito = enviar_reporte_email(datos, resumen_marcas, balance_val_raw)
-            if exito:
-                st.toast(f"📧 Reporte diario de idiomas enviado ({today_str})")
-                batch_write([(RANGO_FECHA_MAIL, today_str)])
-            else:
-                pass
-    # ----------------------------------------------------------------
 
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
     # OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo" # Eliminado, ya no se usa
@@ -656,15 +537,13 @@ def main():
 
         # Usamos placeholder_total para un título genérico
         with placeholder_total.container():
-            st.markdown(f"## Seguimiento de Idiomas de {USUARIO_ACTUAL}")
-
             # ------------------ ANKI STATS ------------------
             # Esto usará la función fetch_anki_stats modificada para Idiomas
             anki_data = fetch_anki_stats(USUARIO_ACTUAL)
             C_MATURE, C_YOUNG, C_OTHER = "#31A354", "#74C476", "#BDBDBD"
             
             if anki_data:
-                with st.expander("Anki (Idiomas)"):
+                with st.expander("Anki"):
                     for deck_name, stats in anki_data.items():
                         if isinstance(stats, dict) and 'total' not in stats:
                             st.markdown(f"## {deck_name}", unsafe_allow_html=True)
@@ -722,8 +601,6 @@ def main():
             # with st.expander("ℹ️ No pensar, actuar."):
             #     md_content = st.secrets["facundo_md"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ivan_md"]
             #     st.markdown(md_content)
-
-            st.subheader("Idiomas")
         
         # --- Actualizar Placeholders de Materias y Botones ---
         mis_materias = USERS[USUARIO_ACTUAL]
