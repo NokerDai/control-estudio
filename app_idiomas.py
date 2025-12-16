@@ -89,40 +89,40 @@ def get_current_user():
     
 
 # Materias anidadas por CATEGORÍA Y USUARIO
-# Esta es la nueva estructura para definir qué idiomas ve cada usuario y qué rangos usa.
+# La clave de la categoría (ej: "F. Idiomas") se usará como el nombre de la hoja (Sheet Name).
 USUARIOS_IDIOMAS = {
     # CONFIGURACIÓN PARA FACUNDO
     "Facundo": {
-        "F. Idiomas": {
+        "F. Idiomas": { # <--- Sheet Name is "F. Idiomas"
             "Inglés": {
-                "time": "'Hoja1'!C",
-                "total": "'Hoja1'!D3"
+                "time_col": "C", # Columna de tiempo diario (Ej: 'F. Idiomas'!C)
+                "total_cell": "D3" # Celda de total (Ej: 'F. Idiomas'!D3)
             },
             "Alemán": {
-                "time": "'Hoja1'!E",
-                "total": "'Hoja1'!F3"
+                "time_col": "E",
+                "total_cell": "F3"
             }
         },
     },
     # CONFIGURACIÓN PARA IVÁN
     "Ivan": {
-        "I. Idiomas": {
+        "I. Idiomas": { # <--- Sheet Name is "I. Idiomas"
             "Japonés": {
-                "time": "'Hoja1'!G",
-                "total": "'Hoja1'!H3"
+                "time_col": "G",
+                "total_cell": "H3"
             },
             "Chino": {
-                "time": "'Hoja1'!I",
-                "total": "'Hoja1'!J3"
+                "time_col": "I",
+                "total_cell": "J3"
             }
         },
     },
     # CONFIGURACIÓN PARA AGUSTIN (si quieres mantenerla como fallback)
     "Agustin": {
-        "Mis Idiomas": {
+        "Mis Idiomas": { # <--- Sheet Name is "Mis Idiomas"
             "Inglés": {
-                "time": "'Hoja1'!C",
-                "total": "'Hoja1'!D3"
+                "time_col": "C",
+                "total_cell": "D3"
             },
         }
     }
@@ -141,10 +141,19 @@ def get_user_language_config():
     user_languages = USUARIOS_IDIOMAS.get(current_user, {})
     
     for category, languages in user_languages.items():
+        sheet_name = category # El nombre de la categoría es el nombre de la hoja
         for lang, ranges in languages.items():
             # La clave única para el estado de sesión será "Categoría: Idioma"
             full_name = f"{category}: {lang}"
-            config_plana[full_name] = ranges
+            
+            # Construir el rango completo con el nombre de la hoja correcto
+            # Si el nombre de la hoja tiene espacios, debe ir entre comillas simples.
+            config_plana[full_name] = {
+                # Ej: "'F. Idiomas'!C"
+                "daily_range_template": f"'{sheet_name}'!{ranges['time_col']}",
+                # Ej: "'F. Idiomas'!D3"
+                "total_cell_range": f"'{sheet_name}'!{ranges['total_cell']}"
+            }
             
     return config_plana, user_languages
 
@@ -162,16 +171,14 @@ def get_client():
         return None
         
     try:
-        # --- MODIFICACIÓN CLAVE (MANEJO DE JSON STRING) ---
         # Si CREDS_JSON es una cadena, la parseamos a un diccionario.
         if isinstance(CREDS_JSON, str):
             creds_info = json.loads(CREDS_JSON)
         else:
             creds_info = CREDS_JSON
-        # --- FIN MODIFICACIÓN CLAVE ---
 
         creds = service_account.Credentials.from_service_account_info(
-            creds_info, # Usamos el diccionario parsedo/cargado
+            creds_info, 
             scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
         )
         client = gspread.authorize(creds)
@@ -185,27 +192,28 @@ def get_client():
         return None
 
 def batch_read(ranges):
-    """Lee un conjunto de rangos no contiguos de forma eficiente (Opción A)."""
+    """Lee un conjunto de rangos no contiguos de forma eficiente (Opción A).
+       Los rangos deben incluir el nombre de la hoja (ej: 'F. Idiomas'!C170).
+    """
     client = get_client()
     if not client: return [''] * len(ranges)
     
     try:
-        worksheet = client.open_by_key(SHEET_ID).sheet1 # Hoja1
+        # Abrimos el SpreadSheet completo. Esto es clave para que los rangos con nombre de hoja funcionen.
+        spreadsheet = client.open_by_key(SHEET_ID)
         
-        # Usamos batch_get para rangos múltiples no contiguos
-        results = worksheet.batch_get(ranges) 
+        # Usamos values_batch_get en el objeto Spreadsheet
+        results = spreadsheet.values_batch_get(ranges)['valueRanges']
         
         final_values = []
         for result_set in results:
-            # result_set: [['valor']] (para una sola celda)
-            
             # Intentamos obtener el primer valor de la primera fila, si existe
-            if result_set and result_set[0] and result_set[0][0]:
-                final_values.append(result_set[0][0])
+            values = result_set.get('values', [])
+            if values and values[0] and values[0][0]:
+                final_values.append(values[0][0])
             else:
                 final_values.append('')
         
-        # El resultado es una lista simple de valores ['valor1', 'valor2', ...]
         return final_values
         
     except Exception as e:
@@ -214,7 +222,9 @@ def batch_read(ranges):
 
 
 def batch_write(updates):
-    """Escribe un conjunto de valores en pares (rango, valor)."""
+    """Escribe un conjunto de valores en pares (rango, valor).
+       Los rangos deben incluir el nombre de la hoja (ej: 'F. Idiomas'!C170).
+    """
     client = get_client()
     if not client: return
 
@@ -226,16 +236,17 @@ def batch_write(updates):
     ]
     
     try:
-        worksheet = client.open_by_key(SHEET_ID).worksheet("Hoja1")
-        # Usa el método spreadheets().values().batchUpdate de la API v4
-        worksheet.batch_update(updates_list, value_input_option='USER_ENTERED')
+        # Abrimos el SpreadSheet completo. Esto es clave para que los rangos con nombre de hoja funcionen.
+        spreadsheet = client.open_by_key(SHEET_ID)
+        # Usamos batch_update en el objeto Spreadsheet.
+        spreadsheet.batch_update(updates_list, value_input_option='USER_ENTERED')
     except Exception as e:
         st.error(f"Error al escribir en Google Sheets: {e}")
         # No propagamos, solo mostramos el error
 
 def replace_row_in_range(range_template, row_number):
     """Reemplaza el marcador de rango con el número de fila.
-       Ej: "'Hoja1'!C" + "170" -> "'Hoja1'!C170"
+       Ej: "'F. Idiomas'!C" + "170" -> "'F. Idiomas'!C170"
     """
     return range_template + str(row_number)
 
@@ -349,8 +360,9 @@ def stop_study():
         return
 
     config = lang_config[full_materia_name]
-    daily_range_template = config["time"]
-    total_cell = config["total"]
+    # Usamos las nuevas claves de rango (que ya incluyen el nombre de la hoja)
+    daily_range_template = config["daily_range_template"]
+    total_cell = config["total_cell_range"]
 
     # 1. Obtener la celda objetivo (diaria)
     target_row = get_time_row()
@@ -382,7 +394,7 @@ def stop_study():
             (total_cell, new_total_hms)  # Tiempo total
         ])
         
-        st.success(f"Tiempo de **{segundos_a_hms(study_duration)}** guardado para **{full_materia_name}**.")
+        st.success(f"Tiempo de **{segundos_a_hms(study_duration)}** guardado en **{full_materia_name}**.")
     except Exception as e:
         st.error(f"Error de escritura en Sheets: {e}")
         
@@ -470,8 +482,9 @@ def main():
             
             # Construir la lista de rangos a leer
             for full_name, config in language_config.items():
-                daily_range = replace_row_in_range(config["time"], target_row)
-                total_range = config["total"]
+                # Usamos la plantilla de rango que ya tiene el nombre de la hoja
+                daily_range = replace_row_in_range(config["daily_range_template"], target_row)
+                total_range = config["total_cell_range"]
                 
                 # Guardamos los rangos para la lectura en lote
                 all_ranges_to_read.append(daily_range)
