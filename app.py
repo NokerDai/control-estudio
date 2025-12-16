@@ -50,10 +50,8 @@ USUARIO_ACTUAL = st.session_state.get("usuario_seleccionado")
 SESSION_ID = get_current_session_id()
 
 if USUARIO_ACTUAL is not None:
-    st.sidebar.markdown("---")
-    
     # Botón explícito para desloguear y liberar el lock
-    if st.sidebar.button("🚪 Desloguear / Cambiar Usuario", use_container_width=True):
+    if st.sidebar.button("🚪 Desloguear", use_container_width=True):
         if USUARIO_ACTUAL in RESTRICTED_USERS:
             # 1. Liberar el lock en Google Sheets
             if app_estudio.set_user_lock_status(USUARIO_ACTUAL, ""):
@@ -86,55 +84,55 @@ if "password" in query_params and not st.session_state.authenticated:
     st.stop()
     
 # ---------------------------------------------------------
-# SELECCIÓN DE USUARIO (MODIFICADO para bloqueo con Sheets)
+# SELECCIÓN DE USUARIO (MODIFICADO: Botones de acceso directo)
 # ---------------------------------------------------------
 
 if st.session_state.usuario_seleccionado is None:
     st.title("Selección de Usuario")
     
-    # Obtener lista de usuarios de app_estudio.py
-    try:
-        users_options = list(app_estudio.USERS.keys())
-    except AttributeError:
-        # Fallback si USERS no está cargado/definido en app_estudio
-        users_options = RESTRICTED_USERS + ["otro"] 
-
-    selected = st.selectbox(
-        "¿Quién sos?",
-        options=["Seleccionar..."] + users_options,
-        index=0,
-        key="user_select_box"
-    )
-    
-    if selected != "Seleccionar...":
+    # Función de callback para manejar el click en los botones
+    def handle_user_login(selected_user):
+        current_id = SESSION_ID
         
-        if selected in RESTRICTED_USERS:
+        if selected_user in RESTRICTED_USERS:
             # Lógica de restricción de sesión usando Google Sheets
-            current_lock_value = app_estudio.get_user_lock_status(selected)
-            current_id = SESSION_ID
+            current_lock_value = app_estudio.get_user_lock_status(selected_user)
             
             is_locked_by_other = False
             if current_lock_value != "":
                 if current_lock_value != current_id:
-                    # El lock está tomado por OTRA sesión. Bloqueamos.
                     is_locked_by_other = True
-                # else: Lo tomó esta sesión antes (ej. por un refresh), lo mantenemos.
             
             if is_locked_by_other:
-                st.error(f"❌ El usuario **{selected}** ya tiene una sesión activa en otra parte. Debe desloguearse primero.")
-                st.stop()
+                st.error(f"❌ El usuario **{selected_user}** ya tiene una sesión activa en otra parte. Debe desloguearse primero.")
+                # st.rerun() # No hacemos rerun aquí, dejamos que el flujo siga hasta el stop()
+                return False 
             else:
-                # 1. Tomar/Revalidar el lock en Google Sheets
-                if app_estudio.set_user_lock_status(selected, current_id):
-                    st.toast(f"✅ Lock de sesión tomado/revalidado para {selected}.")
+                # Tomar/Revalidar el lock en Google Sheets
+                if app_estudio.set_user_lock_status(selected_user, current_id):
+                    st.toast(f"✅ Lock de sesión tomado/revalidado para {selected_user}.")
                 else:
                     st.error("Error al intentar tomar el lock de sesión. Intenta de nuevo.")
-                    st.stop()
+                    return False
         
-        # 2. Proceder con el login local (para todos los usuarios)
-        st.session_state.usuario_seleccionado = selected
+        # Proceder con el login local (para todos los usuarios)
+        st.session_state.usuario_seleccionado = selected_user
         st.rerun()
-            
+        return True
+        
+    # --- Interfaz con Botones ---
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("👤 Facundo", key="btn_facundo", use_container_width=True):
+            handle_user_login("Facundo")
+
+    with col2:
+        if st.button("👤 Iván", key="btn_ivan", use_container_width=True):
+            handle_user_login("Iván")
+
+    # Si hay otros usuarios no restringidos, podríamos listarlos aquí o usar un campo de texto
+    
     st.stop() 
 
 # ---------------------------------------------------------
@@ -162,7 +160,7 @@ if USUARIO_ACTUAL in RESTRICTED_USERS:
 # NAVEGACIÓN EN SIDEBAR
 # ---------------------------------------------------------
 
-st.sidebar.header(f"Hola, {st.session_state.usuario_seleccionado}!")
+st.sidebar.header("Navegación")
 
 # --- Botón para ir a ESTUDIO ---
 # Solo se muestra si NO estamos en la página "estudio"
