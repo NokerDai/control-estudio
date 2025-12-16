@@ -575,7 +575,7 @@ def main():
     # ----------------------------------------------------------------
 
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
-    OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
+    # OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo" # Eliminado, ya no se usa
 
     materia_en_curso = st.session_state.get("materia_activa")
     inicio_dt = st.session_state.get("inicio_dt")
@@ -595,18 +595,18 @@ def main():
 
     usuario_estudiando = materia_en_curso is not None
 
-    materia_otro = next((m for m, v in datos[OTRO_USUARIO]["estado"].items() if str(v).strip() != ""), "")
-    otro_estudiando = materia_otro != ""
+    # materia_otro = next((m for m, v in datos[OTRO_USUARIO]["estado"].items() if str(v).strip() != ""), "") # Eliminado, ya no se usa
+    # otro_estudiando = materia_otro != "" # Eliminado, ya no se usa
 
-    def circle(color):
-        return (f'<span style="display:inline-flex; align-items:center; justify-content:center; '
-                f'width:10px; height:10px; border-radius:50%; background:{color}; '
-                f'margin-right:6px; flex-shrink:0;"></span>')
+    # def circle(color): # Eliminado, ya no se usa
+    #     return (f'<span style="display:inline-flex; align-items:center; justify-content:center; '
+    #             f'width:10px; height:10px; border-radius:50%; background:{color}; '
+    #             f'margin-right:6px; flex-shrink:0;"></span>')
 
-    circle_usuario = circle("#00e676" if usuario_estudiando else "#ffffff")
-    circle_otro = circle("#00e676" if otro_estudiando else "#ffffff")
+    # circle_usuario = circle("#00e676" if usuario_estudiando else "#ffffff") # Eliminado, ya no se usa
+    # circle_otro = circle("#00e676" if otro_estudiando else "#ffffff") # Eliminado, ya no se usa
 
-    placeholder_total = st.empty()
+    placeholder_total = st.empty() # Mantenido solo para fines de re-uso, aunque se vacía
     placeholder_materias = {m: st.empty() for m in USERS[USUARIO_ACTUAL]}
 
     while True:
@@ -632,66 +632,31 @@ def main():
             return m_tot, per_min, objetivo, total_min, progreso_en_dinero
 
         m_tot, m_rate, m_obj, total_min, progreso_en_dinero = calcular_metricas(USUARIO_ACTUAL, tiempo_anadido_seg)
-        pago_objetivo = m_rate * m_obj
-        progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
-        color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
+        # pago_objetivo = m_rate * m_obj # Eliminado, ya no se usa
+        # progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100 # Eliminado, ya no se usa
+        # color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744" # Eliminado, ya no se usa
 
-        objetivo_hms = segundos_a_hms(int(m_obj * 60))
-        total_hms = segundos_a_hms(int(total_min * 60))
+        # objetivo_hms = segundos_a_hms(int(m_obj * 60)) # Eliminado, ya no se usa
+        # total_hms = segundos_a_hms(int(total_min * 60)) # Eliminado, ya no se usa
 
-        balance_val = balance_val_raw
-        if USUARIO_ACTUAL == "Facundo":
-            balance_val = -balance_val
-        balance_val += progreso_en_dinero
-        balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa"
-        balance_str = f"+${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
+        # balance_val = balance_val_raw # Eliminado, ya no se usa
+        # if USUARIO_ACTUAL == "Facundo": # Eliminado, ya no se usa
+        #     balance_val = -balance_val # Eliminado, ya no se usa
+        # balance_val += progreso_en_dinero # Eliminado, ya no se usa
+        # balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa" # Eliminado, ya no se usa
+        # balance_str = f"+${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00") # Eliminado, ya no se usa
 
-        # --- Actualizar Placeholder Global ---
+        # --- Actualizar Placeholder Global --- (BLOQUE ELIMINADO)
+        # with placeholder_total.container():
+        #     st.markdown(f"""...""", unsafe_allow_html=True)
+        #
+        #     # --- PROGRESO DEL OTRO USUARIO --- (BLOQUE ELIMINADO)
+        #     o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
+        #     ...
+
+        # Usamos placeholder_total para un título genérico
         with placeholder_total.container():
-            st.markdown(f"""
-                <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                    <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy (Idiomas)</div>
-                    <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${m_tot:.2f}</div>
-                    <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
-                        <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; color:#888;">
-                        <div>Balance: <span style="color:{balance_color};">{balance_str}</span></div>
-                        <div>{objetivo_hms} | ${pago_objetivo:.2f}</div>
-                    </div>
-                </div>
-            """, unsafe_allow_html=True)
-
-            # --- PROGRESO DEL OTRO USUARIO ---
-            o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
-            o_pago_obj = o_rate * o_obj
-            o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
-            o_color_bar = "#00e676" if o_progreso_pct >= 90 else "#ffeb3b" if o_progreso_pct >= 50 else "#ff1744"
-            o_obj_hms = segundos_a_hms(int(o_obj * 60))
-            o_total_hms = segundos_a_hms(int(total_min_otro * 60))
-
-            materia_visible = 'visible' if materia_otro else 'hidden'
-            materia_nombre_html = f'<span style="color:#00e676; margin-left:6px; visibility:{materia_visible};">{materia_otro if materia_otro else ""}</span>'
-            o_obj_color = "#00e676" if otro_estudiando else "#888"
-
-            with st.expander(f"Progreso de {OTRO_USUARIO} (Idiomas).", expanded=True):
-                 st.markdown(f"""
-                    <div style="margin-bottom: 10px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-size: 1.1rem; color: #ddd;"><b>{o_total_hms} | ${o_tot:.2f}</b></span>
-                        </div>
-                        <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
-                            <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#aaa; margin-top:5px;">
-                            <div style="display:flex; align-items:center;">
-                                {circle_otro}
-                                {materia_nombre_html}
-                            </div>
-                            <span style="font-size: 0.9rem; color: {o_obj_color};">{o_obj_hms} | ${o_pago_obj:.2f}</span>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
+            st.markdown(f"## Seguimiento de Idiomas de {USUARIO_ACTUAL}")
 
             # ------------------ ANKI STATS ------------------
             # Esto usará la función fetch_anki_stats modificada para Idiomas
@@ -753,10 +718,10 @@ def main():
                                 </div>
                             """, unsafe_allow_html=True)
 
-            # --- MANIFIESTO ---
-            with st.expander("ℹ️ No pensar, actuar."):
-                md_content = st.secrets["facundo_md"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ivan_md"]
-                st.markdown(md_content)
+            # --- MANIFIESTO --- (BLOQUE ELIMINADO)
+            # with st.expander("ℹ️ No pensar, actuar."):
+            #     md_content = st.secrets["facundo_md"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ivan_md"]
+            #     st.markdown(md_content)
 
             st.subheader("Idiomas")
         

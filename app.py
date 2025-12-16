@@ -74,23 +74,6 @@ if show_sidebar:
                 st.session_state.current_page = "habitos"
                 st.rerun()
 
-        st.sidebar.markdown("---")
-        if st.sidebar.button("🔒 Salir / Logout", use_container_width=True):
-            st.session_state.authenticated = False
-            st.session_state.current_page = "estudio"
-            # Limpiamos el usuario seleccionado al hacer logout
-            if "usuario_seleccionado" in st.session_state:
-                del st.session_state["usuario_seleccionado"]
-            st.rerun()
-    elif "usuario_seleccionado" in st.session_state:
-        # Opción para cambiar de usuario si no está logueado
-        st.sidebar.markdown("---")
-        if st.sidebar.button(f"Cambiar de Usuario"):
-            del st.session_state["usuario_seleccionado"]
-            st.session_state.current_page = "estudio" # Volvemos a la selección
-            st.rerun()
-
-
 # ---------------------------------------------------------
 # ROUTER (Decide qué app mostrar)
 # ---------------------------------------------------------
