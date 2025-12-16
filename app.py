@@ -15,6 +15,32 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "current_page" not in st.session_state:
     st.session_state.current_page = "estudio" 
+    
+# Definimos los usuarios principales para la lógica de quién espía a quién
+FACUNDO = "Facundo"
+IVAN = "Iván"
+ADMIN_PASSWORD_KEY = "password" # Clave del secret
+
+# -------------------------------------------------------------
+# LÓGICA DINÁMICA DE USUARIOS
+# -------------------------------------------------------------
+
+# El usuario logueado por defecto es Iván (usuario estándar no autenticado)
+st.session_state.current_user = IVAN
+st.session_state.otro_usuario_nombre = FACUNDO
+st.session_state.otro_usuario_current_page = "estudio" # Estado a simular para el otro usuario
+
+# Si está autenticado, es Facundo
+if st.session_state.authenticated:
+    st.session_state.current_user = FACUNDO
+    st.session_state.otro_usuario_nombre = IVAN
+    # Aquí podríamos cargar el estado real de Iván si existiera una base de datos.
+    st.session_state.otro_usuario_current_page = "idiomas" # Ejemplo: Simular que Iván está en Idiomas
+elif not st.session_state.authenticated:
+    # Si no está autenticado, es Iván, y espía a Facundo
+    st.session_state.current_user = IVAN
+    st.session_state.otro_usuario_nombre = FACUNDO
+    st.session_state.otro_usuario_current_page = "estudio" # Ejemplo: Simular que Facundo está en Estudio
 
 # ---------------------------------------------------------
 # LÓGICA DE LOGIN (Solo si hay ?password en la URL)
@@ -27,68 +53,97 @@ if "password" in query_params and not st.session_state.authenticated:
     password_input = st.text_input("Contraseña:", type="password")
     
     if st.button("Entrar"):
-        # Verificamos contra los secrets (asumiendo que están en [auth] password)
-        if password_input == st.secrets["password"]:
+        # Verificamos contra los secrets 
+        if password_input == st.secrets[ADMIN_PASSWORD_KEY]:
             st.session_state.authenticated = True
-            # Bypass para que app_habitos no pida password de nuevo
             st.session_state.pw_correct = True 
-            # ===> AÑADIR ESTA LÍNEA <===
-            st.session_state.usuario_seleccionado = "Facundo" 
-            # Volvemos a la página de inicio (Estudio) pero ya autenticados
+            # El usuario pasa a ser Facundo (el admin) y debe ver a Iván
+            st.session_state.current_user = FACUNDO
+            st.session_state.otro_usuario_nombre = IVAN 
             st.session_state.current_page = "estudio" 
             st.rerun()
         else:
             st.error("Contraseña incorrecta.")
     
-    # Detenemos la ejecución aquí para que no cargue nada más hasta loguearse
     st.stop()
 
 # ---------------------------------------------------------
-# BARRA LATERAL (Lógica de Navegación)
+# BARRA LATERAL (Lógica de Navegación PROPIA)
 # ---------------------------------------------------------
 
-# Navegación siempre visible para todos los usuarios
-st.sidebar.header("Navegación")
+st.sidebar.header(f"Navegación de **{st.session_state.current_user}**")
 
 # --- Botón para ir a ESTUDIO ---
-# Solo se muestra si NO estamos en la página "estudio"
 if st.session_state.current_page != "estudio":
     if st.sidebar.button("📚 Estudio", use_container_width=True):
         st.session_state.current_page = "estudio"
         st.rerun()
 
-# --- Botón para ir a IDIOMAS (NUEVO BLOQUE) ---
-# Solo se muestra si NO estamos en la página "idiomas"
+# --- Botón para ir a IDIOMAS ---
 if st.session_state.current_page != "idiomas":
     if st.sidebar.button("🌎 Idiomas", use_container_width=True):
         st.session_state.current_page = "idiomas"
         st.rerun()
 
-# Lógica solo para usuarios Autenticados
+# Lógica solo para usuarios Autenticados (Facundo)
 if st.session_state.authenticated:
     
     # Botón para ir a HÁBITOS
-    # Solo se muestra si NO estamos en la página "habitos"
     if st.session_state.current_page != "habitos":
         if st.sidebar.button("📅 Hábitos", use_container_width=True):
             st.session_state.current_page = "habitos"
             st.rerun()
 
 # ---------------------------------------------------------
+# VISTA DEL OTRO USUARIO (Visible para TODOS)
+# ---------------------------------------------------------
+
+st.sidebar.markdown("---") 
+
+otro_usuario = st.session_state.otro_usuario_nombre 
+st.sidebar.header(f"Vista de **{otro_usuario}**")
+
+# === Lógica de visualización de páginas (Solo lectura) ===
+otro_usuario_page = st.session_state.otro_usuario_current_page
+
+# 1. Estudio 
+if otro_usuario_page == "estudio":
+    st.sidebar.success(f"📚 Estudio (Activo)")
+else:
+    st.sidebar.info("📚 Estudio")
+    
+# 2. Idiomas 
+if otro_usuario_page == "idiomas":
+    st.sidebar.success(f"🌎 Idiomas (Activo)")
+else:
+    st.sidebar.info("🌎 Idiomas")
+
+# 3. Hábitos (SOLO visible si el usuario actual está autenticado)
+# Solo Facundo (autenticado) puede ver la actividad de Hábitos (en este caso, la de Iván)
+if st.session_state.authenticated:
+    # Comprobamos si el otro usuario (Iván) está "viendo" su página de hábitos
+    if otro_usuario_page == "habitos":
+        st.sidebar.success(f"📅 Hábitos (Activo)")
+    else:
+        st.sidebar.info("📅 Hábitos")
+else:
+    # Ocultamos la información de Hábitos al usuario Iván
+    st.sidebar.caption("🔒 Hábitos (Solo visible para administrador)")
+
+
+# ---------------------------------------------------------
 # ROUTER (Decide qué app mostrar)
 # ---------------------------------------------------------
 
-# 1. Si eligió "habitos" Y está autenticado, mostramos Hábitos
+# 1. Si eligió "habitos" Y está autenticado (Facundo), mostramos Hábitos
 if st.session_state.current_page == "habitos" and st.session_state.authenticated:
-    # Nos aseguramos que app_habitos sepa que ya pasamos la seguridad
     st.session_state.pw_correct = True
     app_habitos.run()
 
 # 2. Si eligió "idiomas" (Autenticado o no), mostramos Idiomas
 elif st.session_state.current_page == "idiomas":
-    # El archivo app_idiomas.py no requiere autenticación
     app_idiomas.main() 
 
-# 3. En cualquier otro caso (Usuario normal, Admin que eligió Estudio), mostramos Estudio
-else: # st.session_state.current_page == "estudio"
+# 3. En cualquier otro caso (Estudio)
+else:
     app_estudio.main()
