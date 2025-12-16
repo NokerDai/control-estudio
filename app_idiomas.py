@@ -1,16 +1,17 @@
 import re
+import json
 import time
-from datetime import datetime, date
+import requests
+import smtplib # Nuevo
+from email.mime.text import MIMEText # Nuevo
+from email.mime.multipart import MIMEMultipart # Nuevo
+from datetime import datetime, date, timedelta, time as dt_time
 import streamlit as st
 from google.oauth2 import service_account
+from google.auth.transport.requests import AuthorizedSession
 from requests.exceptions import RequestException
-import json
-
-# Librerías de Google Sheets
-import gspread
 
 # ------------------ TIMEZONE HELPERS ------------------
-# Importación condicional de zoneinfo (Python >= 3.9) o pytz (fallback)
 try:
     from zoneinfo import ZoneInfo
     _HAS_ZONEINFO = True
@@ -22,10 +23,7 @@ except Exception:
     except Exception:
         pytz = None
 
-TIMEZONE = "America/Argentina/Buenos_Aires" # Zona horaria a usar
-
 def cargar_estilos():
-    # Estilos CSS para mejorar la apariencia en Streamlit
     st.markdown("""
         <style>
         html, body, [class*="css"] { font-size: 18px !important; }
@@ -33,575 +31,710 @@ def cargar_estilos():
         h2 { font-size: 2rem !important; }
         h3 { font-size: 1.5rem !important; }
 
-        /* Estilo para el botón de empezar/terminar */
-        .stButton>button {
-            border-radius: 10px;
-            font-size: 1.2em;
-            font-weight: bold;
-            transition: all 0.3s ease;
+        /* Estilo de la tarjeta */
+        .materia-card {
+            background-color: #262730;
+            border: 1px solid #464b5c;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .materia-title { font-size: 1.4rem; font-weight: bold; color: #ffffff; margin-bottom: 5px; }
+        
+        /* EL TIEMPO */
+        .materia-time { 
+            font-size: 1.6rem; 
+            font-weight: bold; 
+            color: #00e676; 
+            font-family: 'Courier New', monospace; 
+            margin-bottom: 15px; 
         }
 
-        /* Colores de los botones */
-        .btn-start button { background-color: #4CAF50 !important; color: white !important; border-color: #4CAF50 !important; }
-        .btn-stop button { background-color: #F44366 !important; color: white !important; border-color: #F44366 !important; }
-        .btn-pause button { background-color: #FFC107 !important; color: black !important; border-color: #FFC107 !important; }
+        .status-badge { display: inline-block; padding: 5px 10px; border-radius: 12px; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; }
+        .status-active { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
 
-        .stAlert { border-radius: 10px; }
+        div.stButton > button { height: 3.5rem; font-size: 1.2rem !important; font-weight: bold !important; border-radius: 12px !important; }
         </style>
     """, unsafe_allow_html=True)
 
-# ------------------ TIMEZONE HELPERS ------------------
+def _argentina_now_global():
+    if ZoneInfo is not None:
+        return datetime.now(ZoneInfo('America/Argentina/Cordoba'))
+    if 'pytz' in globals() and pytz is not None:
+        return datetime.now(pytz.timezone('America/Argentina/Cordoba'))
+    return datetime.now()
 
-def get_today_argentina():
-    """Obtiene la fecha de hoy en la zona horaria de Argentina."""
-    now = datetime.now()
-    if _HAS_ZONEINFO:
+def ahora_str():
+    dt = _argentina_now_global()
+    try:
+        return dt.isoformat(sep=" ", timespec="seconds")
+    except:
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+def parse_datetime(s):
+    if not s or str(s).strip() == "":
+        raise ValueError("Marca vacía")
+    s = str(s).strip()
+    TZ = _argentina_now_global().tzinfo
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=TZ)
+        return dt.astimezone(TZ)
+    except:
+        pass
+    fmts = ["%Y-%m-%d %H:%M:%S%z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S"]
+    for fmt in fmts:
         try:
-            return now.astimezone(ZoneInfo(TIMEZONE)).date()
-        except Exception:
-            pass # Fallback
-    
-    # Fallback con pytz si está disponible
-    if pytz:
-        try:
-            tz = pytz.timezone(TIMEZONE)
-            return tz.localize(now).date()
-        except Exception:
-            pass
-            
-    # Último fallback (hora local sin garantizar zona horaria)
-    return now.date()
+            dt = datetime.strptime(s, fmt)
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=TZ)
+            return dt.astimezone(TZ)
+        except:
+            continue
+    raise ValueError(f"Formato inválido: {s}")
 
+def hms_a_segundos(hms):
+    if not hms: return 0
+    try:
+        h, m, s = map(int, hms.split(":"))
+        return h*3600 + m*60 + s
+    except:
+        return 0
 
-# ------------------ CONSTANTES ------------------
+def segundos_a_hms(seg):
+    h = seg // 3600
+    m = (seg % 3600) // 60
+    s = seg % 60
+    return f"{h:02d}:{m:02d}:{s:02d}"
 
-# Google Sheets Configuración (de secrets)
-SHEET_ID = st.secrets["sheet_id"]
-CREDS_JSON = st.secrets["service_account"]
+def hms_a_minutos(hms): return hms_a_segundos(hms) / 60
+def parse_float_or_zero(s):
+    if s is None: return 0.0
+    try: return float(str(s).replace(",", ".").strip())
+    except: return 0.0
 
-# Usuario actual (Se obtiene dinámicamente)
-def get_current_user():
-    """Obtiene el usuario actual de la sesión, por defecto 'Agustin'."""
-    # Si la app principal (app.py) establece un 'current_user' lo usamos, sino 'Agustin'.
-    if 'current_user' not in st.session_state:
-        st.session_state.current_user = "Agustin"
-    return st.session_state.current_user
-    
+def parse_time_cell_to_seconds(val):
+    if val is None: return 0
+    s = str(val).strip()
+    if s == "": return 0
+    if ":" in s:
+        try: return hms_a_segundos(s)
+        except: return 0
+    try:
+        f = float(s.replace(",", "."))
+        if 0 <= f <= 1:
+            return int(f * 86400)
+        return int(f)
+    except:
+        return 0
 
-# Materias anidadas por CATEGORÍA Y USUARIO
-# La clave de la categoría (ej: "F. Idiomas") se usará como el nombre de la hoja (Sheet Name).
-USUARIOS_IDIOMAS = {
-    # CONFIGURACIÓN PARA FACUNDO
-    "Facundo": {
-        "F. Idiomas": { # <--- Sheet Name is "F. Idiomas"
-            "Inglés": {
-                "time_col": "C", # Columna de tiempo diario (Ej: 'F. Idiomas'!C)
-                "total_cell": "D3" # Celda de total (Ej: 'F. Idiomas'!D3)
-            },
-            "Alemán": {
-                "time_col": "E",
-                "total_cell": "F3"
-            }
-        },
-    },
-    # CONFIGURACIÓN PARA IVÁN
-    "Ivan": {
-        "I. Idiomas": { # <--- Sheet Name is "I. Idiomas"
-            "Japonés": {
-                "time_col": "G",
-                "total_cell": "H3"
-            },
-            "Chino": {
-                "time_col": "I",
-                "total_cell": "J3"
-            }
-        },
-    },
-    # CONFIGURACIÓN PARA AGUSTIN (si quieres mantenerla como fallback)
-    "Agustin": {
-        "Mis Idiomas": { # <--- Sheet Name is "Mis Idiomas"
-            "Inglés": {
-                "time_col": "C",
-                "total_cell": "D3"
-            },
+def replace_row_in_range(range_str, new_row):
+    if not isinstance(range_str, str): return range_str
+    return re.sub(r'(\d+)(\s*$)', str(new_row), range_str)
+
+def sanitize_key(s):
+    return re.sub(r'[^a-zA-Z0-9_]', '_', s)
+
+# ------------------ RERUN HELPER ------------------
+def pedir_rerun():
+    st.session_state["_do_rerun"] = True
+
+# ------------------ GOOGLE SHEETS SESSION ------------------
+@st.cache_resource
+def get_sheets_session():
+    try:
+        key_dict = json.loads(st.secrets["service_account"])
+    except Exception as e:
+        st.error(f"Error leyendo st.secrets['service_account']")
+        st.stop()
+    try:
+        creds = service_account.Credentials.from_service_account_info(
+            key_dict,
+            scopes=["https://www.googleapis.com/auth/spreadsheets"]
+        )
+        return AuthorizedSession(creds)
+    except Exception as e:
+        st.error(f"Error creando credenciales")
+        st.stop()
+
+session = get_sheets_session()
+
+def sheets_batch_get(spreadsheet_id, ranges):
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values:batchGet"
+    unique_ranges = list(dict.fromkeys(ranges))
+    params = []
+    for r in unique_ranges:
+        params.append(("ranges", r))
+    params.append(("valueRenderOption", "FORMATTED_VALUE"))
+    try:
+        resp = session.get(url, params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        ordered_results = data.get("valueRanges", [])
+        result_map = {r: res for r, res in zip(unique_ranges, ordered_results)}
+        final_list = []
+        for r in ranges:
+            if r in result_map:
+                final_list.append(result_map[r])
+            else:
+                final_list.append({})
+        return {"valueRanges": final_list}
+    except RequestException as e:
+        raise RuntimeError(f"Error HTTP en batchGet al leer la hoja: {e}")
+
+def sheets_batch_update(spreadsheet_id, updates):
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values:batchUpdate"
+    data = {
+        "valueInputOption": "USER_ENTERED",
+        "data": [{"range": r, "values": [[v]]} for r, v in updates]
+    }
+    try:
+        resp = session.post(url, json=data, timeout=30)
+        resp.raise_for_status()
+        return resp.json()
+    except RequestException as e:
+        raise RuntimeError(f"Error HTTP en batchUpdate al escribir en la hoja: {e}")
+
+# ------------------ ANKI HELPERS ------------------
+@st.cache_data(ttl=300) 
+def fetch_anki_stats(USUARIO_ACTUAL):
+    try:
+        DRIVE_JSON_ID = st.secrets["ID_DEL_JSON_FACUNDO"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ID_DEL_JSON_IVAN"]
+        URL = f"https://drive.google.com/uc?id={DRIVE_JSON_ID}"
+    except KeyError:
+        return None
+    try:
+        response = requests.get(URL)
+        response.raise_for_status()
+        return response.json()
+    except Exception:
+        return None
+
+# ------------------ EMAIL HELPERS ------------------
+def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
+    """Calcula los saldos y envía un correo personalizado a cada destinatario."""
+    try:
+        sender = st.secrets["sender"]
+        password = st.secrets["password_mail"]
+        # Asumimos que la lista de recipients es: [email_facundo, email_ivan]
+        recipients = st.secrets["recipients"]
+
+        # Mapa de usuario a email
+        # Asumiendo que Facundo es el primero y Iván el segundo en la lista de secrets.toml
+        if len(recipients) < 2:
+            print("Error: Se esperan al menos dos correos en la lista 'recipients'.")
+            return False
+
+        USER_EMAIL_MAP = {
+            "Facundo": recipients[0],
+            "Iván": recipients[1],
         }
+
+        # --- Lógica de Formato de Balance con Color y Signo ---
+        def format_balance_html(value, user):
+            """Aplica la lógica de signo (Iván: tal cual, Facundo: inverso) y formato con color."""
+            # Facundo lo ve inverso (-número) e Iván lo ve directo (número).
+            final_value = -value if user == "Facundo" else value
+            
+            if final_value > 0:
+                color = "#00e676" # Verde
+                sign_str = f"+${final_value:.2f}"
+            elif final_value < 0:
+                color = "#ff1744" # Rojo
+                sign_str = f"-${abs(final_value):.2f}"
+            else:
+                color = "#ffffff" # Blanco
+                sign_str = "$0.00"
+
+            # Retorna el valor formateado con HTML para el color
+            return f'<div style="color: {color}; font-size: 2.5rem; font-weight: bold; text-align: center; padding: 20px;">{sign_str}</div>'
+
+        # 2. Abrir conexión SMTP una sola vez
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender, password)
+        
+        exito = True
+
+        for user, email in USER_EMAIL_MAP.items():
+            if not email:
+                continue
+
+            # 3. Generar contenido personalizado
+            balance_html = format_balance_html(balance_raw, user)
+
+            msg = MIMEMultipart()
+            msg['From'] = sender
+            msg['To'] = email # Un solo destinatario por correo
+            msg['Subject'] = f"📊 Tu Balance Acumulado - {date.today().strftime('%d/%m')}" 
+
+            # Contenido simplificado sin mencionar al otro usuario.
+            html_content = f"""
+            <html>
+            <body style="
+                font-family: Arial, sans-serif;
+                background-color: #1e1e1e;
+                color: #ffffff;
+                padding: 20px 0;
+            ">
+                <p style="color: #ccc; text-align: center;">
+                    Este es tu balance actual:
+                </p>
+                
+                {balance_html}
+
+                <hr style="border-color: #444; margin: 20px 0;">
+                <div style="
+                    max-width: 350px; 
+                    margin: 0 auto; 
+                    text-align: center;
+                ">
+                    <p style="font-size: 0.9em; color: #888; text-align: center;">
+                        <i>Se envía automáticamente cuando alguno entra por primera vez en el día (5:00 a 22:00).</i><br>
+                    </p>
+                </div>
+            </body>
+            </html>
+            """
+            
+            msg.attach(MIMEText(html_content, 'html'))
+            
+            # 4. Enviar mail
+            try:
+                server.sendmail(sender, email, msg.as_string())
+                print(f"Email de balance enviado a {user} ({email})")
+            except Exception as e:
+                print(f"Error enviando email a {user} ({email}): {e}")
+                exito = False
+
+
+        # 5. Cerrar conexión
+        server.quit()
+        return exito
+
+    except Exception as e:
+        print(f"Error crítico en el proceso de envío de email: {e}")
+        return False
+
+# ------------------ CONSTANTES Y ESTRUCTURAS ------------------
+FILA_BASE = 170
+FECHA_BASE = date(2025, 12, 2)
+SHEET_FACUNDO = "F. Idiomas"
+SHEET_IVAN = "I. Idiomas"
+SHEET_MARCAS = "marcas"
+RANGO_FECHA_MAIL = f"'{SHEET_MARCAS}'!M1" 
+
+def get_time_row():
+    hoy = _argentina_now_global().date()
+    delta = (hoy - FECHA_BASE).days
+    return FILA_BASE + delta
+
+TIME_ROW = get_time_row()
+MARCAS_ROW = 3
+WEEK_RANGE = f"'{SHEET_MARCAS}'!R{TIME_ROW}"
+
+USERS = {
+    "Facundo": {
+        "Matemática 2": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"},
+        "Matemática 3": {"time": f"'{SHEET_FACUNDO}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!C{MARCAS_ROW}"},
+        "Macroeconomía 1": {"time": f"'{SHEET_FACUNDO}'!D{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!D{MARCAS_ROW}"},
+        "Historia":        {"time": f"'{SHEET_FACUNDO}'!E{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!E{MARCAS_ROW}"},
+    },
+    "Iván": {
+        "Física":    {"time": f"'{SHEET_IVAN}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!F{MARCAS_ROW}"},
+        "Análisis": {"time": f"'{SHEET_IVAN}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!G{MARCAS_ROW}"},
     }
 }
 
-def get_user_language_config():
-    """Obtiene la configuración de idiomas específica para el usuario actual.
+RANGO_RATE_FACU = f"'{SHEET_MARCAS}'!C{TIME_ROW}"
+RANGO_RATE_IVAN = f"'{SHEET_MARCAS}'!B{TIME_ROW}"
+RANGO_OBJ_FACU = f"'{SHEET_MARCAS}'!P{TIME_ROW}"
+RANGO_OBJ_IVAN = f"'{SHEET_MARCAS}'!O{TIME_ROW}"
+
+# ------------------ CARGA UNIFICADA (cacheada) ------------------
+@st.cache_data()
+def cargar_datos_unificados():
+    all_ranges = []
+    mapa_indices = {"materias": {}, "rates": {}, "objs": {}, "week": None, "mail_date": None}
+    idx = 0
+    for user, materias in USERS.items():
+        for m, info in materias.items():
+            all_ranges.append(info["est"]); mapa_indices["materias"][(user, m, "est")] = idx; idx += 1
+            all_ranges.append(info["time"]); mapa_indices["materias"][(user, m, "time")] = idx; idx += 1
+    all_ranges.append(RANGO_RATE_FACU); mapa_indices["rates"]["Facundo"] = idx; idx += 1
+    all_ranges.append(RANGO_RATE_IVAN); mapa_indices["rates"]["Iván"] = idx; idx += 1
+    all_ranges.append(RANGO_OBJ_FACU); mapa_indices["objs"]["Facundo"] = idx; idx += 1
+    all_ranges.append(RANGO_OBJ_IVAN); mapa_indices["objs"]["Iván"] = idx; idx += 1
+    all_ranges.append(WEEK_RANGE); mapa_indices["week"] = idx; idx += 1
     
-    Returns:
-        tuple: (config_plana, config_por_categoria)
-    """
-    config_plana = {}
-    current_user = get_current_user()
+    # Agregamos la fecha del mail al batch
+    all_ranges.append(RANGO_FECHA_MAIL); mapa_indices["mail_date"] = idx; idx += 1
 
-    # Obtener las categorías de idiomas para el usuario actual
-    user_languages = USUARIOS_IDIOMAS.get(current_user, {})
-    
-    for category, languages in user_languages.items():
-        sheet_name = category # El nombre de la categoría es el nombre de la hoja
-        for lang, ranges in languages.items():
-            # La clave única para el estado de sesión será "Categoría: Idioma"
-            full_name = f"{category}: {lang}"
-            
-            # Construir el rango completo con el nombre de la hoja correcto
-            # Si el nombre de la hoja tiene espacios, debe ir entre comillas simples.
-            config_plana[full_name] = {
-                # Ej: "'F. Idiomas'!C"
-                "daily_range_template": f"'{sheet_name}'!{ranges['time_col']}",
-                # Ej: "'F. Idiomas'!D3"
-                "total_cell_range": f"'{sheet_name}'!{ranges['total_cell']}"
-            }
-            
-    return config_plana, user_languages
-
-# FILA DE INICIO PARA EL REGISTRO DIARIO
-TIME_RANGE_START_ROW = 170 
-START_DATE = date(2024, 1, 1) # Fecha que corresponde a la fila 170 (Día 0 delta)
-
-# ------------------ HELPERS DE GOOGLE SHEETS ------------------
-
-@st.cache_resource(show_spinner="Conectando a Google Sheets...")
-def get_client():
-    """Inicializa y devuelve el cliente de gspread."""
-    if not SHEET_ID or not CREDS_JSON:
-        st.error("Error de configuración: SHEET_ID o gcp_service_account no encontrados en secrets.")
-        return None
-        
     try:
-        # Si CREDS_JSON es una cadena, la parseamos a un diccionario.
-        if isinstance(CREDS_JSON, str):
-            creds_info = json.loads(CREDS_JSON)
-        else:
-            creds_info = CREDS_JSON
-
-        creds = service_account.Credentials.from_service_account_info(
-            creds_info, 
-            scopes=['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-        )
-        client = gspread.authorize(creds)
-        return client
+        res = sheets_batch_get(st.secrets["sheet_id"], all_ranges)
     except Exception as e:
-        # Manejo más específico del error de JSON
-        if isinstance(e, json.JSONDecodeError):
-            st.error(f"Error al inicializar Google Sheets: No se pudo decodificar el JSON de credenciales. Revisa el formato de service_account en tus secrets.")
-        else:
-            st.error(f"Error al inicializar Google Sheets: {e}")
-        return None
+        st.error(f"Error API Google Sheets: {e}")
+        st.stop()
 
-def batch_read(ranges):
-    """Lee un conjunto de rangos no contiguos de forma eficiente (Opción A).
-       Los rangos deben incluir el nombre de la hoja (ej: 'F. Idiomas'!C170).
-    """
-    client = get_client()
-    if not client: return [''] * len(ranges)
+    values = res.get("valueRanges", [])
+    def get_val(i, default=""):
+        if i >= len(values): return default
+        vr = values[i]; rows = vr.get("values", [])
+        if not rows: return default
+        return rows[0][0] if rows[0] else default
+
+    data_usuarios = {u: {"estado": {}, "tiempos": {}, "inicio_dt": None, "materia_activa": None} for u in USERS}
+    materia_en_curso = None
+    inicio_dt = None
+
+    for user, materias in USERS.items():
+        for m in materias:
+            idx_est = mapa_indices["materias"][(user, m, "est")]
+            raw_est = get_val(idx_est)
+            data_usuarios[user]["estado"][m] = raw_est
+
+            idx_time = mapa_indices["materias"][(user, m, "time")]
+            raw_time = get_val(idx_time)
+            secs = parse_time_cell_to_seconds(raw_time)
+            data_usuarios[user]["tiempos"][m] = segundos_a_hms(secs)
+
+            if user == st.session_state.get("usuario_seleccionado") and str(raw_est).strip() != "":
+                try:
+                    inicio_dt = parse_datetime(raw_est)
+                    materia_en_curso = m
+                except Exception:
+                    pass
+
+    resumen = {
+        "Facundo": {"per_min": parse_float_or_zero(get_val(mapa_indices["rates"]["Facundo"])), "obj": parse_float_or_zero(get_val(mapa_indices["objs"]["Facundo"]))},
+        "Iván": {"per_min": parse_float_or_zero(get_val(mapa_indices["rates"]["Iván"])), "obj": parse_float_or_zero(get_val(mapa_indices["objs"]["Iván"]))}
+    }
+    raw_week = get_val(mapa_indices["week"], "0")
+    balance_val = parse_float_or_zero(raw_week)
     
-    try:
-        # Abrimos el SpreadSheet completo. Esto es clave para que los rangos con nombre de hoja funcionen.
-        spreadsheet = client.open_by_key(SHEET_ID)
-        
-        # Usamos values_batch_get en el objeto Spreadsheet
-        results = spreadsheet.values_batch_get(ranges)['valueRanges']
-        
-        final_values = []
-        for result_set in results:
-            # Intentamos obtener el primer valor de la primera fila, si existe
-            values = result_set.get('values', [])
-            if values and values[0] and values[0][0]:
-                final_values.append(values[0][0])
-            else:
-                final_values.append('')
-        
-        return final_values
-        
-    except Exception as e:
-        st.error(f"Error al leer rangos {ranges}: {e}")
-        return [''] * len(ranges) # Devolvemos vacíos para evitar rotura
+    last_mail_date = get_val(mapa_indices["mail_date"], "")
 
+    if "usuario_seleccionado" in st.session_state:
+        st.session_state["materia_activa"] = materia_en_curso
+        st.session_state["inicio_dt"] = inicio_dt
+
+    return {
+        "users_data": data_usuarios, 
+        "resumen": resumen, 
+        "balance": balance_val,
+        "last_mail_date": last_mail_date
+    }
 
 def batch_write(updates):
-    """Escribe un conjunto de valores en pares (rango, valor).
-       Los rangos deben incluir el nombre de la hoja (ej: 'F. Idiomas'!C170).
-    """
-    client = get_client()
-    if not client: return
-
-    updates_list = [
-        {
-            'range': range_str,
-            'values': [[value]] # Formato requerido: lista de listas
-        } for range_str, value in updates
-    ]
-    
     try:
-        # Abrimos el SpreadSheet completo. Esto es clave para que los rangos con nombre de hoja funcionen.
-        spreadsheet = client.open_by_key(SHEET_ID)
-        # Usamos batch_update en el objeto Spreadsheet.
-        spreadsheet.batch_update(updates_list, value_input_option='USER_ENTERED')
+        sheets_batch_update(st.secrets["sheet_id"], updates)
+        cargar_datos_unificados.clear()
     except Exception as e:
-        st.error(f"Error al escribir en Google Sheets: {e}")
-        # No propagamos, solo mostramos el error
+        st.error(f"Error escribiendo Google Sheets: {e}")
+        st.stop()
 
-def replace_row_in_range(range_template, row_number):
-    """Reemplaza el marcador de rango con el número de fila.
-       Ej: "'F. Idiomas'!C" + "170" -> "'F. Idiomas'!C170"
-    """
-    return range_template + str(row_number)
-
-
-def get_time_row():
-    """Calcula la fila objetivo para el día de hoy, a partir de TIME_RANGE_START_ROW."""
-    today_arg = get_today_argentina()
-    delta = today_arg - START_DATE
-    # La fila 170 corresponde al día 0 de la delta (delta.days = 0)
-    target_row = delta.days + TIME_RANGE_START_ROW
-    return target_row
-
-# ------------------ HELPERS DE TIEMPO ------------------
-
-def hms_a_segundos(hms_str):
-    """Convierte HH:MM:SS a segundos."""
-    if not hms_str:
-        return 0
-    
-    # Intenta encontrar HH:MM:SS (o H:MM:SS)
-    match = re.match(r'(\d+):(\d{2}):(\d{2})', hms_str)
-    if match:
-        h, m, s = map(int, match.groups())
-        return h * 3600 + m * 60 + s
-    
-    # Intenta encontrar MM:SS (si no hay HH, asume 00:MM:SS)
-    match_ms = re.match(r'(\d{1,2}):(\d{2})', hms_str)
-    if match_ms:
-        m, s = map(int, match_ms.groups())
-        return m * 60 + s
-
-    # Si es solo un número (segs)
+def start_materia_callback(usuario, materia):
     try:
-        return int(hms_str)
-    except ValueError:
-        return 0
-
-
-def segundos_a_hms(total_segundos):
-    """Convierte segundos a HH:MM:SS."""
-    if total_segundos < 0:
-        total_segundos = 0
-        
-    horas = int(total_segundos // 3600)
-    minutos = int((total_segundos % 3600) // 60)
-    segundos = int(total_segundos % 60)
-    
-    return f"{horas:02d}:{minutos:02d}:{segundos:02d}"
-
-# ------------------ LÓGICA DE ESTADO Y CALLBACKS ------------------
-
-def pedir_rerun():
-    """Fuerza la recarga de la aplicación después de una acción."""
-    if 'rerun_pending' not in st.session_state:
-        st.session_state.rerun_pending = True
-        st.rerun()
-
-def sanitize_key(text):
-    """Sanea un string para usar como key de Streamlit."""
-    return re.sub(r'[^a-zA-Z0-9_]', '_', text)
-
-def start_study(full_materia_name):
-    """Inicia el estudio para la materia dada (Ej: 'F. Idiomas: Inglés')."""
-    st.session_state.materia_estudiando = full_materia_name
-    st.session_state.start_time = time.time()
-    st.session_state.is_paused = False
-    st.session_state.pause_time = 0
-    pedir_rerun()
-
-def pause_study():
-    """Pausa el estudio."""
-    if not st.session_state.is_paused:
-        st.session_state.is_paused = True
-        st.session_state.pause_start = time.time()
-    pedir_rerun()
-
-def resume_study():
-    """Reanuda el estudio (calcula el tiempo de pausa y lo agrega a pause_time)."""
-    if st.session_state.is_paused:
-        pause_duration = time.time() - st.session_state.pause_start
-        st.session_state.pause_time += pause_duration
-        st.session_state.is_paused = False
-    pedir_rerun()
-
-def stop_study():
-    """Detiene el estudio y guarda el tiempo en Google Sheets."""
-    full_materia_name = st.session_state.materia_estudiando
-    start_time = st.session_state.start_time
-    pause_time = st.session_state.pause_time
-    
-    # Limpieza inicial de estado para evitar re-entradas
-    st.session_state.materia_estudiando = None
-    st.session_state.start_time = None
-    st.session_state.is_paused = False
-    st.session_state.pause_time = 0
-
-    if not full_materia_name:
-        st.error("Error: No hay materia en curso para detener.")
-        pedir_rerun()
-        return
-
-    # Calcula el tiempo total neto
-    study_duration = time.time() - start_time - pause_time
-    study_duration = max(0, int(study_duration)) # Aseguramos que no sea negativo
-    
-    # Obtener configuración del idioma
-    lang_config, _ = get_user_language_config()
-    if full_materia_name not in lang_config:
-        st.error(f"Error: Configuración de idioma '{full_materia_name}' no encontrada para el usuario {get_current_user()}.")
-        pedir_rerun()
-        return
-
-    config = lang_config[full_materia_name]
-    # Usamos las nuevas claves de rango (que ya incluyen el nombre de la hoja)
-    daily_range_template = config["daily_range_template"]
-    total_cell = config["total_cell_range"]
-
-    # 1. Obtener la celda objetivo (diaria)
-    target_row = get_time_row()
-    daily_cell = replace_row_in_range(daily_range_template, target_row)
-
-    # 2. Leer el tiempo actual (diario y total)
-    try:
-        ranges = [daily_cell, total_cell]
-        daily_hms, total_hms = batch_read(ranges)
+        info = USERS[usuario][materia]
+        now_str = ahora_str()
+        updates = [(info["est"], now_str)] + [
+            (m_datos["est"], "")
+            for m_datos in USERS[usuario].values()
+            if m_datos is not None and m_datos is not info
+        ]
+        batch_write(updates)
+        st.session_state["materia_activa"] = materia
+        st.session_state["inicio_dt"] = parse_datetime(now_str)
     except Exception as e:
-        st.error(f"Error de lectura en Sheets antes de guardar: {e}")
+        st.error(f"start_materia error: {e}")
+    finally:
         pedir_rerun()
-        return
 
-    # 3. Sumar el tiempo de estudio
-    daily_segs = hms_a_segundos(daily_hms)
-    total_segs = hms_a_segundos(total_hms)
-    
-    new_daily_segs = daily_segs + study_duration
-    new_total_segs = total_segs + study_duration
-    
-    new_daily_hms = segundos_a_hms(new_daily_segs)
-    new_total_hms = segundos_a_hms(new_total_segs)
-
-    # 4. Escribir los nuevos tiempos
+def stop_materia_callback(usuario, materia):
     try:
-        batch_write([
-            (daily_cell, new_daily_hms), # Tiempo diario
-            (total_cell, new_total_hms)  # Tiempo total
-        ])
-        
-        st.success(f"Tiempo de **{segundos_a_hms(study_duration)}** guardado en **{full_materia_name}**.")
+        info = USERS[usuario][materia]
+        inicio = st.session_state.get("inicio_dt")
+        prev_est = ""
+        if inicio is None or st.session_state.get("materia_activa") != materia:
+            st.warning("Marca de inicio no encontrada en session_state, releyendo de la hoja...")
+            try:
+                res = sheets_batch_get(st.secrets["sheet_id"], [info["est"]])
+                vr = res.get("valueRanges", [{}])[0]
+                prev_est = vr.get("values", [[""]])[0][0] if vr.get("values") else ""
+                if not prev_est:
+                      st.error("No hay marca de inicio registrada (no se puede detener).")
+                      pedir_rerun()
+                      return
+                inicio = parse_datetime(prev_est)
+            except Exception as e:
+                 st.error(f"Error leyendo marca de inicio de la hoja: {e}")
+                 pedir_rerun()
+                 return
+
+        fin = _argentina_now_global()
+        if fin <= inicio:
+            st.error("Tiempo inválido. La hora de fin es anterior a la de inicio.")
+            batch_write([(info["est"], "")])
+            pedir_rerun()
+            return
+
+        midnight = datetime.combine(inicio.date() + timedelta(days=1), dt_time(0,0)).replace(tzinfo=inicio.tzinfo)
+        partes = []
+        if inicio.date() == fin.date():
+            partes.append((inicio, fin))
+        else:
+            partes.append((inicio, midnight))
+            partes.append((midnight, fin))
+
+        updates = []
+        for (p_inicio, p_fin) in partes:
+            segs = int((p_fin - p_inicio).total_seconds())
+            target_row = FILA_BASE + (p_inicio.date() - FECHA_BASE).days
+            time_cell_for_row = replace_row_in_range(info["time"], target_row)
+            try:
+                res2 = sheets_batch_get(st.secrets["sheet_id"], [time_cell_for_row])
+                vr2 = res2.get("valueRanges", [{}])[0]
+                prev_raw = vr2.get("values", [[""]])[0][0] if vr2.get("values") else ""
+            except:
+                prev_raw = ""
+            new_secs = parse_time_cell_to_seconds(prev_raw) + segs
+            updates.append((time_cell_for_row, segundos_a_hms(new_secs)))
+
+        updates.append((info["est"], ""))
+        batch_write(updates)
+        st.session_state["materia_activa"] = None
+        st.session_state["inicio_dt"] = None
     except Exception as e:
-        st.error(f"Error de escritura en Sheets: {e}")
-        
-    pedir_rerun()
-
-
-# ------------------ VISTAS DE PÁGINA ------------------
-
-def display_timer(full_materia_name):
-    """Muestra el cronómetro y los botones de control."""
-    elapsed_time = time.time() - st.session_state.start_time
-    
-    is_paused = st.session_state.get("is_paused", False)
-    
-    if is_paused:
-        current_duration = elapsed_time - st.session_state.pause_time
-        status_text = "⏸️ PAUSADO"
-        control_label = "▶️ Reanudar"
-        on_click_action = resume_study
-    else:
-        current_duration = elapsed_time - st.session_state.pause_time
-        status_text = "🔴 EN CURSO"
-        control_label = "⏸️ Pausar"
-        on_click_action = pause_study
-
-    # Convertir a formato HH:MM:SS
-    display_time = segundos_a_hms(int(current_duration))
-    
-    st.title(full_materia_name)
-    st.markdown(f"### {status_text}")
-    st.markdown(f"<h1 style='font-size: 5rem; text-align: center; color: #1E90FF;'>{display_time}</h1>", unsafe_allow_html=True)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        # Botón de Stop
-        st.markdown('<div class="btn-stop">', unsafe_allow_html=True)
-        st.button("🛑 Terminar y Guardar", key="stop_btn", on_click=stop_study, use_container_width=True, help="Detiene el estudio y registra el tiempo en la hoja de cálculo.")
-        st.markdown('</div>', unsafe_allow_html=True)
-    with col2:
-        # Botón de control (Pausar/Reanudar)
-        st.markdown('<div class="btn-pause">', unsafe_allow_html=True)
-        st.button(control_label, key="control_btn", on_click=on_click_action, use_container_width=True, help="Controla el estado del cronómetro.")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# ------------------ PÁGINA PRINCIPAL ------------------
+        st.error(f"stop_materia error: {e}")
+    finally:
+        pedir_rerun()
 
 def main():
-    """Función principal de la aplicación de idiomas."""
     cargar_estilos()
 
-    # Verificar si hay un estudio en curso y mostrar el temporizador
-    if st.session_state.get("materia_estudiando"):
-        display_timer(st.session_state.materia_estudiando)
-        
-        # Si no está pausado, recargar para actualizar el tiempo
-        if not st.session_state.get("is_paused", False):
-            time.sleep(10)
+    if st.session_state.get("_do_rerun", False):
+        st.session_state["_do_rerun"] = False
+        st.rerun()
+
+    try:
+        params = st.query_params
+    except Exception:
+        params = st.experimental_get_query_params()
+
+    if "usuario_seleccionado" not in st.session_state:
+        def set_user_and_rerun(u):
+            st.session_state["usuario_seleccionado"] = u
             st.rerun()
-        
-        return
 
-    # Reiniciar estado de rerun_pending si existe
-    if 'rerun_pending' in st.session_state:
-        del st.session_state.rerun_pending
-
-    # 1. Obtener la configuración plana y las categorías para el usuario actual
-    language_config, user_language_categories = get_user_language_config()
-    
-    # Si el usuario no tiene idiomas definidos, mostramos un error
-    if not language_config:
-        st.error(f"No hay idiomas configurados para el usuario: {get_current_user()}.")
-        return
-
-    # 2. Inicializar o cargar datos
-    if "data_loaded" not in st.session_state:
-        st.session_state.data_loaded = False
-        st.session_state.time_data = {} # Almacena {full_materia_name: {daily_hms, total_hms, daily_range, total_range}}
-        
-    # 3. Si los datos no están cargados, cargarlos de Sheets
-    if not st.session_state.data_loaded:
-        with st.spinner("Cargando datos de Google Sheets..."):
-            
-            target_row = get_time_row()
-            all_ranges_to_read = []
-            
-            # Construir la lista de rangos a leer
-            for full_name, config in language_config.items():
-                # Usamos la plantilla de rango que ya tiene el nombre de la hoja
-                daily_range = replace_row_in_range(config["daily_range_template"], target_row)
-                total_range = config["total_cell_range"]
-                
-                # Guardamos los rangos para la lectura en lote
-                all_ranges_to_read.append(daily_range)
-                all_ranges_to_read.append(total_range)
-                
-                # También pre-inicializamos el estado con los rangos
-                st.session_state.time_data[full_name] = {
-                    "daily_range": daily_range,
-                    "total_range": total_range,
-                    "daily_hms": "00:00:00",
-                    "total_hms": "00:00:00"
-                }
-
-            # Lectura en lote
+        if "f" in params: set_user_and_rerun("Facundo")
+        if "i" in params: set_user_and_rerun("Iván")
+        if "user" in params:
             try:
-                values = batch_read(all_ranges_to_read)
-                
-                # Asignar los valores leídos al estado
-                idx = 0
-                for full_name in st.session_state.time_data.keys():
-                    # Usamos 'or "00:00:00"' para manejar celdas vacías
-                    st.session_state.time_data[full_name]["daily_hms"] = values[idx] or "00:00:00"
-                    st.session_state.time_data[full_name]["total_hms"] = values[idx + 1] or "00:00:00"
-                    idx += 2
-                    
-                st.session_state.data_loaded = True
-                
-            except Exception as e:
-                # El error ya fue reportado en batch_read
-                st.session_state.data_loaded = False 
-                return
-            
-            # Si la carga fue exitosa, forzamos el rerun para mostrar los datos
-            if st.session_state.data_loaded:
-                st.rerun() 
-                return
+                uval = params["user"][0].lower() if isinstance(params["user"], (list, tuple)) else str(params["user"]).lower()
+            except:
+                uval = str(params["user"]).lower()
+            if uval in ["facu", "facundo"]: set_user_and_rerun("Facundo")
+            if uval in ["ivan", "iván", "iva"]: set_user_and_rerun("Iván")
 
+        if "usuario_seleccionado" not in st.session_state:
+            st.markdown("<h1 style='text-align: center; margin-bottom: 30px;'>¿Quién sos?</h1>", unsafe_allow_html=True)
+            if st.button("👤 Facundo", use_container_width=True):
+                st.session_state["usuario_seleccionado"] = "Facundo"
+                st.rerun()
+            st.write("")
+            if st.button("👤 Iván", use_container_width=True):
+                st.session_state["usuario_seleccionado"] = "Iván"
+                st.rerun()
+            st.stop()
 
-    # 4. VISTA: Mostrar las tarjetas por categoría (F. Idiomas / I. Idiomas)
-    st.header(f"Lista de Idiomas a Estudiar para {get_current_user()}")
+    # --- Carga de datos ---
+    datos_globales = cargar_datos_unificados()
+    datos = datos_globales["users_data"]
+    resumen_marcas = datos_globales["resumen"]
+    balance_val_raw = datos_globales["balance"]
+    last_mail_date_str = datos_globales["last_mail_date"]
+
+    # ------------------ LOGICA ENVIO EMAIL DIARIO ------------------
+    now = _argentina_now_global()
+    today_str = now.strftime("%Y-%m-%d")
     
-    # Usamos user_language_categories (filtrado por usuario)
-    for category, languages in user_language_categories.items(): 
-        st.subheader(f"🌐 {category}")
-        
-        # Usamos columnas fluidas para mostrar los idiomas dentro de la categoría
-        lang_names = list(languages.keys())
-        # Aseguramos que haya al menos una columna si no hay idiomas, aunque la lista debería estar vacía
-        cols = st.columns(len(lang_names) if lang_names else 1) 
-        
-        for i, lang_name in enumerate(lang_names):
-            full_materia_name = f"{category}: {lang_name}"
-            data = st.session_state.time_data.get(full_materia_name, {})
-            
-            # Contenedor para cada idioma
-            with cols[i].container(border=True): 
-                st.markdown(f"**{lang_name}**")
-                st.markdown(f"**Total acumulado:** {data.get('total_hms', '00:00:00')}")
-                st.markdown(f"**Tiempo hoy:** {data.get('daily_hms', '00:00:00')}")
-                
-                # Botón de Empezar
-                st.markdown('<div class="btn-start">', unsafe_allow_html=True)
-                st.button(
-                    f"▶️ Empezar {lang_name}", 
-                    key=f"start_{sanitize_key(full_materia_name)}", 
-                    on_click=start_study, 
-                    args=(full_materia_name,), 
-                    use_container_width=True
-                )
-                st.markdown('</div>', unsafe_allow_html=True)
-                
-                # Formulario de corrección de tiempo
-                with st.expander("Corregir tiempo de hoy"):
-                    correction_key = f"input_{sanitize_key(full_materia_name)}"
-                    
-                    # Usamos el tiempo actual como valor por defecto
-                    default_value = data.get('daily_hms', '00:00:00')
-                    val = st.text_input("HH:MM:SS de corrección:", key=correction_key, value=default_value)
-                    
-                    # Botón de corrección
-                    def save_correction_callback(materia_key_closure):
-                        try:
-                            val = st.session_state[f"input_{sanitize_key(materia_key_closure)}"]
-                            current_data = st.session_state.time_data[materia_key_closure]
-                            
-                            # 1. Calcular diferencia
-                            old_daily_segs = hms_a_segundos(current_data['daily_hms'])
-                            new_daily_segs = hms_a_segundos(val)
-                            
-                            delta_segs = new_daily_segs - old_daily_segs
-                            
-                            # 2. Corregir tiempo total
-                            total_segs = hms_a_segundos(current_data['total_hms'])
-                            new_total_segs = total_segs + delta_segs
-                            new_total_hms = segundos_a_hms(new_total_segs)
+    # Chequeamos hora (7 AM a 10 PM) y si ya se mandó hoy
+    if 7 <= now.hour < 22:
+        if last_mail_date_str != today_str:
+            # Enviamos el mail
+            exito = enviar_reporte_email(datos, resumen_marcas, balance_val_raw)
+            if exito:
+                st.toast(f"📧 Reporte diario enviado ({today_str})")
+                # Actualizamos la celda de la fecha
+                batch_write([(RANGO_FECHA_MAIL, today_str)])
+            else:
+                pass # Falló silenciosamente o lo logueamos en consola
+    # ----------------------------------------------------------------
 
-                            # 3. Preparar escritura
-                            daily_cell = current_data["daily_range"]
-                            total_cell = current_data["total_range"]
-                            
-                            batch_write([
-                                (daily_cell, val),       # Nuevo tiempo diario
-                                (total_cell, new_total_hms) # Nuevo tiempo total
-                            ])
-                            st.success(f"Tiempo de {materia_key_closure} corregido correctamente.")
-                            
-                            # Forzamos la recarga de datos
-                            st.session_state.data_loaded = False 
-                            
-                        except Exception as e:
-                            st.error(f"Error al corregir el tiempo: {e}")
-                        finally:
-                            pedir_rerun()
-                    
-                    if st.button("Guardar Corrección", key=f"save_{sanitize_key(full_materia_name)}", on_click=save_correction_callback, args=(full_materia_name,), use_container_width=True):
-                        pass # La acción está en on_click
+    USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
+
+    materia_en_curso = st.session_state.get("materia_activa")
+    inicio_dt = st.session_state.get("inicio_dt")
+
+    if materia_en_curso is None:
+        for m, est_raw in datos[USUARIO_ACTUAL]["estado"].items():
+            if str(est_raw).strip() != "":
+                try:
+                    inicio_dt_sheet = parse_datetime(est_raw)
+                    st.session_state["materia_activa"] = m
+                    st.session_state["inicio_dt"] = inicio_dt_sheet
+                    materia_en_curso = m
+                    inicio_dt = inicio_dt_sheet
+                except Exception:
+                    pass
+                break
+
+    usuario_estudiando = materia_en_curso is not None
+
+    placeholder_materias = {m: st.empty() for m in USERS[USUARIO_ACTUAL]}
+
+    while True:
+        tiempo_anadido_seg = 0
+        if usuario_estudiando and inicio_dt is not None:
+            tiempo_anadido_seg = int((_argentina_now_global() - inicio_dt).total_seconds())
+
+            # ------------------ ANKI STATS ------------------
+            anki_data = fetch_anki_stats(USUARIO_ACTUAL)
+            C_MATURE, C_YOUNG, C_OTHER = "#31A354", "#74C476", "#BDBDBD"
             
+            if anki_data:
+                with st.expander("Anki"):
+                    for deck_name, stats in anki_data.items():
+                        if isinstance(stats, dict) and 'total' not in stats:
+                            st.markdown(f"## {deck_name}", unsafe_allow_html=True)
+                            for subdeck_name, sub_stats in stats.items():
+                                if not isinstance(sub_stats, dict): continue
+                                a_total = sub_stats.get("total", 0)
+                                a_young = sub_stats.get("young", 0)
+                                a_mature = sub_stats.get("mature", 0)
+                                a_other = max(0, a_total - a_mature - a_young)
+                                if a_total > 0:
+                                    p_mat = (a_mature / a_total) * 100
+                                    p_you = (a_young / a_total) * 100
+                                    p_oth = (a_other / a_total) * 100
+                                else:
+                                    p_mat, p_you, p_oth = 0, 0, 0
+                                st.markdown(f"**{subdeck_name}** <span style='color:#888; font-size:0.8em;'>({a_total} cartas)</span>", unsafe_allow_html=True)
+                                st.markdown(f"""
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 2px; color: #ccc;">
+                                        <span style="color: {C_MATURE};">Maduras: {a_mature} ({p_mat:.0f}%)</span>
+                                        <span style="color: {C_YOUNG};">Jóvenes: {a_young} ({p_you:.0f}%)</span>
+                                        <span style="color: {C_OTHER};">Otros: {a_other}</span>
+                                    </div>
+                                    <div style="width: 100%; height: 15px; border-radius: 5px; overflow: hidden; display: flex; border: 1px solid #444; margin-bottom: 15px;">
+                                        <div title="Mature" style="background-color: {C_MATURE}; width: {p_mat}%; height: 100%;"></div>
+                                        <div title="Young" style="background-color: {C_YOUNG}; width: {p_you}%; height: 100%;"></div>
+                                        <div title="Otros" style="background-color: {C_OTHER}; width: {p_oth}%; height: 100%;"></div>
+                                    </div>
+                                """, unsafe_allow_html=True)
+                        elif isinstance(stats, dict) and 'total' in stats: 
+                            a_total = stats.get("total", 0)
+                            a_young = stats.get("young", 0)
+                            a_mature = stats.get("mature", 0)
+                            a_other = max(0, a_total - a_mature - a_young)
+                            if a_total > 0:
+                                p_mat = (a_mature / a_total) * 100
+                                p_you = (a_young / a_total) * 100
+                                p_oth = (a_other / a_total) * 100
+                            else:
+                                p_mat, p_you, p_oth = 0, 0, 0
+                            st.markdown(f"**{deck_name}** <span style='color:#888; font-size:0.8em;'>({a_total} cartas)</span>", unsafe_allow_html=True)
+                            st.markdown(f"""
+                                <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 2px; color: #ccc;">
+                                    <span style="color: {C_MATURE};">Mat: {a_mature} ({p_mat:.0f}%)</span>
+                                    <span style="color: {C_YOUNG};">Yng: {a_young} ({p_you:.0f}%)</span>
+                                    <span style="color: {C_OTHER};">Oth: {a_other}</span>
+                                </div>
+                                <div style="width: 100%; height: 15px; border-radius: 5px; overflow: hidden; display: flex; border: 1px solid #444; margin-bottom: 15px;">
+                                    <div title="Mature" style="background-color: {C_MATURE}; width: {p_mat}%; height: 100%;"></div>
+                                    <div title="Young" style="background-color: {C_YOUNG}; width: {p_you}%; height: 100%;"></div>
+                                    <div title="Otros" style="background-color: {C_OTHER}; width: {p_oth}%; height: 100%;"></div>
+                                </div>
+                            """, unsafe_allow_html=True)
+
+        st.subheader("Materias")
+        
+        # --- Actualizar Placeholders de Materias y Botones ---
+        mis_materias = USERS[USUARIO_ACTUAL]
+        for materia, info in mis_materias.items():
+
+            base_seg = hms_a_segundos(datos[USUARIO_ACTUAL]["tiempos"][materia])
+            tiempo_total_seg = base_seg
+            en_curso = materia_en_curso == materia
+
+            if en_curso:
+                tiempo_total_seg += max(0, tiempo_anadido_seg)
+
+            tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
+            badge_html = f'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''
+            html_card = f"""<div class="materia-card"><div class="materia-title">{materia}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
+
+            with placeholder_materias[materia].container():
+                st.markdown(html_card, unsafe_allow_html=True)
+
+                key_start = sanitize_key(f"start_{USUARIO_ACTUAL}_{materia}")
+                key_stop = sanitize_key(f"stop_{USUARIO_ACTUAL}_{materia}")
+                key_disabled = sanitize_key(f"dis_{USUARIO_ACTUAL}_{materia}")
+
+                cols = st.columns([1,1,1])
+                with cols[0]:
+                    if en_curso:
+                        st.button(f"⛔ DETENER {materia[:14]}", key=key_stop, use_container_width=True,
+                                  on_click=stop_materia_callback, args=(USUARIO_ACTUAL, materia))
+                    else:
+                        if materia_en_curso is None:
+                            st.button("▶ INICIAR", key=key_start, use_container_width=True,
+                                      on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia))
+                        else:
+                            st.button("...", disabled=True, key=key_disabled, use_container_width=True)
+
+                with cols[1]:
+                    with st.expander("🛠️ Corregir tiempo manualmente"):
+                        input_key = f"input_{sanitize_key(materia)}"
+                        new_val = st.text_input("Tiempo (HH:MM:SS)", value=datos[USUARIO_ACTUAL]["tiempos"][materia], key=input_key)
+
+                        def save_correction_callback(materia_key):
+                            if st.session_state.get("materia_activa") is not None:
+                                st.error("⛔ No podés corregir el tiempo mientras estás estudiando.")
+                                pedir_rerun()
+                                return
+
+                            val = st.session_state.get(f"input_{sanitize_key(materia_key)}", "").strip()
+                            if ":" not in val:
+                                st.error("Formato inválido (debe ser HH:MM:SS)")
+                                pedir_rerun()
+                                return
+
+                            try:
+                                segs = hms_a_segundos(val)
+                                hhmmss = segundos_a_hms(segs)
+                                target_row = get_time_row()  # recalculamos por si cambió
+                                time_cell_for_row = replace_row_in_range(USERS[USUARIO_ACTUAL][materia_key]["time"], target_row)
+                                batch_write([(time_cell_for_row, hhmmss)])
+                                st.success("Tiempo corregido correctamente.")
+                            except Exception as e:
+                                st.error(f"Error al corregir el tiempo: {e}")
+                            finally:
+                                pedir_rerun()
+
+                        if en_curso or usuario_estudiando:
+                            st.info("⛔ No podés corregir el tiempo mientras estás estudiando.")
+                        else:
+                            if st.button("Guardar Corrección", key=f"save_{sanitize_key(materia)}", on_click=save_correction_callback, args=(materia,)):
+                                pass
+
+        if not usuario_estudiando:
+            st.stop()
+
+        time.sleep(10)
+        st.rerun()
 
 if __name__ == "__main__":
     try:

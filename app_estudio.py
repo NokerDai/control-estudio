@@ -324,8 +324,6 @@ FECHA_BASE = date(2025, 12, 2)
 SHEET_FACUNDO = "F. Economía"
 SHEET_IVAN = "I. Física"
 SHEET_MARCAS = "marcas"
-# Celda donde guardaremos la fecha del último mail enviado.
-# Usamos M1 en la hoja 'marcas' (ajustar si está ocupada)
 RANGO_FECHA_MAIL = f"'{SHEET_MARCAS}'!M1" 
 
 def get_time_row():
