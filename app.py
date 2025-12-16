@@ -95,7 +95,7 @@ if st.session_state.authenticated:
             st.rerun()
 
 # ---------------------------------------------------------
-# VISTA DEL OTRO USUARIO (Visible para TODOS)
+# VISTA DEL OTRO USUARIO (Ahora con botones para navegar)
 # ---------------------------------------------------------
 
 st.sidebar.markdown("---") 
@@ -103,47 +103,80 @@ st.sidebar.markdown("---")
 otro_usuario = st.session_state.otro_usuario_nombre 
 st.sidebar.header(f"Vista de **{otro_usuario}**")
 
-# === Lógica de visualización de páginas (Solo lectura) ===
-otro_usuario_page = st.session_state.otro_usuario_current_page
-
-# 1. Estudio 
-if otro_usuario_page == "estudio":
-    st.sidebar.success(f"📚 Estudio (Activo)")
-else:
-    st.sidebar.info("📚 Estudio")
+# === Helper para crear la navegación de solo lectura ===
+def render_other_user_nav(page_name, icon):
+    # La página destino tendrá un prefijo 'otro_' para diferenciarla en el router
+    target_page = f"otro_{page_name}"
+    label = f"{icon} {page_name.capitalize()}"
     
-# 2. Idiomas 
-if otro_usuario_page == "idiomas":
-    st.sidebar.success(f"🌎 Idiomas (Activo)")
-else:
-    st.sidebar.info("🌎 Idiomas")
+    # Define si el otro usuario está 'activo' en esta página para poner el checkmark
+    otro_usuario_page = st.session_state.otro_usuario_current_page
 
-# 3. Hábitos (SOLO visible si el usuario actual está autenticado)
-# Solo Facundo (autenticado) puede ver la actividad de Hábitos (en este caso, la de Iván)
-if st.session_state.authenticated:
-    # Comprobamos si el otro usuario (Iván) está "viendo" su página de hábitos
-    if otro_usuario_page == "habitos":
-        st.sidebar.success(f"📅 Hábitos (Activo)")
+    # 1. Si el usuario actual está VIENDO esta página del otro
+    if st.session_state.current_page == target_page:
+        st.sidebar.success(f"{label} (Viendo)")
+    
+    # 2. Si el usuario actual NO está viendo la página, mostramos el botón
     else:
-        st.sidebar.info("📅 Hábitos")
+        # Añadir un indicador visual si el otro usuario está en esta página
+        display_label = label
+        if otro_usuario_page == page_name:
+            display_label = f"✅ {label}"
+        
+        if st.sidebar.button(display_label, key=f"btn_otro_{page_name}", use_container_width=True):
+            st.session_state.current_page = target_page
+            st.rerun()
+
+# 1. Estudio (Visible y navegable para cualquiera)
+render_other_user_nav("estudio", "📚")
+    
+# 2. Idiomas (Visible y navegable para cualquiera)
+render_other_user_nav("idiomas", "🌎")
+
+# 3. Hábitos (SOLO visible y navegable si el usuario actual está autenticado)
+if st.session_state.authenticated:
+    render_other_user_nav("habitos", "📅")
 else:
-    # Ocultamos la información de Hábitos al usuario Iván
-    st.sidebar.caption("🔒 Hábitos (Solo visible para administrador)")
+    st.sidebar.caption(f"🔒 Hábitos (Solo visible para Facundo)")
 
 
 # ---------------------------------------------------------
 # ROUTER (Decide qué app mostrar)
 # ---------------------------------------------------------
 
-# 1. Si eligió "habitos" Y está autenticado (Facundo), mostramos Hábitos
-if st.session_state.current_page == "habitos" and st.session_state.authenticated:
+current_page = st.session_state.current_page
+
+# 1. NAVEGACIÓN PROPIA
+
+# Si eligió "habitos" Y está autenticado (Facundo), mostramos Hábitos
+if current_page == "habitos" and st.session_state.authenticated:
     st.session_state.pw_correct = True
     app_habitos.run()
-
-# 2. Si eligió "idiomas" (Autenticado o no), mostramos Idiomas
-elif st.session_state.current_page == "idiomas":
+    
+# Si eligió "idiomas" (Autenticado o no), mostramos Idiomas propio
+elif current_page == "idiomas":
     app_idiomas.main() 
 
-# 3. En cualquier otro caso (Estudio)
-else:
+# 2. NAVEGACIÓN DEL OTRO USUARIO (Vistas de solo lectura)
+
+# Si eligió ver los Hábitos del otro Y está autenticado
+elif current_page == "otro_habitos" and st.session_state.authenticated:
+    st.title(f"👀 Vista de {st.session_state.otro_usuario_nombre} - Hábitos")
+    st.warning("⚠️ Esta es una vista de **solo lectura** del progreso de hábitos.")
+    st.info("Aquí iría el contenido de `app_habitos.run()` en modo visualización.")
+    
+# Si eligió ver los Idiomas del otro
+elif current_page == "otro_idiomas":
+    st.title(f"👀 Vista de {st.session_state.otro_usuario_nombre} - Idiomas")
+    st.warning("⚠️ Esta es una vista de **solo lectura** del progreso de idiomas.")
+    st.info("Aquí iría el contenido de `app_idiomas.main()` en modo visualización.")
+
+# Si eligió ver el Estudio del otro
+elif current_page == "otro_estudio":
+    st.title(f"👀 Vista de {st.session_state.otro_usuario_nombre} - Estudio")
+    st.warning("⚠️ Esta es una vista de **solo lectura** del progreso de estudio.")
+    st.info("Aquí iría el contenido de `app_estudio.main()` en modo visualización.")
+    
+# 3. En cualquier otro caso (Estudio propio)
+else: # current_page == "estudio"
     app_estudio.main()
