@@ -63,17 +63,16 @@ def parse_datetime(dt_str):
 SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
 ]
-# CORRECCIÓN FINAL: Usamos "sheet_id", que es la clave que existe en el secrets.
+# CORREGIDO: Usamos "sheet_id", que es la clave que existe en el secrets.
 SPREADSHEET_ID = st.secrets["sheet_id"] 
 
 # ------------------ CONSTANTES Y UTILS ------------------
 HOJA_ESTUDIO = "Estudio"
 USUARIO_ACTUAL = None # Se usa como variable global para la sesión
 
-# CORRECCIÓN DE SANITIZE_KEY: Convertir a minúsculas
+# CORRECCIÓN DE SANITIZE_KEY: Convertir a minúsculas para consistencia.
 def sanitize_key(text):
     """Sanitiza el texto y lo convierte a minúsculas para usarlo como clave."""
-    # Asume que el problema es la capitalización de nombres de usuario.
     return re.sub(r'[^a-zA-Z0-9_]', '', text).lower()
 
 def replace_row_in_range(cell_range, new_row):
@@ -97,10 +96,9 @@ def replace_row_in_range(cell_range, new_row):
 def get_service_account_credentials():
     try:
         # Load from streamlit secrets
-        # Usamos la clave correcta para las credenciales de servicio.
         info = st.secrets["service_account"] 
 
-        # CORRECCIÓN: Si es un string (que causa el error 'no attribute keys'),
+        # CORRECCIÓN: Si es un string (lo que causa el error 'no attribute keys'),
         # lo parseamos a diccionario.
         if isinstance(info, str):
             info = json.loads(info)
@@ -161,10 +159,14 @@ def pedir_rerun():
 # ------------------ DATOS ------------------
 @st.cache_data(ttl=3600, show_spinner="Cargando configuración de usuarios...")
 def cargar_configuracion_de_usuarios():
-    # Obtiene la hoja de configuración de usuarios (asumiendo que es la misma que estudio)
+    
+    # CORRECCIÓN DEL ERROR 400: Encerrar el nombre de la hoja en comillas simples 
+    # para evitar el error "Unable to parse range".
+    SHEET_RANGE = "'Config'!A1:Z100" 
+    
     response = google_sheets_api_call(
         'get',
-        'values/Config!A1:Z100',
+        f"values/{SHEET_RANGE}",
         params={'majorDimension': 'ROWS'}
     )
     if not response or 'values' not in response:
@@ -184,7 +186,7 @@ def cargar_configuracion_de_usuarios():
             continue
 
         user_name = row[0].strip() # Ej: "Facundo"
-        user_key = sanitize_key(user_name) # Ej: "facundo" (en minúsculas por la corrección)
+        user_key = sanitize_key(user_name) # Ej: "facundo"
         USERS_CONFIG[user_key] = {}
         
         # Procesar las materias o idiomas para el usuario
