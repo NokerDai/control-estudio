@@ -203,7 +203,7 @@ def fetch_anki_stats(USUARIO_ACTUAL):
     """Obtiene las estadísticas de Anki para el seguimiento de idiomas."""
     try:
         # **CAMBIO CLAVE: Usamos nuevas variables para los JSON de Anki de idiomas**
-        DRIVE_JSON_ID = st.secrets["ID_DEL_JSON_FACUNDO_IDIOMAS"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ID_DEL_JSON_IVAN_IDIOMAS"]
+        DRIVE_JSON_ID = st.secrets["ID_DEL_JSON_FACUNDO"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ID_DEL_JSON_IVAN"]
         URL = f"https://drive.google.com/uc?id={DRIVE_JSON_ID}"
     except KeyError:
         # Esto ocurrirá si no se definen las nuevas claves en secrets.toml
