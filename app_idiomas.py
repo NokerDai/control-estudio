@@ -1,0 +1,642 @@
+import re
+import json
+import time
+from datetime import datetime, date, timedelta, time as dt_time
+import streamlit as st
+from google.oauth2 import service_account
+from google.auth.transport.requests import AuthorizedSession
+from requests.exceptions import RequestException
+
+# ------------------ TIMEZONE HELPERS ------------------
+# Se asume que app_estudio usa esta estructura de timezones y helpers.
+try:
+    from zoneinfo import ZoneInfo
+    _HAS_ZONEINFO = True
+except Exception:
+    ZoneInfo = None
+    _HAS_ZONEINFO = False
+    try:
+        import pytz
+    except Exception:
+        pytz = None
+
+def _get_tzinfo(tz_str="America/Argentina/Buenos_Aires"):
+    if _HAS_ZONEINFO:
+        return ZoneInfo(tz_str)
+    elif pytz:
+        return pytz.timezone(tz_str)
+    return None
+
+def _argentina_now_global():
+    """Retorna el datetime actual en la zona horaria de Buenos Aires."""
+    tz = _get_tzinfo()
+    if tz:
+        return datetime.now(tz)
+    return datetime.now()
+
+def ahora_str():
+    """Retorna la hora actual en formato de hoja de cálculo."""
+    return _argentina_now_global().strftime("%Y-%m-%d %H:%M:%S")
+
+def parse_datetime(dt_str):
+    """Parsea un string de fecha/hora de la hoja a un objeto datetime con TZ."""
+    dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+    tz = _get_tzinfo()
+    if tz:
+        return dt.replace(tzinfo=tz)
+    return dt
+
+# ------------------ GOOGLE SHEETS AUTH & HELPERS ------------------
+def sheets_batch_get(spreadsheet_id, ranges):
+    """Llama a Sheets API para obtener múltiples rangos."""
+    try:
+        # 1. Autenticación con credenciales de servicio
+        credentials_dict = dict(st.secrets["gcp_service_account"])
+        credentials = service_account.Credentials.from_service_account_info(credentials_dict)
+        
+        # 2. Crea la sesión autorizada
+        authed_session = AuthorizedSession(credentials)
+        
+        # 3. URL de la API de Google Sheets para batchGet
+        base_url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values:batchGet"
+        ranges_query = "&ranges=".join(ranges)
+        url = f"{base_url}?ranges={ranges_query}&valueRenderOption=UNFORMATTED_VALUE"
+        
+        # 4. Hace la solicitud
+        response = authed_session.get(url)
+        response.raise_for_status() # Lanza una excepción para códigos de estado erróneos
+        return response.json()
+        
+    except RequestException as e:
+        st.error(f"Error de solicitud HTTP a Google Sheets: {e}")
+        st.stop()
+    except Exception as e:
+        st.error(f"Error de autenticación o API: {e}")
+        st.stop()
+
+def batch_write(updates):
+    """Escribe múltiples rangos en la hoja."""
+    if not updates:
+        return
+        
+    try:
+        credentials_dict = dict(st.secrets["gcp_service_account"])
+        credentials = service_account.Credentials.from_service_account_info(credentials_dict)
+        authed_session = AuthorizedSession(credentials)
+
+        spreadsheet_id = st.secrets["sheet_id"]
+        url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values:batchUpdate"
+        
+        data = {
+            "valueInputOption": "USER_ENTERED",
+            "data": [
+                {"range": range_str, "values": [[value]]}
+                for range_str, value in updates
+            ]
+        }
+
+        response = authed_session.post(url, json=data)
+        response.raise_for_status()
+        return response.json()
+        
+    except RequestException as e:
+        st.error(f"Error de escritura HTTP a Google Sheets: {e}")
+        st.stop()
+    except Exception as e:
+        st.error(f"Error de autenticación o API al escribir: {e}")
+        st.stop()
+
+# ------------------ TIME FORMAT HELPERS ------------------
+def parse_time_cell_to_seconds(raw_time_str):
+    """Convierte un valor de celda de tiempo (HH:MM:SS) a segundos."""
+    if not raw_time_str:
+        return 0
+    
+    # Intenta limpiar el formato si la celda fue formateada como timedelta
+    cleaned_str = str(raw_time_str).strip()
+    
+    # Patrón: HH:MM:SS
+    match = re.search(r'(\d+):(\d+):(\d+)', cleaned_str)
+    if match:
+        hours, minutes, seconds = map(int, match.groups())
+        return hours * 3600 + minutes * 60 + seconds
+    
+    # Si no coincide (p. ej., valor vacío o texto)
+    return 0
+
+def segundos_a_hms(segundos):
+    """Convierte segundos a formato HH:MM:SS."""
+    segundos = int(segundos)
+    h = segundos // 3600
+    m = (segundos % 3600) // 60
+    s = segundos % 60
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+def hms_a_segundos(hms_str):
+    """Convierte HH:MM:SS a segundos."""
+    if not hms_str: return 0
+    parts = list(map(int, hms_str.split(':')))
+    if len(parts) == 3:
+        return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    elif len(parts) == 2:
+        return parts[0] * 60 + parts[1]
+    return 0
+    
+def replace_row_in_range(range_str, new_row):
+    """Reemplaza el número de fila en un rango A1 (ej: 'Hoja'!B170 -> 'Hoja'!B171)."""
+    # Encuentra la parte que no es el nombre de la hoja (ej: B170)
+    match = re.search(r'(![A-Z]+)(\d+)', range_str)
+    if match:
+        # match.group(1) es !B, match.group(2) es 170
+        return f"{range_str.split('!')[0]}{match.group(1)}{new_row}"
+    return range_str
+
+# ------------------ UI HELPERS ------------------
+def sanitize_key(text):
+    """Normaliza un texto para usarlo como key de Streamlit."""
+    return re.sub(r'[^a-zA-Z0-9_]', '', text).lower()
+
+def pedir_rerun():
+    """Establece un flag para forzar el rerun."""
+    st.session_state["_do_rerun"] = True
+
+def cargar_estilos():
+    st.markdown("""
+        <style>
+        /* Estilo de la tarjeta, copiado de app_estudio */
+        .materia-card {
+            background-color: #262730;
+            border: 1px solid #464b5c;
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 10px;
+        }
+        .materia-title {
+            font-size: 1.2rem;
+            color: #ccc;
+            margin-bottom: 5px;
+        }
+        .materia-time {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00e676; /* Verde para el tiempo */
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .status-active {
+            background-color: #00e676;
+            color: #000;
+        }
+        .status-inactive {
+            background-color: #464b5c;
+            color: #fff;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+def circle(color):
+    """HTML para un círculo de estado simple."""
+    return f'<span style="height: 10px; width: 10px; background-color: {color}; border-radius: 50%; display: inline-block;"></span>'
+
+
+# ------------------ CONSTANTES Y ESTRUCTURAS DE IDIOMAS ------------------
+# Estas constantes deben coincidir con la configuración deseada en la hoja.
+FILA_BASE = 170 # Fila base de la que se calcula el día
+FECHA_BASE = date(2025, 12, 2) # Fecha de inicio del conteo (para la fila FILA_BASE)
+SHEET_FACUNDO = "F. Idiomas"
+SHEET_IVAN = "I. Idiomas"
+SHEET_MARCAS = "marcas"
+MARCAS_ROW = 3 # Fila en la hoja 'marcas' para los estados de idiomas (B3, C3, etc.)
+
+def get_time_row():
+    """Calcula el número de fila actual para el día de hoy."""
+    hoy = _argentina_now_global().date()
+    delta = (hoy - FECHA_BASE).days
+    return FILA_BASE + delta
+
+TIME_ROW = get_time_row()
+
+# Asumiendo la estructura de secrets.toml: [idiomas] facundo/ivan = ["Idioma1", "Idioma2", ...]
+try:
+    IDIOMAS_FACUNDO = st.secrets["idiomas"]["facundo"]
+    IDIOMAS_IVAN = st.secrets["idiomas"]["ivan"]
+except Exception as e:
+    st.error(f"Error cargando idiomas desde secrets: {e}")
+
+
+def map_idiomas_to_ranges(idiomas, sheet, marcas_row, start_col_idx):
+    """Mapea los idiomas a sus rangos de celda 'time' y 'est'."""
+    mapping = {}
+    col_idx = start_col_idx 
+    for idioma in idiomas:
+        # Convertimos el índice de columna a letra (1=B, 2=C, etc.)
+        col_letter = chr(ord('A') + col_idx)
+        
+        mapping[idioma] = {
+            "time": f"'{sheet}'!{col_letter}{TIME_ROW}", 
+            "est": f"'{SHEET_MARCAS}'!{col_letter}{marcas_row}" # Fila 3 en 'marcas'
+        }
+        col_idx += 1
+    return mapping
+
+
+USERS = {
+    "Facundo": map_idiomas_to_ranges(IDIOMAS_FACUNDO, SHEET_FACUNDO, MARCAS_ROW, 1),
+    "Iván": map_idiomas_to_ranges(IDIOMAS_IVAN, SHEET_IVAN, MARCAS_ROW, 1 + len(IDIOMAS_FACUNDO)),
+}
+
+# ------------------ CARGA UNIFICADA (cacheada) ------------------
+@st.cache_data(ttl=5) # Cacheamos por 5 segundos para no sobrecargar la API
+def cargar_datos_unificados():
+    # Solo necesitamos los rangos de 'est' (marcas) y 'time' (horas)
+    all_ranges = []
+    mapa_indices = {"idiomas": {}}
+    idx = 0
+    for user, idiomas in USERS.items():
+        for i, info in idiomas.items():
+            # Agregamos rangos de estado (est) y tiempo (time) para la carga batch
+            all_ranges.append(info["est"]); mapa_indices["idiomas"][(user, i, "est")] = idx; idx += 1
+            all_ranges.append(info["time"]); mapa_indices["idiomas"][(user, i, "time")] = idx; idx += 1
+    
+    if not all_ranges:
+        return {"users_data": {u: {"estado": {}, "tiempos": {}} for u in USERS}}
+
+    try:
+        res = sheets_batch_get(st.secrets["sheet_id"], all_ranges)
+    except Exception as e:
+        st.error(f"Error API Google Sheets: {e}")
+        st.stop()
+
+    values = res.get("valueRanges", [])
+    
+    def get_val(i, default=""):
+        if i >= len(values): return default
+        vr = values[i]; rows = vr.get("values", [])
+        if not rows: return default
+        # Retorna el primer valor de la primera fila
+        return rows[0][0] if rows[0] else default
+
+    data_usuarios = {u: {"estado": {}, "tiempos": {}, "inicio_dt": None, "idioma_activo": None} for u in USERS}
+    idioma_en_curso = None
+    inicio_dt = None
+
+    for user, idiomas in USERS.items():
+        for i in idiomas:
+            # 1. Estado (marca de inicio de tiempo)
+            idx_est = mapa_indices["idiomas"][(user, i, "est")]
+            raw_est = get_val(idx_est)
+            data_usuarios[user]["estado"][i] = raw_est
+
+            # 2. Tiempo acumulado
+            idx_time = mapa_indices["idiomas"][(user, i, "time")]
+            raw_time = get_val(idx_time)
+            secs = parse_time_cell_to_seconds(raw_time)
+            data_usuarios[user]["tiempos"][i] = segundos_a_hms(secs)
+
+            # Si el usuario actual tiene un idioma activo
+            if user == st.session_state.get("usuario_seleccionado") and str(raw_est).strip() != "":
+                try:
+                    inicio_dt = parse_datetime(raw_est)
+                    idioma_en_curso = i
+                except Exception:
+                    pass
+
+    # Guardar en session_state (solo para el usuario logueado en esta sesión)
+    if "usuario_seleccionado" in st.session_state:
+        st.session_state["idioma_activo"] = idioma_en_curso
+        st.session_state["inicio_dt_idioma"] = inicio_dt 
+
+    return {
+        "users_data": data_usuarios,
+    }
+
+# ------------------ START/STOP DE IDIOMA ------------------
+
+def start_idioma_callback(usuario, idioma):
+    """Establece la marca de tiempo de inicio en la celda 'est' del idioma."""
+    try:
+        info = USERS[usuario][idioma]
+        now_str = ahora_str()
+        
+        # 1. Prepara las actualizaciones:
+        updates = [
+            (info["est"], now_str) # Poner la marca de inicio en el idioma seleccionado
+        ] + [
+            # 2. Limpiar las marcas de inicio de los otros idiomas (si las hay)
+            (i_datos["est"], "")
+            for i_datos in USERS[usuario].values()
+            if i_datos is not None and i_datos is not info
+        ]
+        
+        batch_write(updates)
+        
+        # 3. Actualiza el estado de la sesión
+        st.session_state["idioma_activo"] = idioma
+        st.session_state["inicio_dt_idioma"] = parse_datetime(now_str)
+        
+    except Exception as e:
+        st.error(f"start_idioma error: {e}")
+    finally:
+        pedir_rerun()
+        
+def stop_idioma_callback(usuario, idioma):
+    """Calcula y registra el tiempo transcurrido en la celda 'time'."""
+    try:
+        info = USERS[usuario][idioma]
+        inicio = st.session_state.get("inicio_dt_idioma")
+        
+        # 1. Lógica de seguridad/relectura si el estado de sesión está incompleto
+        if inicio is None or st.session_state.get("idioma_activo") != idioma:
+            # Releer de la hoja si el estado de sesión se perdió
+            try:
+                res = sheets_batch_get(st.secrets["sheet_id"], [info["est"]])
+                prev_est = res.get("valueRanges", [{}])[0].get("values", [[""]])[0][0] if res.get("valueRanges") else ""
+                
+                if not prev_est:
+                      st.error("No hay marca de inicio registrada. Deteniendo sin guardar tiempo.")
+                      pedir_rerun()
+                      return
+                      
+                inicio = parse_datetime(prev_est)
+            except Exception as e:
+                 st.error(f"Error leyendo marca de inicio de la hoja: {e}")
+                 batch_write([(info["est"], "")]) # Limpiar el estado fallido
+                 pedir_rerun()
+                 return
+
+        fin = _argentina_now_global()
+        
+        if fin <= inicio:
+            st.error("Tiempo inválido. La hora de fin es anterior a la de inicio. Limpiando marca.")
+            batch_write([(info["est"], "")])
+            pedir_rerun()
+            return
+
+        # 2. Manejo del cambio de día (split en medianoche)
+        midnight = datetime.combine(inicio.date() + timedelta(days=1), dt_time(0,0)).replace(tzinfo=inicio.tzinfo)
+        partes = []
+        
+        if inicio.date() == fin.date():
+            # Si el inicio y fin son el mismo día
+            partes.append((inicio, fin))
+        else:
+            # Split en la medianoche
+            partes.append((inicio, midnight))
+            partes.append((midnight, fin))
+
+        # 3. Cálculo de tiempo y preparación de updates
+        updates = []
+        for (p_inicio, p_fin) in partes:
+            segs = int((p_fin - p_inicio).total_seconds())
+            
+            # Calcular la fila de destino basada en la fecha de inicio de la parte
+            target_row = FILA_BASE + (p_inicio.date() - FECHA_BASE).days
+            time_cell_for_row = replace_row_in_range(info["time"], target_row)
+            
+            # Obtener el valor de tiempo actual en esa celda
+            try:
+                res2 = sheets_batch_get(st.secrets["sheet_id"], [time_cell_for_row])
+                prev_raw = res2.get("valueRanges", [{}])[0].get("values", [[""]])[0][0] if res2.get("valueRanges") else ""
+            except:
+                prev_raw = ""
+
+            # Sumar el tiempo nuevo
+            new_secs = parse_time_cell_to_seconds(prev_raw) + segs
+            updates.append((time_cell_for_row, segundos_a_hms(new_secs)))
+
+        # 4. Limpiamos el estado ('est')
+        updates.append((info["est"], ""))
+        batch_write(updates)
+        
+        # 5. Limpiamos el estado de la sesión
+        st.session_state["idioma_activo"] = None
+        st.session_state["inicio_dt_idioma"] = None
+        
+    except Exception as e:
+        st.error(f"stop_idioma error: {e}")
+    finally:
+        pedir_rerun()
+
+
+# ------------------ MAIN DE IDIOMAS ------------------
+def main():
+    cargar_estilos()
+
+    if st.session_state.get("_do_rerun", False):
+        st.session_state["_do_rerun"] = False
+        st.rerun()
+
+    # --- SELECCIÓN DE USUARIO (Idéntica a app_estudio para acceso público) ---
+    if "usuario_seleccionado" not in st.session_state:
+        def set_user_and_rerun(u):
+            st.session_state["usuario_seleccionado"] = u
+            st.rerun()
+        
+        try:
+            params = st.query_params
+        except Exception:
+            params = st.experimental_get_query_params()
+
+        # Check de query params
+        if "f" in params: set_user_and_rerun("Facundo")
+        if "i" in params: set_user_and_rerun("Iván")
+        if "user" in params:
+            try:
+                uval = params["user"][0].lower() if isinstance(params["user"], (list, tuple)) else str(params["user"]).lower()
+            except:
+                uval = str(params["user"]).lower()
+            if uval in ["facu", "facundo"]: set_user_and_rerun("Facundo")
+            if uval in ["ivan", "iván", "iva"]: set_user_and_rerun("Iván")
+
+        if "usuario_seleccionado" not in st.session_state:
+            st.markdown("<h1 style='text-align: center; margin-bottom: 30px;'>¿Quién sos?</h1>", unsafe_allow_html=True)
+            if st.button("👤 Facundo", use_container_width=True):
+                st.session_state["usuario_seleccionado"] = "Facundo"
+                st.rerun()
+            st.write("")
+            if st.button("👤 Iván", use_container_width=True):
+                st.session_state["usuario_seleccionado"] = "Iván"
+                st.rerun()
+            st.stop()
+
+
+    # --- Carga de datos ---
+    datos_globales = cargar_datos_unificados()
+    datos = datos_globales["users_data"]
+
+    USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
+    OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
+
+    # Adaptar claves de session_state a las de idiomas
+    idioma_en_curso = st.session_state.get("idioma_activo")
+    inicio_dt = st.session_state.get("inicio_dt_idioma")
+
+    # Relectura de estado si session_state está vacío
+    if idioma_en_curso is None:
+        for i, est_raw in datos[USUARIO_ACTUAL]["estado"].items():
+            if str(est_raw).strip() != "":
+                try:
+                    inicio_dt_sheet = parse_datetime(est_raw)
+                    st.session_state["idioma_activo"] = i
+                    st.session_state["inicio_dt_idioma"] = inicio_dt_sheet
+                    idioma_en_curso = i
+                    inicio_dt = inicio_dt_sheet
+                except Exception:
+                    pass
+                break
+
+    usuario_estudiando = idioma_en_curso is not None
+
+    # Estado del otro usuario
+    idioma_otro = next((i for i, v in datos[OTRO_USUARIO]["estado"].items() if str(v).strip() != ""), "")
+    otro_estudiando = idioma_otro != ""
+
+    circle_usuario = circle("#00e676" if usuario_estudiando else "#ffffff")
+    circle_otro = circle("#00e676" if otro_estudiando else "#ffffff")
+
+    placeholder_total = st.empty()
+    placeholder_idiomas = {i: st.empty() for i in USERS[USUARIO_ACTUAL]}
+
+    while True:
+        tiempo_anadido_seg = 0
+        if usuario_estudiando and inicio_dt is not None:
+            # Tiempo transcurrido desde el inicio de la sesión
+            tiempo_anadido_seg = int((_argentina_now_global() - inicio_dt).total_seconds())
+
+        # --- CÁLCULO DE TIEMPO TOTAL ---
+        def calcular_total_tiempo(usuario, tiempo_activo_seg_local=0):
+            total_min = 0.0
+            # Iterar sobre todos los idiomas de ese usuario
+            for idioma, info in USERS[usuario].items():
+                base_seg = hms_a_segundos(datos[usuario]["tiempos"][idioma])
+                segs_idioma = base_seg
+                # Solo suma el tiempo activo al idioma que está siendo estudiado actualmente por el usuario de la app
+                if usuario_estudiando and usuario == USUARIO_ACTUAL and idioma == idioma_en_curso:
+                    segs_idioma += tiempo_activo_seg_local
+                total_min += segs_idioma / 60
+            return total_min
+
+        total_min = calcular_total_tiempo(USUARIO_ACTUAL, tiempo_anadido_seg)
+        total_hms = segundos_a_hms(int(total_min * 60))
+
+        # --- Actualizar Placeholder Global de Tiempo Total de Idiomas ---
+        with placeholder_total.container():
+            st.markdown(f"""
+                <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
+                    <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Tiempo total de Idiomas hoy: {USUARIO_ACTUAL}</div>
+                    <div style="width: 100%; font-size: 2.5rem; font-weight: bold; color: #fff; line-height: 1.2;">{total_hms}</div>
+                </div>
+            """, unsafe_allow_html=True)
+
+            # --- PROGRESO DEL OTRO USUARIO ---
+            o_total_min = calcular_total_tiempo(OTRO_USUARIO)
+            o_total_hms = segundos_a_hms(int(o_total_min * 60))
+
+            idioma_visible = 'visible' if idioma_otro else 'hidden'
+            idioma_nombre_html = f'<span style="color:#00e676; margin-left:6px; visibility:{idioma_visible};">{idioma_otro if idioma_otro else "Libre"}</span>'
+
+            with st.expander(f"Progreso de {OTRO_USUARIO} en idiomas.", expanded=False):
+                 st.markdown(f"""
+                    <div style="margin-bottom: 10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size: 1.1rem; color: #ddd;"><b>{o_total_hms}</b></span>
+                        </div>
+                        <div style="display:flex; justify-content:flex-start; align-items:center; font-size:0.9rem; color:#aaa; margin-top:5px;">
+                            {circle_otro}
+                            {idioma_nombre_html}
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            st.subheader(f"Tus idiomas, {USUARIO_ACTUAL}")
+        
+        # --- Actualizar Placeholders de Idiomas y Botones ---
+        mis_idiomas = USERS[USUARIO_ACTUAL]
+        for idioma in mis_idiomas:
+
+            base_seg = hms_a_segundos(datos[USUARIO_ACTUAL]["tiempos"][idioma])
+            tiempo_total_seg = base_seg
+            en_curso = idioma_en_curso == idioma
+
+            if en_curso:
+                tiempo_total_seg += max(0, tiempo_anadido_seg) # Suma el tiempo transcurrido
+
+            tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
+            badge_html = f'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''
+            html_card = f"""<div class="materia-card"><div class="materia-title">{idioma}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
+
+            with placeholder_idiomas[idioma].container():
+                st.markdown(html_card, unsafe_allow_html=True)
+
+                key_start = sanitize_key(f"start_{USUARIO_ACTUAL}_{idioma}_idioma")
+                key_stop = sanitize_key(f"stop_{USUARIO_ACTUAL}_{idioma}_idioma")
+                key_disabled = sanitize_key(f"dis_{USUARIO_ACTUAL}_{idioma}_idioma")
+
+                cols = st.columns([1,1,1])
+                with cols[0]:
+                    if en_curso:
+                        st.button(f"⛔ DETENER {idioma[:10]}", key=key_stop, use_container_width=True,
+                                  on_click=stop_idioma_callback, args=(USUARIO_ACTUAL, idioma))
+                    else:
+                        if idioma_en_curso is None:
+                            st.button("▶ INICIAR", key=key_start, use_container_width=True,
+                                      on_click=start_idioma_callback, args=(USUARIO_ACTUAL, idioma))
+                        else:
+                            st.button("...", disabled=True, key=key_disabled, use_container_width=True)
+
+                with cols[1]:
+                    with st.expander("🛠️ Corregir tiempo"):
+                        input_key = f"input_{sanitize_key(idioma)}_idioma"
+                        new_val = st.text_input("Tiempo (HH:MM:SS)", value=datos[USUARIO_ACTUAL]["tiempos"][idioma], key=input_key)
+
+                        def save_correction_callback(idioma_key):
+                            if st.session_state.get("idioma_activo") is not None:
+                                st.error("⛔ No podés corregir el tiempo mientras estás estudiando.")
+                                pedir_rerun()
+                                return
+
+                            val = st.session_state.get(f"input_{sanitize_key(idioma_key)}_idioma", "").strip()
+                            if ":" not in val:
+                                st.error("Formato inválido (debe ser HH:MM:SS)")
+                                pedir_rerun()
+                                return
+
+                            try:
+                                segs = hms_a_segundos(val)
+                                hhmmss = segundos_a_hms(segs)
+                                target_row = get_time_row()
+                                time_cell_for_row = replace_row_in_range(USERS[USUARIO_ACTUAL][idioma_key]["time"], target_row)
+                                batch_write([(time_cell_for_row, hhmmss)])
+                                st.success("Tiempo corregido correctamente.")
+                            except Exception as e:
+                                st.error(f"Error al corregir el tiempo: {e}")
+                            finally:
+                                pedir_rerun()
+
+                        if en_curso or usuario_estudiando:
+                            st.info("⛔ No podés corregir.")
+                        else:
+                            if st.button("Guardar Corrección", key=f"save_{sanitize_key(idioma)}_idioma_btn", on_click=save_correction_callback, args=(idioma,)):
+                                pass
+
+        if not usuario_estudiando:
+            st.stop()
+
+        time.sleep(10)
+        st.rerun()
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        st.error(f"Error crítico en main(): {e}")
+        st.sidebar.error(f"Error crítico: {e}")
+        if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
+            st.session_state.clear()
+            st.rerun()

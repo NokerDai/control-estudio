@@ -1,11 +1,12 @@
 import streamlit as st
 import app_estudio
 import app_habitos
+import app_idiomas # <--- ¡NUEVO!
 
 # 1. Configuración global (Siempre va primero)
 st.set_page_config(
-    page_title="Estudio", 
-    page_icon="⏳", 
+    page_title="Estudio",
+    page_icon="⏳",
     layout="centered"
 )
 
@@ -43,30 +44,52 @@ if "password" in query_params and not st.session_state.authenticated:
     st.stop()
 
 # ---------------------------------------------------------
-# BARRA LATERAL (Solo visible si estás Autenticado)
+# BARRA LATERAL (Visible si estás Autenticado O en una página pública)
 # ---------------------------------------------------------
-if st.session_state.authenticated:
+# La navegación se muestra si estás autenticado o si ya seleccionaste un usuario
+# para poder alternar entre estudio e idiomas.
+
+# Definimos si mostramos la barra lateral
+show_sidebar = st.session_state.authenticated or ("usuario_seleccionado" in st.session_state)
+
+if show_sidebar:
     st.sidebar.header("Navegación")
-    
+
     # Botón para ir a ESTUDIO
-    # Solo se muestra si NO estamos en la página "estudio"
     if st.session_state.current_page != "estudio":
         if st.sidebar.button("📚 Ir a Estudio", use_container_width=True):
             st.session_state.current_page = "estudio"
             st.rerun()
 
-    # Botón para ir a HÁBITOS
-    # Solo se muestra si NO estamos en la página "habitos"
-    if st.session_state.current_page != "habitos":
-        if st.sidebar.button("📅 Ir a Hábitos", use_container_width=True):
-            st.session_state.current_page = "habitos"
+    # Botón para ir a IDIOMAS (¡NUEVO!)
+    if st.session_state.current_page != "idiomas":
+        if st.sidebar.button("🗣️ Ir a Idiomas", use_container_width=True):
+            st.session_state.current_page = "idiomas"
             st.rerun()
 
-    st.sidebar.markdown("---")
-    if st.sidebar.button("🔒 Salir / Logout", use_container_width=True):
-        st.session_state.authenticated = False
-        st.session_state.current_page = "estudio"
-        st.rerun()
+    # Botón para ir a HÁBITOS (Solo si está autenticado)
+    if st.session_state.authenticated:
+        if st.session_state.current_page != "habitos":
+            if st.sidebar.button("📅 Ir a Hábitos", use_container_width=True):
+                st.session_state.current_page = "habitos"
+                st.rerun()
+
+        st.sidebar.markdown("---")
+        if st.sidebar.button("🔒 Salir / Logout", use_container_width=True):
+            st.session_state.authenticated = False
+            st.session_state.current_page = "estudio"
+            # Limpiamos el usuario seleccionado al hacer logout
+            if "usuario_seleccionado" in st.session_state:
+                del st.session_state["usuario_seleccionado"]
+            st.rerun()
+    elif "usuario_seleccionado" in st.session_state:
+        # Opción para cambiar de usuario si no está logueado
+        st.sidebar.markdown("---")
+        if st.sidebar.button(f"Cambiar de Usuario ({st.session_state.usuario_seleccionado})"):
+            del st.session_state["usuario_seleccionado"]
+            st.session_state.current_page = "estudio" # Volvemos a la selección
+            st.rerun()
+
 
 # ---------------------------------------------------------
 # ROUTER (Decide qué app mostrar)
@@ -77,6 +100,12 @@ if st.session_state.current_page == "habitos" and st.session_state.authenticated
     # Nos aseguramos que app_habitos sepa que ya pasamos la seguridad
     st.session_state.pw_correct = True
     app_habitos.run()
+    
+# Si eligió "idiomas", mostramos Idiomas (¡NUEVO!)
+elif st.session_state.current_page == "idiomas":
+    # Le pasamos la lógica de tiempo al módulo de idiomas
+    # Para esto, app_idiomas debe importar la lógica de app_estudio
+    app_idiomas.main()
 
 # En cualquier otro caso (Usuario normal o Admin que eligió Estudio), mostramos Estudio
 else:
