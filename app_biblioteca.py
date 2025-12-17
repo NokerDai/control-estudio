@@ -133,7 +133,7 @@ def main():
 
     col_filter, col_metric = st.columns([3, 1])
     with col_filter:
-        cat_filter = st.selectbox("Filtrar por categoría:", ["Todas"] + sorted(list(todas_las_cats)))
+        cat_filter = st.selectbox("Filtrar por categoría:", sorted(list(todas_las_cats)))
     with col_metric:
         # La métrica se actualizará según el resultado del filtrado
         count_placeholder = st.empty()
@@ -149,10 +149,7 @@ def main():
         
         # 2. Filtro por Categoría
         cats = d.get("categoria", [])
-        if cat_filter == "Todas":
-            match_cat = True
-        else:
-            match_cat = (cat_filter in cats) if isinstance(cats, list) else (cat_filter == cats)
+        match_cat = (cat_filter in cats) if isinstance(cats, list) else (cat_filter == cats)
         
         if match_search and match_cat:
             display_data.append(d)
