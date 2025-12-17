@@ -118,36 +118,47 @@ def main():
                 else:
                     st.warning("Completa Título, Autor y al menos una Categoría.")
 
+    st.divider()
     if not data:
         st.info("No hay registros.")
         return
 
-    # --- NUEVO: BARRA DE BÚSQUEDA Y FILTROS ---
+    # --- BARRA DE BÚSQUEDA Y FILTROS ---
     search_query = st.text_input("🔍 Buscar por título o autor", "").lower()
 
+    # Recolectamos todas las categorías disponibles
     todas_las_cats = set()
     for d in data:
         c = d.get("categoria", [])
         if isinstance(c, list): todas_las_cats.update(c)
         else: todas_las_cats.add(c)
+    
+    lista_categorias = sorted(list(todas_las_cats))
 
     col_filter, col_metric = st.columns([3, 1])
     with col_filter:
-        cat_filter = st.selectbox("Filtrar por categoría:", sorted(list(todas_las_cats)))
+        # Buscamos el índice de "Filosofía" para que sea el default
+        try:
+            default_ix = lista_categorias.index("Filosofía")
+        except ValueError:
+            default_ix = 0
+            
+        # Eliminamos "Todas" simplemente no agregándolo a la lista
+        cat_filter = st.selectbox("Filtrar por categoría:", lista_categorias, index=default_ix)
+        
     with col_metric:
-        # La métrica se actualizará según el resultado del filtrado
         count_placeholder = st.empty()
 
     # --- LÓGICA DE FILTRADO COMBINADA ---
     display_data = []
     for d in data:
-        # 1. Filtro por Texto (Título o Autor)
+        # Filtro por Texto
         match_search = (
             search_query in d.get("titulo", "").lower() or 
             search_query in d.get("autor", "").lower()
         )
         
-        # 2. Filtro por Categoría
+        # Filtro por Categoría (Obligatorio ahora que no hay "Todas")
         cats = d.get("categoria", [])
         match_cat = (cat_filter in cats) if isinstance(cats, list) else (cat_filter == cats)
         
@@ -158,14 +169,14 @@ def main():
 
     # --- GRID DE LIBROS ---
     if not display_data:
-        st.info("No se encontraron libros con esos criterios.")
+        st.info(f"No hay libros en '{cat_filter}' que coincidan con la búsqueda.")
     else:
         cols = st.columns(3)
         for i, libro in enumerate(display_data):
             with cols[i % 3]:
                 with st.container(border=True):
                     if libro.get("imagen"):
-                        st.image(libro["imagen"], width=True)
+                        st.image(libro["imagen"], use_column_width=True)
                     
                     st.subheader(libro["titulo"])
                     st.write(f"**{libro['autor']}**")
