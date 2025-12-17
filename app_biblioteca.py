@@ -29,7 +29,7 @@ def get_drive_service():
         return None
 
 def get_user_file_id():
-    usuario = st.session_state.get("usuario_seleccionado") # Asegúrate que coincida con tu login
+    usuario = st.session_state.get("usuario_seleccionado")
     if not usuario: return None
     key_map = {"Facundo": "facundo", "Iván": "ivan", "Ivan": "ivan"}
     user_key = key_map.get(usuario)
@@ -81,7 +81,7 @@ def main():
     
     data = st.session_state[session_key]
 
-    # --- FORMULARIO DE ALTA CON CATEGORÍAS DINÁMICAS ---
+    # --- FORMULARIO DE ALTA ---
     with st.expander("Registrar Lectura", expanded=False):
         with st.form("form_alta_libro", clear_on_submit=True):
             col_a, col_b = st.columns(2)
@@ -89,7 +89,6 @@ def main():
                 titulo = st.text_input("Título del Libro")
                 autor = st.text_input("Autor(es)")
             with col_b:
-                # Opciones base + cualquier categoría ya existente en tus datos
                 opciones_base = ["Filosofía", "Psicología", "Economía", "Espiritualidad", "Ficción", "Desarrollo Personal", "Ciencia"]
                 existentes = set()
                 for d in data:
@@ -98,9 +97,7 @@ def main():
                     else: existentes.add(cats)
                 
                 todas_opciones = sorted(list(set(opciones_base) | existentes))
-                
-                # Multiselect que permite escribir nuevas etiquetas
-                categorias = st.multiselect("Categorías (selecciona o escribe nuevas)", todas_opciones)
+                categorias = st.multiselect("Categorías", todas_opciones)
                 imagen = st.text_input("URL de portada (Opcional)")
 
             if st.form_submit_button("Guardar Lectura"):
@@ -126,8 +123,9 @@ def main():
         st.info("No hay registros.")
         return
 
-    # --- FILTROS Y MÉTRICAS ---
-    # Obtenemos todas las categorías actuales para el filtro
+    # --- NUEVO: BARRA DE BÚSQUEDA Y FILTROS ---
+    search_query = st.text_input("🔍 Buscar por título o autor", "").lower()
+
     todas_las_cats = set()
     for d in data:
         c = d.get("categoria", [])
@@ -138,33 +136,48 @@ def main():
     with col_filter:
         cat_filter = st.selectbox("Filtrar por categoría:", ["Todas"] + sorted(list(todas_las_cats)))
     with col_metric:
-        st.metric("Libros", len(data))
+        # La métrica se actualizará según el resultado del filtrado
+        count_placeholder = st.empty()
 
-    # Lógica de filtrado (soporta lista o string antiguo)
-    display_data = data
-    if cat_filter != "Todas":
-        display_data = [
-            d for d in data 
-            if (isinstance(d.get("categoria"), list) and cat_filter in d["categoria"]) 
-            or (d.get("categoria") == cat_filter)
-        ]
+    # --- LÓGICA DE FILTRADO COMBINADA ---
+    display_data = []
+    for d in data:
+        # 1. Filtro por Texto (Título o Autor)
+        match_search = (
+            search_query in d.get("titulo", "").lower() or 
+            search_query in d.get("autor", "").lower()
+        )
+        
+        # 2. Filtro por Categoría
+        cats = d.get("categoria", [])
+        if cat_filter == "Todas":
+            match_cat = True
+        else:
+            match_cat = (cat_filter in cats) if isinstance(cats, list) else (cat_filter == cats)
+        
+        if match_search and match_cat:
+            display_data.append(d)
+
+    count_placeholder.metric("Libros", len(display_data))
 
     # --- GRID DE LIBROS ---
-    cols = st.columns(3)
-    for i, libro in enumerate(display_data):
-        with cols[i % 3]:
-            with st.container(border=True):
-                if libro.get("imagen"):
-                    st.image(libro["imagen"], use_column_width=True)
-                
-                st.subheader(libro["titulo"])
-                st.write(f"**{libro['autor']}**")
-                
-                # Mostrar categorías con estilo de etiquetas
-                cats = libro.get("categoria", [])
-                txt_cats = ", ".join(cats) if isinstance(cats, list) else cats
-                st.caption(f"📅 {libro['fecha']}")
-                st.caption(f"🏷️ {txt_cats}")
+    if not display_data:
+        st.info("No se encontraron libros con esos criterios.")
+    else:
+        cols = st.columns(3)
+        for i, libro in enumerate(display_data):
+            with cols[i % 3]:
+                with st.container(border=True):
+                    if libro.get("imagen"):
+                        st.image(libro["imagen"], use_column_width=True)
+                    
+                    st.subheader(libro["titulo"])
+                    st.write(f"**{libro['autor']}**")
+                    
+                    cats = libro.get("categoria", [])
+                    txt_cats = ", ".join(cats) if isinstance(cats, list) else cats
+                    st.caption(f"📅 {libro['fecha']}")
+                    st.caption(f"🏷️ {txt_cats}")
 
 if __name__ == "__main__":
     main()
