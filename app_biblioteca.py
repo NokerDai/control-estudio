@@ -82,8 +82,7 @@ def main():
     data = st.session_state[session_key]
 
     # --- FORMULARIO DE ALTA CON CATEGORÍAS DINÁMICAS ---
-    st.markdown(f"**Biblioteca de:** **{usuario}**")
-    with st.expander("📖 Registrar Nueva Lectura", expanded=False):
+    with st.expander("Registrar Lectura", expanded=False):
         with st.form("form_alta_libro", clear_on_submit=True):
             col_a, col_b = st.columns(2)
             with col_a:
