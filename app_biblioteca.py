@@ -134,7 +134,7 @@ def main():
                 autor = st.text_input("Autor(es)")
             
             with col_b:
-                cats = ["Filosofía", "Psicología", "Economía", "Espiritualidad", "Ficción"]
+                cats = ["Filosofía", "Psicología", "Economía", "Espiritualidad", "Ficción", "Desarrollo Personal", "Ciencia"]
                 categoria = st.selectbox("Categoría", cats)
                 imagen = st.text_input("URL de portada (Opcional)", placeholder="https://...")
 
