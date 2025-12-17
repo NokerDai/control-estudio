@@ -118,7 +118,6 @@ def main():
                 else:
                     st.warning("Completa Título, Autor y al menos una Categoría.")
 
-    st.divider()
     if not data:
         st.info("No hay registros.")
         return
