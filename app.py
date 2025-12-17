@@ -2,6 +2,7 @@ import streamlit as st
 import app_estudio
 import app_habitos
 import app_idiomas 
+import app_biblioteca
 from datetime import datetime
 try:
     # Necesitamos el ID de la sesión para el lock
@@ -206,6 +207,13 @@ if st.session_state.current_page != "idiomas":
         st.session_state.current_page = "idiomas"
         st.rerun()
 
+# --- Botón para ir a BIBLIOTECA ---
+# Solo se muestra si NO estamos en la página "biblioteca"
+if st.session_state.current_page != "biblioteca":
+    if st.sidebar.button("📖 Biblioteca", use_container_width=True):
+        st.session_state.current_page = "biblioteca"
+        st.rerun()
+
 # Lógica solo para usuarios Autenticados
 if st.session_state.authenticated:
     
@@ -230,6 +238,10 @@ if st.session_state.current_page == "habitos" and st.session_state.authenticated
 elif st.session_state.current_page == "idiomas":
     app_idiomas.main()
 
-# 3. Por defecto (o si eligió "estudio"), mostramos Estudio
+# 3. Si eligió "biblioteca" (Autenticado o no), mostramos Biblioteca
+elif st.session_state.current_page == "biblioteca":
+    app_biblioteca.main()
+
+# 4. Por defecto (o si eligió "estudio"), mostramos Estudio
 else:
     app_estudio.main()
