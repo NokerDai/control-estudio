@@ -29,7 +29,7 @@ def get_drive_service():
         return None
 
 def get_user_file_id():
-    usuario = st.session_state.get("usuario_selected") # Asegúrate que coincida con tu login
+    usuario = st.session_state.get("usuario_seleccionado") # Asegúrate que coincida con tu login
     if not usuario: return None
     key_map = {"Facundo": "facundo", "Iván": "ivan", "Ivan": "ivan"}
     user_key = key_map.get(usuario)
