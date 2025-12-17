@@ -248,11 +248,13 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
 
             # 3. Generar contenido personalizado
             balance_html = format_balance_html(balance_raw, user)
+            now = _argentina_now_global()
+            fecha_hora = now.strftime("%d/%m %H:%M")
 
             msg = MIMEMultipart()
             msg['From'] = sender
             msg['To'] = email # Un solo destinatario por correo
-            msg['Subject'] = f"📊 Tu Balance Acumulado - {date.today().strftime('%d/%m')}" 
+            msg['Subject'] = f"📊 Tu Balance Acumulado - {fecha_hora}" 
 
             # Contenido simplificado sin mencionar al otro usuario.
             html_content = f"""
@@ -276,7 +278,7 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
                     text-align: center;
                 ">
                     <p style="font-size: 0.9em; color: #888; text-align: center;">
-                        <i>Se envía automáticamente cuando alguno entra por primera vez en el día (5:00 a 22:00).</i><br>
+                        <i>Se envía automáticamente cuando alguno entra por primera vez cada 2 horas de 7:00 a 22:00.</i><br>
                     </p>
                 </div>
             </body>
@@ -559,19 +561,36 @@ def main():
 
     # ------------------ LOGICA ENVIO EMAIL DIARIO ------------------
     now = _argentina_now_global()
-    today_str = now.strftime("%Y-%m-%d")
-    
-    # Chequeamos hora (7 AM a 10 PM) y si ya se mandó hoy
-    if 7 <= now.hour < 22:
-        if last_mail_date_str != today_str:
-            # Enviamos el mail
-            exito = enviar_reporte_email(datos, resumen_marcas, balance_val_raw)
-            if exito:
-                st.toast(f"📧 Reporte diario enviado ({today_str})")
-                # Actualizamos la celda de la fecha
-                batch_write([(RANGO_FECHA_MAIL, today_str)])
-            else:
-                pass # Falló silenciosamente o lo logueamos en consola
+
+    HORA_INICIO = 7
+    HORA_FIN = 22
+    INTERVALO_HORAS = 2
+
+    def puede_enviar_mail(now, last_mail_str):
+        # Fuera del horario permitido
+        if not (HORA_INICIO <= now.hour < HORA_FIN):
+            return False
+
+        # Nunca se envió mail
+        if not last_mail_str or str(last_mail_str).strip() == "":
+            return True
+
+        try:
+            last_dt = parse_datetime(last_mail_str)
+        except Exception:
+            # Si el formato es inválido, permitimos enviar
+            return True
+
+        # Diferencia en horas
+        diff = now - last_dt
+        return diff >= timedelta(hours=INTERVALO_HORAS)
+
+    # --- LÓGICA FINAL ---
+    if puede_enviar_mail(now, last_mail_date_str):
+        exito = enviar_reporte_email(datos, resumen_marcas, balance_val_raw)
+        if exito:
+            st.toast("📧 Reporte enviado")
+            batch_write([(RANGO_FECHA_MAIL, ahora_str())])
     # ----------------------------------------------------------------
 
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
