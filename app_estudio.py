@@ -278,7 +278,12 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
                     text-align: center;
                 ">
                     <p style="font-size: 0.9em; color: #888; text-align: center;">
-                        <i>Se envía automáticamente cuando alguno entra por primera vez cada 2 horas de 7:00 a 22:00.</i><br>
+                        <i>Se envía automáticamente cuando alguno entra por primera vez cada 2 horas de 7:00 a 22:00.</i>
+                        <span style="margin-left: 10px;">
+                            <a href="https://estudio.streamlit.app/" style="color: #00e676; text-decoration: none; font-weight: bold;">
+                                [ Ir a la App ]
+                            </a>
+                        </span>
                     </p>
                 </div>
             </body>
@@ -310,7 +315,7 @@ FECHA_BASE = date(2025, 12, 2)
 SHEET_FACUNDO = "F. Economía"
 SHEET_IVAN = "I. Física"
 SHEET_MARCAS = "marcas"
-RANGO_FECHA_MAIL = f"'{SHEET_MARCAS}'!M1" 
+RANGO_FECHA_MAIL = f"'{SHEET_MARCAS}'!M1"
 
 # NUEVOS RANGOS PARA EL LOCK DE SESIÓN (Se asume N37 y O37 en la hoja 'marcas')
 RANGO_LOCK_IVAN = f"'{SHEET_MARCAS}'!N37"
