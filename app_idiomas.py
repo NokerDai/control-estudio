@@ -38,6 +38,7 @@ def cargar_estilos():
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
         .materia-title { font-size: 1.4rem; font-weight: bold; color: #ffffff; margin-bottom: 5px; }
+        .materia-extra { font-size: 0.9rem; color: #aab0c6; font-weight: normal; margin-left: 10px; }
         
         /* EL TIEMPO */
         .materia-time { 
@@ -95,8 +96,14 @@ def parse_datetime(s):
 def hms_a_segundos(hms):
     if not hms: return 0
     try:
-        h, m, s = map(int, hms.split(":"))
-        return h*3600 + m*60 + s
+        parts = list(map(int, hms.split(":")))
+        if len(parts) == 3:
+            h, m, s = parts
+            return h*3600 + m*60 + s
+        elif len(parts) == 2:
+            m, s = parts
+            return m*60 + s
+        return 0
     except:
         return 0
 
@@ -105,12 +112,6 @@ def segundos_a_hms(seg):
     m = (seg % 3600) // 60
     s = seg % 60
     return f"{h:02d}:{m:02d}:{s:02d}"
-
-def hms_a_minutos(hms): return hms_a_segundos(hms) / 60
-def parse_float_or_zero(s):
-    if s is None: return 0.0
-    try: return float(str(s).replace(",", ".").strip())
-    except: return 0.0
 
 def parse_time_cell_to_seconds(val):
     if val is None: return 0
@@ -134,7 +135,6 @@ def replace_row_in_range(range_str, new_row):
 def sanitize_key(s):
     return re.sub(r'[^a-zA-Z0-9_]', '_', s)
 
-# ------------------ RERUN HELPER ------------------
 def pedir_rerun():
     st.session_state["_do_rerun"] = True
 
@@ -143,43 +143,29 @@ def pedir_rerun():
 def get_sheets_session():
     try:
         key_dict = json.loads(st.secrets["service_account"])
-    except Exception as e:
-        st.error(f"Error leyendo st.secrets['service_account']")
-        st.stop()
-    try:
         creds = service_account.Credentials.from_service_account_info(
             key_dict,
             scopes=["https://www.googleapis.com/auth/spreadsheets"]
         )
         return AuthorizedSession(creds)
     except Exception as e:
-        st.error(f"Error creando credenciales")
+        st.error(f"Error configurando Google Sheets: {e}")
         st.stop()
 
 session = get_sheets_session()
 
 def sheets_batch_get(spreadsheet_id, ranges):
     url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values:batchGet"
-    unique_ranges = list(dict.fromkeys(ranges))
-    params = []
-    for r in unique_ranges:
-        params.append(("ranges", r))
+    params = [("ranges", r) for r in list(dict.fromkeys(ranges))]
     params.append(("valueRenderOption", "FORMATTED_VALUE"))
     try:
         resp = session.get(url, params=params, timeout=30)
         resp.raise_for_status()
         data = resp.json()
-        ordered_results = data.get("valueRanges", [])
-        result_map = {r: res for r, res in zip(unique_ranges, ordered_results)}
-        final_list = []
-        for r in ranges:
-            if r in result_map:
-                final_list.append(result_map[r])
-            else:
-                final_list.append({})
-        return {"valueRanges": final_list}
+        result_map = {r: res for r, res in zip(list(dict.fromkeys(ranges)), data.get("valueRanges", []))}
+        return {"valueRanges": [result_map.get(r, {}) for r in ranges]}
     except RequestException as e:
-        raise RuntimeError(f"Error HTTP en batchGet al leer la hoja: {e}")
+        raise RuntimeError(f"Error HTTP en batchGet: {e}")
 
 def sheets_batch_update(spreadsheet_id, updates):
     url = f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values:batchUpdate"
@@ -192,7 +178,7 @@ def sheets_batch_update(spreadsheet_id, updates):
         resp.raise_for_status()
         return resp.json()
     except RequestException as e:
-        raise RuntimeError(f"Error HTTP en batchUpdate al escribir en la hoja: {e}")
+        raise RuntimeError(f"Error HTTP en batchUpdate: {e}")
 
 # ------------------ ANKI HELPERS ------------------
 @st.cache_data(ttl=300) 
@@ -200,9 +186,6 @@ def fetch_anki_stats(USUARIO_ACTUAL):
     try:
         DRIVE_JSON_ID = st.secrets["ID_DEL_JSON_FACUNDO"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ID_DEL_JSON_IVAN"]
         URL = f"https://drive.google.com/uc?id={DRIVE_JSON_ID}"
-    except KeyError:
-        return None
-    try:
         response = requests.get(URL)
         response.raise_for_status()
         return response.json()
@@ -223,13 +206,23 @@ def get_time_row():
 
 TIME_ROW = get_time_row()
 MARCAS_ROW = 3
-WEEK_RANGE = f"'{SHEET_MARCAS}'!R{TIME_ROW}"
 
 USERS = {
     "Facundo": {
-        "🇩🇪 Deutsch": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"},
-        "🇨🇳 普通话": {"time": f"'{SHEET_FACUNDO}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!C{MARCAS_ROW}"},
-        "🇬🇧 English": {"time": f"'{SHEET_FACUNDO}'!D{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!D{MARCAS_ROW}"},
+        "🇩🇪 Deutsch": {
+            "time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", 
+            "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}",
+            "extra": f"'{SHEET_FACUNDO}'!E{TIME_ROW}" # Información extra al lado de Deutsch
+        },
+        "🇨🇳 普通话": {
+            "time": f"'{SHEET_FACUNDO}'!C{TIME_ROW}", 
+            "est": f"'{SHEET_MARCAS}'!C{MARCAS_ROW}",
+            "extra": f"'{SHEET_FACUNDO}'!F{TIME_ROW}" # Información extra al lado de Chino
+        },
+        "🇬🇧 English": {
+            "time": f"'{SHEET_FACUNDO}'!D{TIME_ROW}", 
+            "est": f"'{SHEET_MARCAS}'!D{MARCAS_ROW}"
+        },
     },
     "Iván": {
         "🇬🇧 English":    {"time": f"'{SHEET_IVAN}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!F{MARCAS_ROW}"},
@@ -238,7 +231,7 @@ USERS = {
     }
 }
 
-# ------------------ CARGA UNIFICADA (cacheada) ------------------
+# ------------------ CARGA UNIFICADA ------------------
 @st.cache_data()
 def cargar_datos_unificados():
     all_ranges = []
@@ -246,8 +239,10 @@ def cargar_datos_unificados():
     idx = 0
     for user, materias in USERS.items():
         for m, info in materias.items():
-            all_ranges.append(info["est"]); mapa_indices["materias"][(user, m, "est")] = idx; idx += 1
-            all_ranges.append(info["time"]); mapa_indices["materias"][(user, m, "time")] = idx; idx += 1
+            all_ranges.append(info["est"]); mapa_indices[(user, m, "est")] = idx; idx += 1
+            all_ranges.append(info["time"]); mapa_indices[(user, m, "time")] = idx; idx += 1
+            if "extra" in info:
+                all_ranges.append(info["extra"]); mapa_indices[(user, m, "extra")] = idx; idx += 1
 
     try:
         res = sheets_batch_get(st.secrets["sheet_id"], all_ranges)
@@ -258,39 +253,33 @@ def cargar_datos_unificados():
     values = res.get("valueRanges", [])
     def get_val(i, default=""):
         if i >= len(values): return default
-        vr = values[i]; rows = vr.get("values", [])
-        if not rows: return default
-        return rows[0][0] if rows[0] else default
+        rows = values[i].get("values", [])
+        return rows[0][0] if rows and rows[0] else default
 
-    data_usuarios = {u: {"estado": {}, "tiempos": {}, "inicio_dt": None, "materia_activa": None} for u in USERS}
+    data_usuarios = {u: {"estado": {}, "tiempos": {}, "extra": {}} for u in USERS}
     materia_en_curso = None
     inicio_dt = None
 
     for user, materias in USERS.items():
         for m in materias:
-            idx_est = mapa_indices["materias"][(user, m, "est")]
-            raw_est = get_val(idx_est)
-            data_usuarios[user]["estado"][m] = raw_est
+            data_usuarios[user]["estado"][m] = get_val(mapa_indices[(user, m, "est")])
+            raw_time = get_val(mapa_indices[(user, m, "time")])
+            data_usuarios[user]["tiempos"][m] = segundos_a_hms(parse_time_cell_to_seconds(raw_time))
+            
+            if (user, m, "extra") in mapa_indices:
+                data_usuarios[user]["extra"][m] = get_val(mapa_indices[(user, m, "extra")])
 
-            idx_time = mapa_indices["materias"][(user, m, "time")]
-            raw_time = get_val(idx_time)
-            secs = parse_time_cell_to_seconds(raw_time)
-            data_usuarios[user]["tiempos"][m] = segundos_a_hms(secs)
-
-            if user == st.session_state.get("usuario_seleccionado") and str(raw_est).strip() != "":
+            if user == st.session_state.get("usuario_seleccionado") and str(data_usuarios[user]["estado"][m]).strip() != "":
                 try:
-                    inicio_dt = parse_datetime(raw_est)
+                    inicio_dt = parse_datetime(data_usuarios[user]["estado"][m])
                     materia_en_curso = m
-                except Exception:
-                    pass
+                except: pass
 
     if "usuario_seleccionado" in st.session_state:
         st.session_state["materia_activa"] = materia_en_curso
         st.session_state["inicio_dt"] = inicio_dt
 
-    return {
-        "users_data": data_usuarios
-    }
+    return {"users_data": data_usuarios}
 
 def batch_write(updates):
     try:
@@ -298,293 +287,129 @@ def batch_write(updates):
         cargar_datos_unificados.clear()
     except Exception as e:
         st.error(f"Error escribiendo Google Sheets: {e}")
-        st.stop()
 
 def start_materia_callback(usuario, materia):
     try:
         info = USERS[usuario][materia]
         now_str = ahora_str()
         updates = [(info["est"], now_str)] + [
-            (m_datos["est"], "")
-            for m_datos in USERS[usuario].values()
-            if m_datos is not None and m_datos is not info
+            (m_datos["est"], "") for m_datos in USERS[usuario].values() if m_datos is not info
         ]
         batch_write(updates)
         st.session_state["materia_activa"] = materia
         st.session_state["inicio_dt"] = parse_datetime(now_str)
-    except Exception as e:
-        st.error(f"start_materia error: {e}")
-    finally:
-        pedir_rerun()
+    except Exception as e: st.error(f"Error al iniciar: {e}")
+    finally: pedir_rerun()
 
 def stop_materia_callback(usuario, materia):
     try:
         info = USERS[usuario][materia]
         inicio = st.session_state.get("inicio_dt")
-        prev_est = ""
-        if inicio is None or st.session_state.get("materia_activa") != materia:
-            st.warning("Marca de inicio no encontrada en session_state, releyendo de la hoja...")
-            try:
-                res = sheets_batch_get(st.secrets["sheet_id"], [info["est"]])
-                vr = res.get("valueRanges", [{}])[0]
-                prev_est = vr.get("values", [[""]])[0][0] if vr.get("values") else ""
-                if not prev_est:
-                      st.error("No hay marca de inicio registrada (no se puede detener).")
-                      pedir_rerun()
-                      return
-                inicio = parse_datetime(prev_est)
-            except Exception as e:
-                 st.error(f"Error leyendo marca de inicio de la hoja: {e}")
-                 pedir_rerun()
-                 return
+        if not inicio:
+            res = sheets_batch_get(st.secrets["sheet_id"], [info["est"]])
+            prev_est = res["valueRanges"][0].get("values", [[""]])[0][0]
+            if not prev_est: return
+            inicio = parse_datetime(prev_est)
 
         fin = _argentina_now_global()
-        if fin <= inicio:
-            st.error("Tiempo inválido. La hora de fin es anterior a la de inicio.")
-            batch_write([(info["est"], "")])
-            pedir_rerun()
-            return
+        segs = int((fin - inicio).total_seconds())
+        if segs < 0: segs = 0
 
-        midnight = datetime.combine(inicio.date() + timedelta(days=1), dt_time(0,0)).replace(tzinfo=inicio.tzinfo)
-        partes = []
-        if inicio.date() == fin.date():
-            partes.append((inicio, fin))
-        else:
-            partes.append((inicio, midnight))
-            partes.append((midnight, fin))
-
-        updates = []
-        for (p_inicio, p_fin) in partes:
-            segs = int((p_fin - p_inicio).total_seconds())
-            target_row = FILA_BASE + (p_inicio.date() - FECHA_BASE).days
-            time_cell_for_row = replace_row_in_range(info["time"], target_row)
-            try:
-                res2 = sheets_batch_get(st.secrets["sheet_id"], [time_cell_for_row])
-                vr2 = res2.get("valueRanges", [{}])[0]
-                prev_raw = vr2.get("values", [[""]])[0][0] if vr2.get("values") else ""
-            except:
-                prev_raw = ""
-            new_secs = parse_time_cell_to_seconds(prev_raw) + segs
-            updates.append((time_cell_for_row, segundos_a_hms(new_secs)))
-
-        updates.append((info["est"], ""))
-        batch_write(updates)
+        # Obtener tiempo actual de la celda
+        res_time = sheets_batch_get(st.secrets["sheet_id"], [info["time"]])
+        prev_raw = res_time["valueRanges"][0].get("values", [[""]])[0][0]
+        new_secs = parse_time_cell_to_seconds(prev_raw) + segs
+        
+        batch_write([(info["time"], segundos_a_hms(new_secs)), (info["est"], "")])
         st.session_state["materia_activa"] = None
         st.session_state["inicio_dt"] = None
-    except Exception as e:
-        st.error(f"stop_materia error: {e}")
-    finally:
-        pedir_rerun()
+    except Exception as e: st.error(f"Error al detener: {e}")
+    finally: pedir_rerun()
 
 def main():
     cargar_estilos()
-
     if st.session_state.get("_do_rerun", False):
         st.session_state["_do_rerun"] = False
         st.rerun()
 
-    try:
-        params = st.query_params
-    except Exception:
-        params = st.experimental_get_query_params()
-
     if "usuario_seleccionado" not in st.session_state:
-        def set_user_and_rerun(u):
-            st.session_state["usuario_seleccionado"] = u
+        st.markdown("<h1 style='text-align: center;'>¿Quién sos?</h1>", unsafe_allow_html=True)
+        if st.button("👤 Facundo", use_container_width=True):
+            st.session_state["usuario_seleccionado"] = "Facundo"
             st.rerun()
-
-        if "f" in params: set_user_and_rerun("Facundo")
-        if "i" in params: set_user_and_rerun("Iván")
-        if "user" in params:
-            try:
-                uval = params["user"][0].lower() if isinstance(params["user"], (list, tuple)) else str(params["user"]).lower()
-            except:
-                uval = str(params["user"]).lower()
-            if uval in ["facu", "facundo"]: set_user_and_rerun("Facundo")
-            if uval in ["ivan", "iván", "iva"]: set_user_and_rerun("Iván")
-
-        if "usuario_seleccionado" not in st.session_state:
-            st.markdown("<h1 style='text-align: center; margin-bottom: 30px;'>¿Quién sos?</h1>", unsafe_allow_html=True)
-            if st.button("👤 Facundo", use_container_width=True):
-                st.session_state["usuario_seleccionado"] = "Facundo"
-                st.rerun()
-            st.write("")
-            if st.button("👤 Iván", use_container_width=True):
-                st.session_state["usuario_seleccionado"] = "Iván"
-                st.rerun()
-            st.stop()
-
-    # --- Carga de datos ---
-    datos_globales = cargar_datos_unificados()
-    datos = datos_globales["users_data"]
+        if st.button("👤 Iván", use_container_width=True):
+            st.session_state["usuario_seleccionado"] = "Iván"
+            st.rerun()
+        st.stop()
 
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
-
+    datos = cargar_datos_unificados()["users_data"]
+    
     materia_en_curso = st.session_state.get("materia_activa")
     inicio_dt = st.session_state.get("inicio_dt")
-
-    if materia_en_curso is None:
-        for m, est_raw in datos[USUARIO_ACTUAL]["estado"].items():
-            if str(est_raw).strip() != "":
-                try:
-                    inicio_dt_sheet = parse_datetime(est_raw)
-                    st.session_state["materia_activa"] = m
-                    st.session_state["inicio_dt"] = inicio_dt_sheet
-                    materia_en_curso = m
-                    inicio_dt = inicio_dt_sheet
-                except Exception:
-                    pass
-                break
-
     usuario_estudiando = materia_en_curso is not None
 
-    placeholder_materias = {m: st.empty() for m in USERS[USUARIO_ACTUAL]}
+    # ANKI SECTION
+    anki_data = fetch_anki_stats(USUARIO_ACTUAL)
+    if anki_data:
+        with st.expander("📊 Estadísticas Anki"):
+            for deck, stats in anki_data.items():
+                if not isinstance(stats, dict): continue
+                total = stats.get("total", 0)
+                if total == 0: continue
+                mat = stats.get("mature", 0)
+                yng = stats.get("young", 0)
+                oth = max(0, total - mat - yng)
+                p_mat, p_yng = (mat/total)*100, (yng/total)*100
+                st.markdown(f"**{deck}** <small>({total} cartas)</small>", unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div style="width: 100%; height: 12px; border-radius: 6px; overflow: hidden; display: flex; background: #444; margin-bottom: 10px;">
+                        <div style="background: #31A354; width: {p_mat}%;"></div>
+                        <div style="background: #74C476; width: {p_yng}%;"></div>
+                    </div>
+                """, unsafe_allow_html=True)
 
-    while True:
-        tiempo_anadido_seg = 0
-        if usuario_estudiando and inicio_dt is not None:
-            tiempo_anadido_seg = int((_argentina_now_global() - inicio_dt).total_seconds())
-
-        # ------------------ ANKI STATS ------------------
-        anki_data = fetch_anki_stats(USUARIO_ACTUAL)
-        C_MATURE, C_YOUNG, C_OTHER = "#31A354", "#74C476", "#BDBDBD"
+    # MATERIAS SECTION
+    for materia, info in USERS[USUARIO_ACTUAL].items():
+        base_seg = hms_a_segundos(datos[USUARIO_ACTUAL]["tiempos"][materia])
+        en_curso = (materia_en_curso == materia)
         
-        if anki_data:
-            with st.expander("Anki"):
-                for deck_name, stats in anki_data.items():
-                    if isinstance(stats, dict) and 'total' not in stats:
-                        st.markdown(f"## {deck_name}", unsafe_allow_html=True)
-                        for subdeck_name, sub_stats in stats.items():
-                            if not isinstance(sub_stats, dict): continue
-                            a_total = sub_stats.get("total", 0)
-                            a_young = sub_stats.get("young", 0)
-                            a_mature = sub_stats.get("mature", 0)
-                            a_other = max(0, a_total - a_mature - a_young)
-                            if a_total > 0:
-                                p_mat = (a_mature / a_total) * 100
-                                p_you = (a_young / a_total) * 100
-                                p_oth = (a_other / a_total) * 100
-                            else:
-                                p_mat, p_you, p_oth = 0, 0, 0
-                            st.markdown(f"**{subdeck_name}** <span style='color:#888; font-size:0.8em;'>({a_total} cartas)</span>", unsafe_allow_html=True)
-                            st.markdown(f"""
-                                <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 2px; color: #ccc;">
-                                    <span style="color: {C_MATURE};">Maduras: {a_mature} ({p_mat:.0f}%)</span>
-                                    <span style="color: {C_YOUNG};">Jóvenes: {a_young} ({p_you:.0f}%)</span>
-                                    <span style="color: {C_OTHER};">Otros: {a_other}</span>
-                                </div>
-                                <div style="width: 100%; height: 15px; border-radius: 5px; overflow: hidden; display: flex; border: 1px solid #444; margin-bottom: 15px;">
-                                    <div title="Mature" style="background-color: {C_MATURE}; width: {p_mat}%; height: 100%;"></div>
-                                    <div title="Young" style="background-color: {C_YOUNG}; width: {p_you}%; height: 100%;"></div>
-                                    <div title="Otros" style="background-color: {C_OTHER}; width: {p_oth}%; height: 100%;"></div>
-                                </div>
-                            """, unsafe_allow_html=True)
-                    elif isinstance(stats, dict) and 'total' in stats: 
-                        a_total = stats.get("total", 0)
-                        a_young = stats.get("young", 0)
-                        a_mature = stats.get("mature", 0)
-                        a_other = max(0, a_total - a_mature - a_young)
-                        if a_total > 0:
-                            p_mat = (a_mature / a_total) * 100
-                            p_you = (a_young / a_total) * 100
-                            p_oth = (a_other / a_total) * 100
-                        else:
-                            p_mat, p_you, p_oth = 0, 0, 0
-                        st.markdown(f"**{deck_name}** <span style='color:#888; font-size:0.8em;'>({a_total} cartas)</span>", unsafe_allow_html=True)
-                        st.markdown(f"""
-                            <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 2px; color: #ccc;">
-                                <span style="color: {C_MATURE};">Mat: {a_mature} ({p_mat:.0f}%)</span>
-                                <span style="color: {C_YOUNG};">Yng: {a_young} ({p_you:.0f}%)</span>
-                                <span style="color: {C_OTHER};">Oth: {a_other}</span>
-                            </div>
-                            <div style="width: 100%; height: 15px; border-radius: 5px; overflow: hidden; display: flex; border: 1px solid #444; margin-bottom: 15px;">
-                                <div title="Mature" style="background-color: {C_MATURE}; width: {p_mat}%; height: 100%;"></div>
-                                <div title="Young" style="background-color: {C_YOUNG}; width: {p_you}%; height: 100%;"></div>
-                                <div title="Otros" style="background-color: {C_OTHER}; width: {p_oth}%; height: 100%;"></div>
-                            </div>
-                        """, unsafe_allow_html=True)
+        if en_curso and inicio_dt:
+            base_seg += int((_argentina_now_global() - inicio_dt).total_seconds())
+
+        # Info extra (Columnas E y F de Facundo)
+        extra_info = datos[USUARIO_ACTUAL]["extra"].get(materia, "")
+        extra_html = f'<span class="materia-extra">{extra_info}</span>' if extra_info else ""
         
-        # --- Actualizar Placeholders de Materias y Botones ---
-        mis_materias = USERS[USUARIO_ACTUAL]
-        for materia, info in mis_materias.items():
+        badge_html = f'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''
+        
+        st.markdown(f"""
+            <div class="materia-card">
+                <div class="materia-title">{materia}{extra_html}</div>
+                {badge_html}
+                <div class="materia-time">{segundos_a_hms(base_seg)}</div>
+            </div>
+        """, unsafe_allow_html=True)
 
-            base_seg = hms_a_segundos(datos[USUARIO_ACTUAL]["tiempos"][materia])
-            tiempo_total_seg = base_seg
-            en_curso = materia_en_curso == materia
-
+        col1, col2 = st.columns([1, 1])
+        with col1:
             if en_curso:
-                tiempo_total_seg += max(0, tiempo_anadido_seg)
+                st.button(f"⛔ DETENER", key=f"stop_{materia}", on_click=stop_materia_callback, args=(USUARIO_ACTUAL, materia), use_container_width=True)
+            elif not usuario_estudiando:
+                st.button(f"▶ INICIAR", key=f"start_{materia}", on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia), use_container_width=True)
+        
+        with col2:
+            with st.expander("🛠️"):
+                new_t = st.text_input("HH:MM:SS", value=datos[USUARIO_ACTUAL]["tiempos"][materia], key=f"in_{materia}")
+                if st.button("Guardar", key=f"save_{materia}"):
+                    if not usuario_estudiando:
+                        batch_write([(info["time"], new_t)])
+                        pedir_rerun()
+                    else: st.error("No podés editar mientras estudias")
 
-            tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
-            badge_html = f'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''
-            html_card = f"""<div class="materia-card"><div class="materia-title">{materia}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
-
-            with placeholder_materias[materia].container():
-                st.markdown(html_card, unsafe_allow_html=True)
-
-                key_start = sanitize_key(f"start_{USUARIO_ACTUAL}_{materia}")
-                key_stop = sanitize_key(f"stop_{USUARIO_ACTUAL}_{materia}")
-                key_disabled = sanitize_key(f"dis_{USUARIO_ACTUAL}_{materia}")
-
-                cols = st.columns([1,1,1])
-                with cols[0]:
-                    if en_curso:
-                        st.button(f"⛔ DETENER {materia[:14]}", key=key_stop, use_container_width=True,
-                                  on_click=stop_materia_callback, args=(USUARIO_ACTUAL, materia))
-                    else:
-                        if materia_en_curso is None:
-                            st.button("▶ INICIAR", key=key_start, use_container_width=True,
-                                      on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia))
-                        else:
-                            st.button("...", disabled=True, key=key_disabled, use_container_width=True)
-
-                with cols[1]:
-                    with st.expander("🛠️ Corregir tiempo manualmente"):
-                        input_key = f"input_{sanitize_key(materia)}"
-                        new_val = st.text_input("Tiempo (HH:MM:SS)", value=datos[USUARIO_ACTUAL]["tiempos"][materia], key=input_key)
-
-                        def save_correction_callback(materia_key):
-                            if st.session_state.get("materia_activa") is not None:
-                                st.error("⛔ No podés corregir el tiempo mientras estás estudiando.")
-                                pedir_rerun()
-                                return
-
-                            val = st.session_state.get(f"input_{sanitize_key(materia_key)}", "").strip()
-                            if ":" not in val:
-                                st.error("Formato inválido (debe ser HH:MM:SS)")
-                                pedir_rerun()
-                                return
-
-                            try:
-                                segs = hms_a_segundos(val)
-                                hhmmss = segundos_a_hms(segs)
-                                target_row = get_time_row()  # recalculamos por si cambió
-                                time_cell_for_row = replace_row_in_range(USERS[USUARIO_ACTUAL][materia_key]["time"], target_row)
-                                batch_write([(time_cell_for_row, hhmmss)])
-                                st.success("Tiempo corregido correctamente.")
-                            except Exception as e:
-                                st.error(f"Error al corregir el tiempo: {e}")
-                            finally:
-                                pedir_rerun()
-
-                        if en_curso or usuario_estudiando:
-                            st.info("⛔ No podés corregir el tiempo mientras estás estudiando.")
-                        else:
-                            if st.button("Guardar Corrección", key=f"save_{sanitize_key(materia)}", on_click=save_correction_callback, args=(materia,)):
-                                pass
-
-        if not usuario_estudiando:
-            st.stop()
-
+    if usuario_estudiando:
         time.sleep(10)
         st.rerun()
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        st.error(f"Error crítico en main(): {e}")
-        st.sidebar.error(f"Error crítico: {e}")
-        if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
-            st.session_state.clear()
-            st.rerun()
+    main()
