@@ -176,7 +176,7 @@ def main():
             with cols[i % 3]:
                 with st.container(border=True):
                     if libro.get("imagen"):
-                        st.image(libro["imagen"], width=True)
+                        st.image(libro["imagen"], use_column_width=True)
                     
                     st.subheader(libro["titulo"])
                     st.write(f"**{libro['autor']}**")
