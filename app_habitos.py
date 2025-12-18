@@ -344,7 +344,7 @@ def run():
     STREAK_GOAL = 30 # Objetivo de la barra de progreso (ajustable)
     streak_pct = min(streak / STREAK_GOAL, 1.0) * 100
     
-    status_text = f"{HABIT_NAME} - Día {streak} 🔥"
+    status_text = f"{HABIT_NAME}, tocar cuenta."
     
     st.markdown(f"""
         <div style="background-color: #262730; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
@@ -357,7 +357,7 @@ def run():
 
     if not completed:
         st.button(
-            f"✅ Marcar {HABIT_NAME} (Día {streak + 1})",
+            f"Completado",
             key="habit_streak_log",
             on_click=log_habit_streak,
             args=(HABIT_NAME, sheet), 
