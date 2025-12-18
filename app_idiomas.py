@@ -587,8 +587,4 @@ if __name__ == "__main__":
         st.sidebar.error(f"Error crítico: {e}")
         if st.sidebar.button("Reiniciar sesión (limpiar estado)"):
             st.session_state.clear()
-<<<<<<< HEAD
             st.rerun()
-=======
-            st.rerun()
->>>>>>> c6f5250472b17f00389871d6ff8518901b6fcacc
