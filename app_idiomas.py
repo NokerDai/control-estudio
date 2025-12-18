@@ -69,7 +69,7 @@ creds = service_account.Credentials.from_service_account_info(
 )
 session = AuthorizedSession(creds)
 
-SPREADSHEET_ID = st.secrets["spreadsheet_id"]
+SPREADSHEET_ID = st.secrets["sheet_id"]
 RANGE_NAME = 'F. Idiomas!A2:F100' # Extendemos el rango hasta la columna F
 
 USUARIOS_DISPONIBLES = ["Facundo", "Iván"]
