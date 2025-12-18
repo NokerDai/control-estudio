@@ -747,14 +747,14 @@ def main():
                 cols = st.columns([1,1,1])
                 with cols[0]:
                     if en_curso:
-                        st.button(f"⛔ DETENER {materia[:14]}", key=key_stop, use_container_width=True,
+                        st.button(f"⛔ DETENER {materia[:14]}", key=key_stop, width=True,
                                   on_click=stop_materia_callback, args=(USUARIO_ACTUAL, materia))
                     else:
                         if materia_en_curso is None:
-                            st.button("▶ INICIAR", key=key_start, use_container_width=True,
+                            st.button("▶ INICIAR", key=key_start, width=True,
                                       on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia))
                         else:
-                            st.button("...", disabled=True, key=key_disabled, use_container_width=True)
+                            st.button("...", disabled=True, key=key_disabled, width=True)
 
                 with cols[1]:
                     with st.expander("🛠️ Corregir tiempo manualmente"):
