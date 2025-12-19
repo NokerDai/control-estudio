@@ -52,6 +52,12 @@ def cargar_estilos():
         .status-active { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
 
         div.stButton > button { height: 3.5rem; font-size: 1.2rem !important; font-weight: bold !important; border-radius: 12px !important; }
+        .materia-extra {
+            font-size: 0.85rem;
+            font-style: italic;
+            color: #b0b0b0;
+            margin-left: 6px;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -545,14 +551,19 @@ def main():
             
             valor_E = datos_globales["extras"].get("F_idiomas_E", "")
             valor_F = datos_globales["extras"].get("F_idiomas_F", "")
+
+            extra_html = ""
+            extra = None
             if materia == "🇩🇪 Deutsch" and USUARIO_ACTUAL == "Facundo":
                 extra = valor_E
             elif materia == "🇨🇳 普通话" and USUARIO_ACTUAL == "Facundo":
                 extra = valor_F
+            if extra:
+                extra_html = f'<span class="materia-extra">{extra}</span>'
 
             tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
             badge_html = f'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''
-            html_card = f"""<div class="materia-card"><div class="materia-title">{materia} {extra}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
+            html_card = f"""<div class="materia-card"><div class="materia-title">{materia} {extra_html}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
 
             with placeholder_materias[materia].container():
                 st.markdown(html_card, unsafe_allow_html=True)
