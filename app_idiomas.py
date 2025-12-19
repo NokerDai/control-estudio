@@ -242,13 +242,32 @@ USERS = {
 @st.cache_data()
 def cargar_datos_unificados():
     all_ranges = []
-    mapa_indices = {"materias": {}}
+    mapa_indices = {"materias": {}, "extras": {}}
     idx = 0
+
+    # --- Construir lista de ranges para materias (igual que antes) ---
     for user, materias in USERS.items():
         for m, info in materias.items():
             all_ranges.append(info["est"]); mapa_indices["materias"][(user, m, "est")] = idx; idx += 1
             all_ranges.append(info["time"]); mapa_indices["materias"][(user, m, "time")] = idx; idx += 1
 
+    # --- RANGES EXTRAS: leer E y F de 'F. Idiomas' (solo una vez) ---
+    # Usamos TIME_ROW actual insertado en la cadena (coherente con resto del código).
+    extra_ranges = {
+        "F_idiomas_E": f"'{SHEET_FACUNDO}'!E{TIME_ROW}",
+        "F_idiomas_F": f"'{SHEET_FACUNDO}'!F{TIME_ROW}",
+    }
+    for key, r in extra_ranges.items():
+        # Evitar duplicados: solo agregar si no estaba ya en all_ranges
+        if r not in all_ranges:
+            all_ranges.append(r)
+            mapa_indices["extras"][key] = idx
+            idx += 1
+        else:
+            # si ya está, mapear su índice actual
+            mapa_indices["extras"][key] = all_ranges.index(r)
+
+    # --- Llamada única a Google Sheets ---
     try:
         res = sheets_batch_get(st.secrets["sheet_id"], all_ranges)
     except Exception as e:
@@ -258,10 +277,12 @@ def cargar_datos_unificados():
     values = res.get("valueRanges", [])
     def get_val(i, default=""):
         if i >= len(values): return default
-        vr = values[i]; rows = vr.get("values", [])
+        vr = values[i]
+        rows = vr.get("values", [])
         if not rows: return default
         return rows[0][0] if rows[0] else default
 
+    # --- Reconstruir estructura de usuarios como antes ---
     data_usuarios = {u: {"estado": {}, "tiempos": {}, "inicio_dt": None, "materia_activa": None} for u in USERS}
     materia_en_curso = None
     inicio_dt = None
@@ -284,12 +305,19 @@ def cargar_datos_unificados():
                 except Exception:
                     pass
 
+    # --- Extraer los strings leídos en extras ---
+    extras_res = {}
+    for key, idx_pos in mapa_indices["extras"].items():
+        extras_res[key] = get_val(idx_pos, "")
+
+    # --- Guardar en session_state si corresponde (igual que antes) ---
     if "usuario_seleccionado" in st.session_state:
         st.session_state["materia_activa"] = materia_en_curso
         st.session_state["inicio_dt"] = inicio_dt
 
     return {
-        "users_data": data_usuarios
+        "users_data": data_usuarios,
+        "extras": extras_res
     }
 
 def batch_write(updates):
@@ -514,10 +542,17 @@ def main():
 
             if en_curso:
                 tiempo_total_seg += max(0, tiempo_anadido_seg)
+            
+            valor_E = datos_globales["extras"].get("F_idiomas_E", "")
+            valor_F = datos_globales["extras"].get("F_idiomas_F", "")
+            if materia == "🇩🇪 Deutsch" and USUARIO_ACTUAL == "Facundo":
+                extra = valor_E
+            elif materia == "🇨🇳 普通话" and USUARIO_ACTUAL == "Facundo":
+                extra = valor_F
 
             tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
             badge_html = f'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''
-            html_card = f"""<div class="materia-card"><div class="materia-title">{materia}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
+            html_card = f"""<div class="materia-card"><div class="materia-title">{materia} {extra}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
 
             with placeholder_materias[materia].container():
                 st.markdown(html_card, unsafe_allow_html=True)
