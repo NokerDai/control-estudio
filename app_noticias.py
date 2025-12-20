@@ -3,7 +3,7 @@ import feedparser
 import requests
 import urllib.parse
 from bs4 import BeautifulSoup
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 
 
 COUNTRIES = {
@@ -14,7 +14,7 @@ COUNTRIES = {
 }
 
 
-translator = Translator()
+translator = GoogleTranslator(source="auto", target="es")
 
 
 @st.cache_data(ttl=120)
@@ -25,8 +25,7 @@ def fetch_feed(url: str):
 @st.cache_data(ttl=3600)
 def translate_to_spanish(text: str) -> str:
     try:
-        result = translator.translate(text, dest="es")
-        return result.text
+        return translator.translate(text)
     except Exception:
         return text
 
@@ -72,10 +71,6 @@ def extract_og_image(article_url: str, timeout: int = 6):
         if og and og.get("content"):
             return og["content"]
 
-        img = soup.find("img")
-        if img and img.get("src"):
-            return img["src"]
-
     except Exception:
         return None
 
@@ -89,9 +84,7 @@ def main():
     )
 
     st.title("Visualizador de Google News")
-    st.markdown(
-        "Titulares por país usando Google News RSS, con traducción opcional al español."
-    )
+    st.markdown("Titulares por país con traducción opcional al español.")
 
     with st.sidebar:
         st.markdown("---")
@@ -133,9 +126,7 @@ def main():
 
         final_link = resolve_url(link) if resolve_links and link else link
 
-        image_url = None
-        if fetch_images and final_link:
-            image_url = extract_og_image(final_link)
+        image_url = extract_og_image(final_link) if fetch_images else None
 
         cols = st.columns([1, 4]) if image_url else st.columns([1])
 
