@@ -143,24 +143,14 @@ def main():
             title_display = title_original
 
         final_link = resolve_url(link) if resolve_links and link else link
-        image_url = extract_og_image(final_link) if fetch_images else None
 
-        cols = st.columns([1, 4]) if image_url else st.columns([1])
+        cols = st.columns([1])
 
-        if image_url:
-            with cols[0]:
-                st.image(image_url, use_column_width=True)
-            with cols[1]:
-                st.markdown(f"### [{title_display}]({final_link})")
-                if published:
-                    st.caption(published)
-                st.write(summary, unsafe_allow_html=True)
-        else:
-            with cols[0]:
-                st.markdown(f"### [{title_display}]({final_link})")
-                if published:
-                    st.caption(published)
-                st.write(summary, unsafe_allow_html=True)
+        with cols[0]:
+            st.markdown(f"### [{title_display}]({final_link})")
+            if published:
+                st.caption(published)
+            st.write(summary, unsafe_allow_html=True)
 
         st.divider()
 
