@@ -6,4 +6,4 @@ pytz
 google-api-python-client
 feedparser
 bs4
-googletrans
+googletrans==4.0.0-rc1
