@@ -545,6 +545,9 @@ def stop_materia_callback(usuario, materia):
         pedir_rerun()
 
 def main():
+    st.set_page_config(
+        page_icon="📖"
+    )
     cargar_estilos()
 
     if st.session_state.get("_do_rerun", False):

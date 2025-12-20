@@ -197,7 +197,7 @@ if USUARIO_ACTUAL in RESTRICTED_USERS:
 # --- Botón para ir a ESTUDIO ---
 # Solo se muestra si NO estamos en la página "estudio"
 if st.session_state.current_page != "estudio":
-    if st.sidebar.button("📚 Estudio", use_container_width=True):
+    if st.sidebar.button("📖 Estudio", use_container_width=True):
         st.session_state.current_page = "estudio"
         st.rerun()
 
@@ -211,7 +211,7 @@ if st.session_state.current_page != "idiomas":
 # --- Botón para ir a BIBLIOTECA ---
 # Solo se muestra si NO estamos en la página "biblioteca"
 if st.session_state.current_page != "biblioteca":
-    if st.sidebar.button("📖 Biblioteca", use_container_width=True):
+    if st.sidebar.button("📚 Biblioteca", use_container_width=True):
         st.session_state.current_page = "biblioteca"
         st.rerun()
 

@@ -63,6 +63,9 @@ def save_library_data(file_id, data):
 # === INTERFAZ PRINCIPAL ===
 def main():
     st.title("📚 Biblioteca")
+    st.set_page_config(
+        page_icon="📚"
+    )
 
     usuario = st.session_state.get("usuario_seleccionado")
     if not usuario:

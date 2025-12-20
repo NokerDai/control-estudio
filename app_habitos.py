@@ -37,6 +37,10 @@ def check_password():
     return False
 
 def run():
+    st.set_page_config(
+        page_icon="📅"
+    )
+
     # Si la contraseña no es correcta → NO seguir cargando la app
     if not check_password():
         st.stop()

@@ -412,6 +412,9 @@ def stop_materia_callback(usuario, materia):
 
 def main():
     cargar_estilos()
+    st.set_page_config(
+        page_icon="🌎"
+    )
 
     if st.session_state.get("_do_rerun", False):
         st.session_state["_do_rerun"] = False
