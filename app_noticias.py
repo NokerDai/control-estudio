@@ -113,9 +113,6 @@ def main():
     # 1. INDEC arriba de todo
     mostrar_alerta_indec()
 
-    st.title("Visualizador de Google News")
-    st.markdown("Noticias internacionales y agenda económica.")
-
     # 2. BARRA LATERAL
     with st.sidebar:
         country = st.selectbox("País", list(COUNTRIES.keys()))
@@ -142,8 +139,6 @@ def main():
     if not entries:
         st.info("No hay noticias para mostrar.")
         return
-
-    st.divider()
 
     # 4. RENDERIZADO
     for entry in entries:
