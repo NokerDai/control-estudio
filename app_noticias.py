@@ -2,8 +2,8 @@ import streamlit as st
 import feedparser
 import requests
 import urllib.parse
-from datetime import datetime
 from bs4 import BeautifulSoup
+from googletrans import Translator
 
 
 COUNTRIES = {
@@ -14,9 +14,21 @@ COUNTRIES = {
 }
 
 
+translator = Translator()
+
+
 @st.cache_data(ttl=120)
 def fetch_feed(url: str):
     return feedparser.parse(url)
+
+
+@st.cache_data(ttl=3600)
+def translate_to_spanish(text: str) -> str:
+    try:
+        result = translator.translate(text, dest="es")
+        return result.text
+    except Exception:
+        return text
 
 
 def build_feed_url(country_key: str, query: str = "") -> str:
@@ -76,18 +88,17 @@ def main():
         layout="wide",
     )
 
-    st.title("Visualizador de Google News (RSS)")
+    st.title("Visualizador de Google News")
     st.markdown(
-        "Selecciona país y (opcionalmente) una búsqueda para "
-        "ver titulares de Google News."
+        "Titulares por país usando Google News RSS, con traducción opcional al español."
     )
 
-    # Sidebar
     with st.sidebar:
         st.markdown("---")
         country = st.selectbox("País", list(COUNTRIES.keys()))
         query = st.text_input("Buscar (opcional)", "")
         n_articles = st.slider("Cantidad de artículos", 5, 50, 15)
+        translate_titles = st.checkbox("Traducir títulos al español", False)
         fetch_images = st.checkbox("Extraer imágenes (lento)", False)
         resolve_links = st.checkbox("Resolver enlaces finales", True)
 
@@ -106,16 +117,21 @@ def main():
         st.info("No se encontraron artículos.")
         return
 
+    st.divider()
+
     for entry in entries:
-        title = entry.get("title", "Sin título")
+        title_original = entry.get("title", "Sin título")
         summary = entry.get("summary", "")
         link = entry.get("link", "")
         published = entry.get("published", "")
 
-        if resolve_links and link:
-            final_link = resolve_url(link)
+        if translate_titles:
+            title_es = translate_to_spanish(title_original)
+            title_display = f"{title_es}\n\n*({title_original})*"
         else:
-            final_link = link
+            title_display = title_original
+
+        final_link = resolve_url(link) if resolve_links and link else link
 
         image_url = None
         if fetch_images and final_link:
@@ -127,14 +143,18 @@ def main():
             with cols[0]:
                 st.image(image_url, use_column_width=True)
             with cols[1]:
-                st.markdown(f"### [{title}]({final_link})")
-                st.caption(published)
+                st.markdown(f"### [{title_display}]({final_link})")
+                if published:
+                    st.caption(published)
                 st.write(summary, unsafe_allow_html=True)
         else:
             with cols[0]:
-                st.markdown(f"### [{title}]({final_link})")
-                st.caption(published)
+                st.markdown(f"### [{title_display}]({final_link})")
+                if published:
+                    st.caption(published)
                 st.write(summary, unsafe_allow_html=True)
+
+        st.divider()
 
 
 if __name__ == "__main__":
