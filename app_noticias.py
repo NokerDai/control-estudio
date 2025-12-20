@@ -64,20 +64,9 @@ def mostrar_alerta_indec():
 
     # 3. Mostrar resultados
     if publicaciones_hoy:
-        st.info(f"📅 **PUBLICACIONES DE INDEC PARA HOY ({hoy}):**")
         for pub in publicaciones_hoy:
-            st.markdown(f"• **{pub['indicador']}**")
+            st.info(f"📅INDEC: {pub['indicador']}")
         st.divider()
-    else:
-        # MENSAJE DE DEPURACIÓN (Solo visible si falla)
-        with st.expander(f"🔍 Debug: No se encontraron datos para {hoy}"):
-            st.write("Fechas encontradas en el JSON (últimas 5):")
-            fechas_json = [p.get("fecha") for p in publicaciones[-5:]]
-            st.write(fechas_json)
-            st.write("Si tu fecha no está aquí, Google Drive está enviando una versión vieja del archivo.")
-            if st.button("Limpiar Caché y Recargar"):
-                st.cache_data.clear()
-                st.rerun()
 
 # --- FUNCIONES DE NOTICIAS ---
 
@@ -129,13 +118,6 @@ def main():
 
     # 2. BARRA LATERAL
     with st.sidebar:
-        st.header("Filtros")
-        
-        # Botón para limpiar caché manualmente si editaste el JSON
-        if st.button("🔄 Recargar Datos"):
-            st.cache_data.clear()
-            st.rerun()
-
         country = st.selectbox("País", list(COUNTRIES.keys()))
         topic_label = st.selectbox("Tema", list(TOPICS.keys()))
         topic_id = TOPICS[topic_label]
