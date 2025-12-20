@@ -6,6 +6,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from bs4 import BeautifulSoup
 from deep_translator import GoogleTranslator
+import time
 
 # --- CONFIGURACIÓN DE NOTICIAS ---
 COUNTRIES = {
@@ -25,14 +26,14 @@ translator = GoogleTranslator(source="auto", target="es")
 
 # --- FUNCIONES DE INDEC (DRIVE) ---
 
-# Bajamos el tiempo de caché a 600s (10 min) para ver actualizaciones más rápido
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=60) # Bajamos a 60 segundos para pruebas
 def obtener_calendario_indec():
-    """Descarga el JSON del calendario desde Google Drive usando el ID de secrets."""
+    """Descarga el JSON del calendario desde Google Drive."""
     try:
-        # Obtenemos el ID desde st.secrets
         id_drive = st.secrets["DRIVE_FILE_ID"]
-        url = f"https://drive.google.com/uc?export=download&id={id_drive}"
+        # TRUCO: Agregamos un timestamp a la URL para que Google no nos de una versión cacheada
+        timestamp = int(time.time())
+        url = f"https://drive.google.com/uc?export=download&id={id_drive}&t={timestamp}"
         
         response = requests.get(url, timeout=10)
         response.raise_for_status()
@@ -47,25 +48,36 @@ def mostrar_alerta_indec():
     if not datos:
         return
 
-    # Definimos la fecha actual forzando la zona horaria de Argentina (UTC-3)
-    # Esto evita errores si el servidor está en UTC u otra zona.
+    # 1. Calcular fecha actual (Argentina UTC-3)
     utc_now = datetime.now(timezone.utc)
     arg_time = utc_now - timedelta(hours=3)
     hoy = arg_time.strftime("%Y-%m-%d")
     
-    # Buscamos coincidencias en el JSON
+    # 2. Buscar coincidencias limpiando espacios en blanco
     publicaciones = datos.get("publicaciones", [])
-    publicaciones_hoy = [p for p in publicaciones if p.get("fecha") == hoy]
+    
+    # Usamos .strip() por si el JSON tiene "2025-12-20 " con espacio final
+    publicaciones_hoy = [
+        p for p in publicaciones 
+        if p.get("fecha", "").strip() == hoy
+    ]
 
+    # 3. Mostrar resultados
     if publicaciones_hoy:
         st.info(f"📅 **PUBLICACIONES DE INDEC PARA HOY ({hoy}):**")
         for pub in publicaciones_hoy:
             st.markdown(f"• **{pub['indicador']}**")
         st.divider()
     else:
-        # Opcional: Mostrar en sidebar para depuración si no hay nada hoy
-        with st.sidebar:
-            st.caption(f"Sin alertas INDEC para hoy ({hoy}).")
+        # MENSAJE DE DEPURACIÓN (Solo visible si falla)
+        with st.expander(f"🔍 Debug: No se encontraron datos para {hoy}"):
+            st.write("Fechas encontradas en el JSON (últimas 5):")
+            fechas_json = [p.get("fecha") for p in publicaciones[-5:]]
+            st.write(fechas_json)
+            st.write("Si tu fecha no está aquí, Google Drive está enviando una versión vieja del archivo.")
+            if st.button("Limpiar Caché y Recargar"):
+                st.cache_data.clear()
+                st.rerun()
 
 # --- FUNCIONES DE NOTICIAS ---
 
