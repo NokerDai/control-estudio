@@ -38,6 +38,7 @@ def obtener_calendario_indec():
         return response.json()
     except Exception as e:
         # Si no existe el secret o falla la conexión, devolvemos None
+        st.error(f"No se pudo obtener el calendario de INDEC: {e}")
         return None
 
 def mostrar_alerta_indec():
