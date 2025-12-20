@@ -13,6 +13,12 @@ COUNTRIES = {
     "China": {"gl": "CN", "hl": "zh-CN", "ceid": "CN:zh-CN"},
 }
 
+TOPICS = {
+    "Economía / Negocios": "BUSINESS",
+    "Ciencia": "SCIENCE",
+    "Tecnología": "TECHNOLOGY",
+}
+
 
 translator = GoogleTranslator(source="auto", target="es")
 
@@ -30,18 +36,25 @@ def translate_to_spanish(text: str) -> str:
         return text
 
 
-def build_feed_url(country_key: str, query: str = "") -> str:
+def build_feed_url(
+    country_key: str,
+    query: str = "",
+    topic: str | None = None,
+) -> str:
     cfg = COUNTRIES[country_key]
+    params = f"hl={cfg['hl']}&gl={cfg['gl']}&ceid={cfg['ceid']}"
+
     if query.strip():
         q_enc = urllib.parse.quote(query)
+        return f"https://news.google.com/rss/search?q={q_enc}&{params}"
+
+    if topic:
         return (
-            f"https://news.google.com/rss/search?q={q_enc}"
-            f"&hl={cfg['hl']}&gl={cfg['gl']}&ceid={cfg['ceid']}"
+            "https://news.google.com/rss/headlines/section/topic/"
+            f"{topic}?{params}"
         )
-    return (
-        f"https://news.google.com/rss"
-        f"?hl={cfg['hl']}&gl={cfg['gl']}&ceid={cfg['ceid']}"
-    )
+
+    return f"https://news.google.com/rss?{params}"
 
 
 def resolve_url(url: str, timeout: int = 6) -> str:
@@ -84,18 +97,23 @@ def main():
     )
 
     st.title("Visualizador de Google News")
-    st.markdown("Titulares por país con traducción opcional al español.")
+    st.markdown(
+        "Titulares por país con selección de tema y traducción opcional al español."
+    )
 
     with st.sidebar:
         st.markdown("---")
         country = st.selectbox("País", list(COUNTRIES.keys()))
+        topic_label = st.selectbox("Tema", list(TOPICS.keys()))
+        topic_id = TOPICS[topic_label]
+
         query = st.text_input("Buscar (opcional)", "")
         n_articles = st.slider("Cantidad de artículos", 5, 50, 15)
         translate_titles = st.checkbox("Traducir títulos al español", False)
         fetch_images = st.checkbox("Extraer imágenes (lento)", False)
         resolve_links = st.checkbox("Resolver enlaces finales", True)
 
-    feed_url = build_feed_url(country, query)
+    feed_url = build_feed_url(country, query, topic_id)
     st.sidebar.code(feed_url)
 
     parsed = fetch_feed(feed_url)
@@ -125,7 +143,6 @@ def main():
             title_display = title_original
 
         final_link = resolve_url(link) if resolve_links and link else link
-
         image_url = extract_og_image(final_link) if fetch_images else None
 
         cols = st.columns([1, 4]) if image_url else st.columns([1])
