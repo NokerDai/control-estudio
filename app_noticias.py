@@ -84,6 +84,7 @@ def main():
 
     # Sidebar
     with st.sidebar:
+        st.markdown("---")
         country = st.selectbox("País", list(COUNTRIES.keys()))
         query = st.text_input("Buscar (opcional)", "")
         n_articles = st.slider("Cantidad de artículos", 5, 50, 15)
