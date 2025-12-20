@@ -110,7 +110,6 @@ def main():
         query = st.text_input("Buscar (opcional)", "")
         n_articles = st.slider("Cantidad de artículos", 5, 50, 15)
         translate_titles = st.checkbox("Traducir títulos al español", False)
-        fetch_images = st.checkbox("Extraer imágenes (lento)", False)
         resolve_links = st.checkbox("Resolver enlaces finales", True)
 
     feed_url = build_feed_url(country, query, topic_id)
