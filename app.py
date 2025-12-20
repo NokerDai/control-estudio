@@ -3,6 +3,7 @@ import app_estudio
 import app_habitos
 import app_idiomas 
 import app_biblioteca
+import app_noticias
 from datetime import datetime
 try:
     # Necesitamos el ID de la sesión para el loc
@@ -214,6 +215,13 @@ if st.session_state.current_page != "biblioteca":
         st.session_state.current_page = "biblioteca"
         st.rerun()
 
+# --- Botón para ir a NOTICIAS ---
+# Solo se muestra si NO estamos en la página "noticias"
+if st.session_state.current_page != "noticias":
+    if st.sidebar.button("📰 Noticias", use_container_width=True):
+        st.session_state.current_page = "noticias"
+        st.rerun()
+
 # Lógica solo para usuarios Autenticados
 if st.session_state.authenticated:
     
@@ -241,6 +249,10 @@ elif st.session_state.current_page == "idiomas":
 # 3. Si eligió "biblioteca" (Autenticado o no), mostramos Biblioteca
 elif st.session_state.current_page == "biblioteca":
     app_biblioteca.main()
+
+# 4. Si eligió "noticias" (Autenticado o no), mostramos Noticias
+elif st.session_state.current_page == "noticias":
+    app_noticias.main()
 
 # 4. Por defecto (o si eligió "estudio"), mostramos Estudio
 else:
