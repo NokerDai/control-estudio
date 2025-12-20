@@ -3,7 +3,7 @@ import feedparser
 import requests
 import urllib.parse
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from bs4 import BeautifulSoup
 from deep_translator import GoogleTranslator
 
@@ -25,7 +25,8 @@ translator = GoogleTranslator(source="auto", target="es")
 
 # --- FUNCIONES DE INDEC (DRIVE) ---
 
-@st.cache_data(ttl=3600)
+# Bajamos el tiempo de caché a 600s (10 min) para ver actualizaciones más rápido
+@st.cache_data(ttl=600)
 def obtener_calendario_indec():
     """Descarga el JSON del calendario desde Google Drive usando el ID de secrets."""
     try:
@@ -37,7 +38,6 @@ def obtener_calendario_indec():
         response.raise_for_status()
         return response.json()
     except Exception as e:
-        # Si no existe el secret o falla la conexión, devolvemos None
         st.error(f"No se pudo obtener el calendario de INDEC: {e}")
         return None
 
@@ -47,17 +47,25 @@ def mostrar_alerta_indec():
     if not datos:
         return
 
-    # Fecha actual en formato YYYY-MM-DD
-    hoy = datetime.now().strftime("%Y-%m-%d")
+    # Definimos la fecha actual forzando la zona horaria de Argentina (UTC-3)
+    # Esto evita errores si el servidor está en UTC u otra zona.
+    utc_now = datetime.now(timezone.utc)
+    arg_time = utc_now - timedelta(hours=3)
+    hoy = arg_time.strftime("%Y-%m-%d")
     
     # Buscamos coincidencias en el JSON
-    publicaciones_hoy = [p for p in datos.get("publicaciones", []) if p.get("fecha") == hoy]
+    publicaciones = datos.get("publicaciones", [])
+    publicaciones_hoy = [p for p in publicaciones if p.get("fecha") == hoy]
 
     if publicaciones_hoy:
-        st.warning("📅 **PUBLICACIONES DE INDEC PARA HOY:**")
+        st.info(f"📅 **PUBLICACIONES DE INDEC PARA HOY ({hoy}):**")
         for pub in publicaciones_hoy:
             st.markdown(f"• **{pub['indicador']}**")
         st.divider()
+    else:
+        # Opcional: Mostrar en sidebar para depuración si no hay nada hoy
+        with st.sidebar:
+            st.caption(f"Sin alertas INDEC para hoy ({hoy}).")
 
 # --- FUNCIONES DE NOTICIAS ---
 
@@ -111,6 +119,12 @@ def main():
     # 2. BARRA LATERAL
     with st.sidebar:
         st.header("Filtros")
+        
+        # Botón para limpiar caché manualmente si editaste el JSON
+        if st.button("🔄 Recargar Datos"):
+            st.cache_data.clear()
+            st.rerun()
+
         country = st.selectbox("País", list(COUNTRIES.keys()))
         topic_label = st.selectbox("Tema", list(TOPICS.keys()))
         topic_id = TOPICS[topic_label]
