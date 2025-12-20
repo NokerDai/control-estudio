@@ -134,13 +134,13 @@ def main():
             with cols[0]:
                 st.image(image_url, use_column_width=True)
             with cols[1]:
-                st.markdown(f"### [{title_display}]({final_link})")
+                st.markdown(f"### {title_display}({final_link})")
                 if published:
                     st.caption(published)
                 st.write(summary, unsafe_allow_html=True)
         else:
             with cols[0]:
-                st.markdown(f"### [{title_display}]({final_link})")
+                st.markdown(f"### {title_display}({final_link})")
                 if published:
                     st.caption(published)
                 st.write(summary, unsafe_allow_html=True)
