@@ -105,8 +105,6 @@ def resolve_url(url: str, timeout: int = 6) -> str:
 
 def main():
     st.set_page_config(
-        page_title="Visualizador Google News + INDEC",
-        layout="wide",
         page_icon="📰"
     )
 
