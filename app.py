@@ -30,7 +30,7 @@ RESTRICTED_USERS = ["Facundo", "Iván"]
 
 # 1. Configuración global (Siempre va primero)
 st.set_page_config(
-    page_title="Estudio", 
+    page_title="Selector de Usuario", 
     page_icon="⏳", 
     layout="centered"
 )

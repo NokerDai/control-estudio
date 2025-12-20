@@ -117,6 +117,7 @@ def resolve_url(url: str, timeout: int = 6) -> str:
 
 def main():
     st.set_page_config(
+        page_title="Noticias", 
         page_icon="📰"
     )
 

@@ -38,6 +38,7 @@ def check_password():
 
 def run():
     st.set_page_config(
+        page_title="Hábitos",
         page_icon="📅"
     )
 

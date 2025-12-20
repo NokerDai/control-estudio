@@ -413,6 +413,7 @@ def stop_materia_callback(usuario, materia):
 def main():
     cargar_estilos()
     st.set_page_config(
+        page_title="Idiomas",
         page_icon="🌎"
     )
 

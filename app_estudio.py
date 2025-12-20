@@ -546,6 +546,7 @@ def stop_materia_callback(usuario, materia):
 
 def main():
     st.set_page_config(
+        page_title="Estudio",
         page_icon="📖"
     )
     cargar_estilos()

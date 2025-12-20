@@ -64,6 +64,7 @@ def save_library_data(file_id, data):
 def main():
     st.title("📚 Biblioteca")
     st.set_page_config(
+        page_title="Biblioteca",
         page_icon="📚"
     )
 
