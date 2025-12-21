@@ -68,7 +68,7 @@ def mostrar_alerta_indec():
 
         for pub in publicaciones_hoy:
             st.info(
-                f"📅 **INDEC**: {pub['indicador']}\n"
+                f"📅 **INDEC**: {pub['indicador']}\n\n"
                 f"🔗 [Ver calendario INDEC]({link_calendario})"
             )
 
