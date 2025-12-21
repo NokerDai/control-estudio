@@ -48,24 +48,30 @@ def mostrar_alerta_indec():
     if not datos:
         return
 
-    # 1. Calcular fecha actual (Argentina UTC-3)
+    # 1. Fecha actual Argentina (UTC-3)
     utc_now = datetime.now(timezone.utc)
     arg_time = utc_now - timedelta(hours=3)
     hoy = arg_time.strftime("%Y-%m-%d")
-    
-    # 2. Buscar coincidencias limpiando espacios en blanco
+    hoy_indec = arg_time.strftime("%Y%m%d")  # formato para el link
+
     publicaciones = datos.get("publicaciones", [])
-    
-    # Usamos .strip() por si el JSON tiene "2025-12-20 " con espacio final
+
     publicaciones_hoy = [
-        p for p in publicaciones 
+        p for p in publicaciones
         if p.get("fecha", "").strip() == hoy
     ]
 
-    # 3. Mostrar resultados
     if publicaciones_hoy:
+        link_calendario = (
+            f"https://www.indec.gob.ar/indec/web/Calendario-Fecha-{hoy_indec}"
+        )
+
         for pub in publicaciones_hoy:
-            st.info(f"📅INDEC: {pub['indicador']}")
+            st.info(
+                f"📅 **INDEC**: {pub['indicador']}\n"
+                f"🔗 [Ver calendario INDEC]({link_calendario})"
+            )
+
         st.divider()
 
 # --- FUNCIONES DE NOTICIAS ---
