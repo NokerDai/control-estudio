@@ -73,8 +73,6 @@ def run():
     WORKSHEET_NAME = st.secrets["worksheet_name"]
     BOUNDARY_COLUMN = st.secrets["boundary_column"]
     
-    # STREAK_HABIT_NAME = st.secrets["streak_habit_name"]
-    
     # -------------------------------------------------------------------
     # CONEXIÓN A GOOGLE SHEETS
     # -------------------------------------------------------------------
@@ -255,38 +253,6 @@ def run():
 
     if 'all_habits' not in st.session_state:
         st.session_state.all_habits = st.secrets["habits"]
-
-    # Obtener el estado del hábito de racha
-    streak_info = st.session_state.streak_habit_info
-    HABIT_NAME = streak_info["habit_name"]
-    streak = streak_info["current_streak"]
-    completed = streak_info["is_completed"]
-    
-    # -------------------------
-    #     HÁBITO DE RACHA
-    # -------------------------
-    STREAK_GOAL = 30 # Objetivo de la barra de progreso (ajustable)
-    streak_pct = min(streak / STREAK_GOAL, 1.0) * 100
-    
-    status_text = f"{HABIT_NAME}, tocar cuenta."
-    
-    st.markdown(f"""
-        <div style="background-color: #262730; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-            <div style="font-size: 1.1rem; color: #aaa; margin-bottom: 8px;">{status_text}</div>
-            <div style="width:100%; background-color:#444; border-radius:10px; height:12px;">
-                <div style="width:{streak_pct}%; background-color:#ff9800; height:100%; border-radius:10px;"></div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    if not completed:
-        st.button(
-            f"Completado",
-            key="habit_streak_log",
-            on_click=log_habit_streak,
-            args=(HABIT_NAME, sheet), 
-            use_container_width=True
-        )
 
 
     # -------------------------
