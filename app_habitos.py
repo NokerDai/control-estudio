@@ -100,106 +100,55 @@ def run():
             return None
 
     # -------------------------------------------------------------------
-    # LECTURA ESPECÍFICA DE RACHA (PARA EL CÁLCULO DE LA NUEVA RACHA)
-    # -------------------------------------------------------------------
-    def get_yesterdays_streak(worksheet, habit_name):
-        """Lee el número de racha (que está en la columna del hábito) del día anterior."""
-        if worksheet is None:
-            return 0
-
-        yesterday_dt = _argentina_now_global().date() - timedelta(days=1)
-        yesterday_str = f"{yesterday_dt.day:02d}/{yesterday_dt.month:02d}"
-
-        try:
-            headers = worksheet.row_values(1)
-            if habit_name not in headers:
-                return 0 
-
-            streak_col_index = headers.index(habit_name) + 1 
-
-            all_dates = worksheet.col_values(1)
-            if yesterday_str not in all_dates:
-                return 0 
-
-            yesterday_row_index = all_dates.index(yesterday_str) + 1 
-
-            streak_val = worksheet.cell(yesterday_row_index, streak_col_index).value
-
-            if streak_val:
-                try:
-                    stripped_val = streak_val.strip()
-                    if not stripped_val: return 0
-                        
-                    # CORRECCIÓN APLICADA: Usamos float() antes de int() para manejar '1.00'
-                    final_streak = int(float(stripped_val))
-                    return final_streak
-                except ValueError:
-                    return 0
-            else:
-                return 0
-
-        except Exception as e:
-            return 0
-            
-    # -------------------------------------------------------------------
     # LOG DE RACHA 
     # -------------------------------------------------------------------
-    def log_habit_streak(habit_name, worksheet):
-        """Calcula new_streak = yesterday_streak + 1 y actualiza la celda del hábito con el número de racha."""
-        try:
-            if worksheet is None: return
-
-            today_str = get_argentina_date_str()
-            
-            current_streak = get_yesterdays_streak(worksheet, habit_name) 
-            new_streak = current_streak + 1
-
-            # 1. Encontrar la fila de hoy
-            all_dates = worksheet.col_values(1)
-            if today_str not in all_dates:
-                st.error(f"La fecha de hoy ({today_str}) no está en la columna A.")
-                return
-            date_row = all_dates.index(today_str) + 1
-
-            # 2. Encontrar/Crear la columna del Hábito/Racha
-            headers = worksheet.row_values(1)
-            if habit_name in headers:
-                habit_col_idx = headers.index(habit_name) + 1
-            else:
-                if BOUNDARY_COLUMN in headers:
-                    boundary = headers.index(BOUNDARY_COLUMN)
-                    habit_col_idx = boundary + 1 
-                else:
-                    habit_col_idx = len(headers) + 1 
-                
-                worksheet.update_cell(1, habit_col_idx, habit_name)
-                headers = worksheet.row_values(1) 
-
-            # 3. Actualizar la celda del Hábito con el número de la NUEVA RACHA
-            if habit_name in headers:
-                 habit_col_idx = headers.index(habit_name) + 1
-                 worksheet.update_cell(date_row, habit_col_idx, new_streak)
-
-            st.session_state.needs_rerun = True
-
-        except Exception as e:
-            st.error(f"Error al registrar la racha: {e}")
-
     # -------------------------------------------------------------------
     # HÁBITOS DESDE SECRETS
     # -------------------------------------------------------------------
     def load_habits():
-        """Carga todos los hábitos, pero filtra el hábito de racha para el grid."""
+        """Carga todos los hábitos."""
         try:
             raw_habits = st.secrets["habits"]
             if isinstance(raw_habits, list):
                 st.session_state.all_habits = raw_habits
-                return [h for h in raw_habits]
+                return raw_habits
             st.error("El campo [gcp].habits en secrets no es una lista válida.")
             return []
         except Exception as e:
             st.error(f"Error al cargar hábitos desde secrets: {e}")
             return []
+
+    # -------------------------------------------------------------------
+    # CONFIGURACIÓN DEL ESTADO DIARIO (LÓGICA CORREGIDA)
+    # -------------------------------------------------------------------
+    def setup_daily_state(worksheet):
+        today_str = get_argentina_date_str()
+        
+        # El resto de la lógica (hábitos del grid) se mantiene
+        pending_habits_list = []
+        if worksheet is not None:
+            try:
+                all_dates = worksheet.col_values(1)
+                date_row_index = all_dates.index(today_str) if today_str in all_dates else -1
+                
+                if date_row_index != -1:
+                    today_row = worksheet.row_values(date_row_index + 1)
+                    headers = worksheet.row_values(1)
+                    
+                    for habit in st.session_state.all_habits:
+                        name = habit["name"]
+
+                        if name in headers:
+                            col_idx = headers.index(name)
+                            if col_idx >= len(today_row) or not today_row[col_idx].strip():
+                                pending_habits_list.append(name)
+                        else:
+                            pending_habits_list.append(name)
+            except:
+                 pass
+        
+        st.session_state.todays_pending_habits = pending_habits_list
+
 
     def log_habit_grid(habit_name, worksheet):
         try:
@@ -254,6 +203,7 @@ def run():
     if 'all_habits' not in st.session_state:
         st.session_state.all_habits = st.secrets["habits"]
 
+    setup_daily_state(sheet)
 
     # -------------------------
     #     GRUPOS DE HÁBITOS
