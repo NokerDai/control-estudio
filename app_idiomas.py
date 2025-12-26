@@ -235,7 +235,6 @@ USERS = {
     "Facundo": {
         "🇩🇪 Deutsch": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"},
         "🇨🇳 普通话": {"time": f"'{SHEET_FACUNDO}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!C{MARCAS_ROW}"},
-        "🇫🇷 Français": {"time": f"'{SHEET_FACUNDO}'!D{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!D{MARCAS_ROW}"},
     },
     "Iván": {
         "🇬🇧 English":    {"time": f"'{SHEET_IVAN}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!F{MARCAS_ROW}"},
@@ -260,8 +259,8 @@ def cargar_datos_unificados():
     # --- RANGES EXTRAS: leer E y F de 'F. Idiomas' (solo una vez) ---
     # Usamos TIME_ROW actual insertado en la cadena (coherente con resto del código).
     extra_ranges = {
+        "F_idiomas_D": f"'{SHEET_FACUNDO}'!D{TIME_ROW}",
         "F_idiomas_E": f"'{SHEET_FACUNDO}'!E{TIME_ROW}",
-        "F_idiomas_F": f"'{SHEET_FACUNDO}'!F{TIME_ROW}",
     }
     for key, r in extra_ranges.items():
         # Evitar duplicados: solo agregar si no estaba ya en all_ranges
@@ -553,8 +552,8 @@ def main():
             if en_curso:
                 tiempo_total_seg += max(0, tiempo_anadido_seg)
             
-            valor_E = datos_globales["extras"].get("F_idiomas_E", "")
-            valor_F = datos_globales["extras"].get("F_idiomas_F", "")
+            valor_E = datos_globales["extras"].get("F_idiomas_D", "")
+            valor_F = datos_globales["extras"].get("F_idiomas_E", "")
 
             extra_html = ""
             extra = None
