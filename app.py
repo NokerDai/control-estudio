@@ -118,6 +118,25 @@ def handle_user_login(selected_user):
 # ---------------------------------------------------------
 query_params = st.query_params
 
+if USUARIO_ACTUAL is not None:
+    # Botón explícito para desloguear y liberar el lock
+    if st.sidebar.button("🚪 Desloguear", use_container_width=True):
+        if USUARIO_ACTUAL in RESTRICTED_USERS:
+            # 1. Liberar el lock en Google Sheets
+            if app_estudio.set_user_lock_status(USUARIO_ACTUAL, ""):
+                st.toast(f"🔒 Lock de {USUARIO_ACTUAL} liberado en Sheets.")
+            else:
+                st.warning("⚠️ Error al liberar el lock de sesión en Sheets.")
+            
+        # 2. Limpiar estado de sesión local
+        st.session_state.usuario_seleccionado = None
+        st.session_state.current_page = "estudio"
+
+        if len(query_params) > 0:
+            st.query_params.clear()
+
+        st.rerun()
+
 # Si la URL tiene ?password Y aún no estamos logueados:
 if "password" in query_params and not st.session_state.authenticated:
     st.title("🔒 Acceso Administrativo")
