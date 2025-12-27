@@ -1,7 +1,6 @@
 import streamlit as st
 
 def main():
-    # Lista de filósofos en orden cronológico
     PHILOSOPHERS = [
         "Heráclito",
         "Parménides",
@@ -43,26 +42,26 @@ def main():
     st.set_page_config(page_title="Biblioteca Filosófica", layout="wide")
     st.title("Biblioteca Filosófica (orden cronológico)")
 
-    # Inicializar estado
+    # Estado
     if "library" not in st.session_state:
         st.session_state.library = {p: [] for p in PHILOSOPHERS}
 
     if "active_philosopher" not in st.session_state:
         st.session_state.active_philosopher = None
 
-    # Renderizado principal
+    # UI principal
     for philosopher in PHILOSOPHERS:
-        col1, col2 = st.columns([8, 1])
+        col1, col2 = st.columns([9, 1])
 
         with col1:
             st.markdown(f"## {philosopher}")
 
         with col2:
-            if st.button("＋", key=f"open_{philosopher}"):
+            if st.button("＋", key=f"add_{philosopher}"):
                 st.session_state.active_philosopher = philosopher
 
-        # Mostrar libros debajo del nombre
         books = st.session_state.library[philosopher]
+
         if books:
             cols = st.columns(5)
             for i, book in enumerate(books):
@@ -74,16 +73,19 @@ def main():
 
         st.divider()
 
-    # Modal para agregar libros
+    # Pseudo-modal compatible
     if st.session_state.active_philosopher:
-        with st.modal(f"Agregar libro a {st.session_state.active_philosopher}"):
-            title = st.text_input("Título del libro")
-            image_url = st.text_input("URL de la portada")
+        st.markdown("---")
+        st.subheader(f"Agregar libro a {st.session_state.active_philosopher}")
 
-            col_a, col_b = st.columns(2)
+        with st.container():
+            title = st.text_input("Título del libro", key="modal_title")
+            image_url = st.text_input("URL de la portada", key="modal_image")
 
-            with col_a:
-                if st.button("Agregar"):
+            c1, c2 = st.columns(2)
+
+            with c1:
+                if st.button("Agregar libro"):
                     if title and image_url:
                         st.session_state.library[
                             st.session_state.active_philosopher
@@ -93,7 +95,7 @@ def main():
                     else:
                         st.error("Completa todos los campos")
 
-            with col_b:
+            with c2:
                 if st.button("Cancelar"):
                     st.session_state.active_philosopher = None
                     st.rerun()
