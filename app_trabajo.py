@@ -123,7 +123,7 @@ def cargar_estilos_trabajo():
 # ------------------ GOOGLE SHEETS CORE ------------------
 def connect_to_google_sheets():
     try:
-        info = st.secrets["gcp_service_account"]
+        info = st.secrets["service_account"]
         creds = service_account.Credentials.from_service_account_info(info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
         return AuthorizedSession(creds)
     except Exception as e:
