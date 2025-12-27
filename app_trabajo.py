@@ -123,7 +123,21 @@ def cargar_estilos_trabajo():
 # ------------------ GOOGLE SHEETS CORE ------------------
 def connect_to_google_sheets():
     try:
+        # Verificamos si el secreto existe
+        if "service_account" not in st.secrets:
+            st.error("No se encontró 'gcp_service_account' en st.secrets.")
+            return None
+            
         info = st.secrets["service_account"]
+        
+        # Si Streamlit cargó el secreto como string (JSON), lo convertimos a dict
+        if isinstance(info, str):
+            info = json.loads(info)
+        else:
+            # Si es un objeto de Streamlit (Dict-like), intentamos convertirlo a dict real
+            # Esto evita el error "'str' object has no attribute 'keys'" si el parser falla
+            info = dict(info)
+            
         creds = service_account.Credentials.from_service_account_info(info, scopes=["https://www.googleapis.com/auth/spreadsheets"])
         return AuthorizedSession(creds)
     except Exception as e:
@@ -155,28 +169,28 @@ def batch_write(spreadsheet_id, updates):
         st.error(f"Error escribiendo en la hoja: {e}")
 
 # ------------------ CONFIGURACIÓN UNIFICADA ------------------
-# Usamos la misma lógica que app_estudio/idiomas: spreadsheet_id_usuario
-def get_config_usuario():
-    # Intentar obtener el ID de la planilla principal
+def get_config_usuario(username):
+    # Intentar obtener el ID de la planilla principal usando el nombre de usuario
     sheet_id = st.secrets.get("sheet_id", "")
+    
     return {
         "sheet_id": sheet_id,
         "proyecto": {
             "nombre": "Trabajo",
             "time": "'F. Trabajo'!B2",
             "start": "'F. Trabajo'!B3",
-            "target_hours": 4
+            "target_hours": 8 # Objetivo de tiempo diario
         }
     }
 
 def start_work_callback(usuario):
-    cfg = get_config_usuario()
+    cfg = get_config_usuario(usuario)
     target_cell = cfg["proyecto"]["start"]
     batch_write(cfg["sheet_id"], [(target_cell, ahora_str())])
     st.session_state[f"working_status_{usuario}"] = True
 
 def stop_work_callback(usuario):
-    cfg = get_config_usuario()
+    cfg = get_config_usuario(usuario)
     p_cfg = cfg["proyecto"]
     
     vals = batch_read(cfg["sheet_id"], [p_cfg["time"], p_cfg["start"]])
@@ -203,7 +217,7 @@ def main():
     cargar_estilos_trabajo()
     
     USUARIO_ACTUAL = st.session_state.get("username", "Facundo")
-    cfg = get_config_usuario()
+    cfg = get_config_usuario(USUARIO_ACTUAL)
     
     if not cfg["sheet_id"]:
         st.error(f"No se encontró spreadsheet_id para {USUARIO_ACTUAL} en secrets.")
