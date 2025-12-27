@@ -716,7 +716,7 @@ def main():
                                 {circle_otro}
                                 {materia_nombre_html}
                             </div>
-                            <span style="font-size: 0.9rem; color: {o_obj_color};">{o_obj_hms} | ${o_pago_obj:.2f}</span>
+                            <span style="font-size: 0.9rem; color: #ddd;">{o_obj_hms} | ${o_pago_obj:.2f}</span>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
