@@ -706,7 +706,7 @@ def main():
                  st.markdown(f"""
                     <div style="margin-bottom: 10px;">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-size: 1.1rem; color: #ddd;"><b>{o_total_hms} | ${o_tot:.2f}</b></span>
+                            <span style="font-size: 1.1rem; color: #aaa;"><b>{o_total_hms} | ${o_tot:.2f}</b></span>
                         </div>
                         <div style="width:100%; background-color:#444; border-radius:8px; height:8px; margin-top: 8px;">
                             <div style="width:{o_progreso_pct}%; background-color:{o_color_bar}; height:100%; border-radius:8px;"></div>
@@ -716,7 +716,7 @@ def main():
                                 {circle_otro}
                                 {materia_nombre_html}
                             </div>
-                            <span style="font-size: 0.9rem; color: #ddd;">{o_obj_hms} | ${o_pago_obj:.2f}</span>
+                            <span style="font-size: 0.9rem; color: #aaa;">{o_obj_hms} | ${o_pago_obj:.2f}</span>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
