@@ -4,7 +4,7 @@ import app_habitos
 import app_idiomas 
 import app_biblioteca
 import app_noticias
-# import app_trabajo
+import app_trabajo
 
 from datetime import datetime
 try:
@@ -232,10 +232,10 @@ if st.session_state.authenticated:
     
     # Botón para ir a TRABAJO
     # Solo se muestra si NO estamos en la página "trabajo"
-    # if st.session_state.current_page != "trabajo":
-    #     if st.sidebar.button("💼 Trabajo", use_container_width=True):
-    #         st.session_state.current_page = "trabajo"
-    #         st.rerun()
+    if st.session_state.current_page != "trabajo":
+        if st.sidebar.button("💼 Trabajo", use_container_width=True):
+            st.session_state.current_page = "trabajo"
+            st.rerun()
     
     # --- Botón para ir a NOTICIAS ---
     # Solo se muestra si NO estamos en la página "noticias" y está autenticado
@@ -274,8 +274,8 @@ elif st.session_state.current_page == "noticias" and st.session_state.authentica
     app_noticias.main()
 
 # 5. Si eligió "trabajo" Y está autenticado, mostramos Trabajo
-# elif st.session_state.current_page == "trabajo" and st.session_state.authenticated:
-#     app_trabajo.main()
+elif st.session_state.current_page == "trabajo" and st.session_state.authenticated:
+    app_trabajo.main()
 
 # 6. Por defecto (o si eligió "estudio"), mostramos Estudio
 else:
