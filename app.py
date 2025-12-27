@@ -4,6 +4,8 @@ import app_habitos
 import app_idiomas 
 import app_biblioteca
 import app_noticias
+import app_trabajo
+
 from datetime import datetime
 try:
     # Necesitamos el ID de la sesión para el loc
@@ -221,12 +223,18 @@ if st.session_state.current_page != "idiomas":
 
 # Lógica solo para usuarios Autenticados
 if st.session_state.authenticated:
+    # Botón para ir a HÁBITOS
+    # Solo se muestra si NO estamos en la página "habitos"
+    if st.session_state.current_page != "habitos":
+        if st.sidebar.button("📅 Hábitos", use_container_width=True):
+            st.session_state.current_page = "habitos"
+            st.rerun()
     
-    # Botón para ir a BIBLIOTECA ---
-    # Solo se muestra si NO estamos en la página "biblioteca" y está autenticado
-    if st.session_state.current_page != "biblioteca":
-        if st.sidebar.button("📚 Biblioteca", use_container_width=True):
-            st.session_state.current_page = "biblioteca"
+    # Botón para ir a TRABAJO
+    # Solo se muestra si NO estamos en la página "trabajo"
+    if st.session_state.current_page != "trabajo":
+        if st.sidebar.button("💼 Trabajo", use_container_width=True):
+            st.session_state.current_page = "trabajo"
             st.rerun()
     
     # --- Botón para ir a NOTICIAS ---
@@ -236,11 +244,11 @@ if st.session_state.authenticated:
             st.session_state.current_page = "noticias"
             st.rerun()
     
-    # Botón para ir a HÁBITOS
-    # Solo se muestra si NO estamos en la página "habitos"
-    if st.session_state.current_page != "habitos":
-        if st.sidebar.button("📅 Hábitos", use_container_width=True):
-            st.session_state.current_page = "habitos"
+    # Botón para ir a BIBLIOTECA ---
+    # Solo se muestra si NO estamos en la página "biblioteca" y está autenticado
+    if st.session_state.current_page != "biblioteca":
+        if st.sidebar.button("📚 Biblioteca", use_container_width=True):
+            st.session_state.current_page = "biblioteca"
             st.rerun()
 
 # ---------------------------------------------------------
@@ -265,6 +273,10 @@ elif st.session_state.current_page == "biblioteca" and st.session_state.authenti
 elif st.session_state.current_page == "noticias" and st.session_state.authenticated:
     app_noticias.main()
 
-# 4. Por defecto (o si eligió "estudio"), mostramos Estudio
+# 5. Si eligió "trabajo" Y está autenticado, mostramos Trabajo
+elif st.session_state.current_page == "trabajo" and st.session_state.authenticated:
+    app_trabajo.main()
+
+# 6. Por defecto (o si eligió "estudio"), mostramos Estudio
 else:
     app_estudio.main()
