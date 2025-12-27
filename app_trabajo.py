@@ -205,7 +205,7 @@ MARCAS_ROW = 4 # Usamos una fila diferente en marcas para no pisar Estudio/Idiom
 # Puedes cambiar "General" por nombres de proyectos específicos
 WORK_PROJECTS = {
     "Facundo": {
-        "Trabajo General": {"time": f"'{SHEET_TRABAJO}'!H{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"}
+        "Trabajo General": {"time": f"'{SHEET_TRABAJO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"}
     }
 }
 
