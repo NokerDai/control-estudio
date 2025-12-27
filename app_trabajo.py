@@ -204,7 +204,7 @@ TIME_ROW = get_time_row()
 
 WORK_PROJECTS = {
     "Facundo": {
-        "Trabajo": {"time": f"'{SHEET_TRABAJO_CRONO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"}
+        "Trabajo General": {"time": f"'{SHEET_TRABAJO_CRONO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"}
     }
 }
 
