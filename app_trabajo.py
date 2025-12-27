@@ -213,6 +213,7 @@ def get_time_row():
 TIME_ROW = get_time_row()
 MARCAS_ROW = 4
 WEEK_RANGE = f"'{SHEET_MARCAS}'!R{TIME_ROW}"
+RANGO_OBJ_TRABAJO = f"'{SHEET_FACUNDO}'!A1"
 
 USERS = {
     "Facundo": {
@@ -232,6 +233,9 @@ def cargar_datos_unificados():
         for m, info in materias.items():
             all_ranges.append(info["est"]); mapa_indices["materias"][(user, m, "est")] = idx; idx += 1
             all_ranges.append(info["time"]); mapa_indices["materias"][(user, m, "time")] = idx; idx += 1
+
+    # Agregar rango del objetivo
+    all_ranges.append(RANGO_OBJ_TRABAJO); mapa_indices["obj"] = idx; idx += 1
 
     # --- Llamada única a Google Sheets ---
     try:
@@ -276,6 +280,9 @@ def cargar_datos_unificados():
     for key, idx_pos in mapa_indices["extras"].items():
         extras_res[key] = get_val(idx_pos, "")
 
+    # Obtener el objetivo
+    obj = parse_time_cell_to_seconds(get_val(mapa_indices["obj"]))
+
     # --- Guardar en session_state si corresponde (igual que antes) ---
     if "usuario_seleccionado" in st.session_state:
         st.session_state["materia_activa"] = materia_en_curso
@@ -283,7 +290,8 @@ def cargar_datos_unificados():
 
     return {
         "users_data": data_usuarios,
-        "extras": extras_res
+        "extras": extras_res,
+        "obj": obj
     }
 
 def batch_write(updates):
@@ -415,6 +423,7 @@ def main():
     # --- Carga de datos ---
     datos_globales = cargar_datos_unificados()
     datos = datos_globales["users_data"]
+    obj = datos_globales["obj"]
 
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
 
@@ -437,12 +446,36 @@ def main():
     usuario_estudiando = materia_en_curso is not None
 
     placeholder_materias = {m: st.empty() for m in USERS[USUARIO_ACTUAL]}
+    placeholder_total = st.empty()
 
     while True:
         tiempo_anadido_seg = 0
         if usuario_estudiando and inicio_dt is not None:
             tiempo_anadido_seg = int((_argentina_now_global() - inicio_dt).total_seconds())
         
+        # Calcular métricas para la barra de progreso
+        total_min = sum(hms_a_minutos(datos[USUARIO_ACTUAL]["tiempos"][m]) for m in USERS[USUARIO_ACTUAL]) + (tiempo_anadido_seg / 60)
+        obj_min = obj / 60
+        progreso_pct = min(total_min / max(1, obj_min), 1.0) * 100
+        color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
+        total_hms = segundos_a_hms(int(total_min * 60))
+        objetivo_hms = segundos_a_hms(obj)
+
+        # --- Actualizar Placeholder Total ---
+        with placeholder_total.container():
+            st.markdown(f"""
+                <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
+                    <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms}</div>
+                    <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
+                        <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; color:#888;">
+                        <div>Objetivo: {objetivo_hms}</div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+
         # --- Actualizar Placeholders de Materias y Botones ---
         mis_materias = USERS[USUARIO_ACTUAL]
         for materia, info in mis_materias.items():
