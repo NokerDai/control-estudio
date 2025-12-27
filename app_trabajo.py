@@ -184,14 +184,16 @@ def sheets_batch_update(spreadsheet_id, updates):
         raise RuntimeError(f"Error HTTP en batchUpdate: {e}")
 
 # ------------------ CONFIGURACIÓN DE HOJAS ------------------
-# NOTA: Ajusta estos rangos a tus hojas reales. 
-# Se asume una hoja "Trabajo" o columnas libres en tus hojas existentes.
-SHEET_TRABAJO = "F. Trabajo"  # Placeholder: ajusta esto a tu hoja real de trabajo
+# CRONÓMETRO:
+SHEET_TRABAJO_CRONO = "F. Trabajo" # Puedes cambiar esto si el cronómetro también va a F. Trabajo
 SHEET_MARCAS = "marcas"
-
-# Fila base y fecha base (igual que app_estudio para consistencia)
 FILA_BASE = 170
 FECHA_BASE = date(2025, 12, 2)
+MARCAS_ROW = 4 
+
+# TAREAS:
+SHEET_TAREAS = "F. Trabajo" # Hoja específica para las tareas
+RANGE_TAREAS = f"'{SHEET_TAREAS}'!C2:D100" # Leemos hasta 100 tareas. A=Desc, B=Done
 
 def get_time_row():
     hoy = _argentina_now_global().date()
@@ -199,17 +201,14 @@ def get_time_row():
     return FILA_BASE + delta
 
 TIME_ROW = get_time_row()
-MARCAS_ROW = 4 # Usamos una fila diferente en marcas para no pisar Estudio/Idiomas
 
-# Estructura de Proyectos/Trabajo
-# Puedes cambiar "General" por nombres de proyectos específicos
 WORK_PROJECTS = {
     "Facundo": {
-        "Trabajo General": {"time": f"'{SHEET_TRABAJO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"}
+        "Trabajo": {"time": f"'{SHEET_TRABAJO_CRONO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"}
     }
 }
 
-# ------------------ LÓGICA DE DATOS ------------------
+# ------------------ LÓGICA DE DATOS (CRONÓMETRO) ------------------
 @st.cache_data()
 def cargar_datos_trabajo():
     all_ranges = []
@@ -261,10 +260,73 @@ def cargar_datos_trabajo():
 
     return data
 
+# ------------------ LÓGICA DE DATOS (TAREAS) ------------------
+@st.cache_data(ttl=5) # Cache corto para reflejar cambios rápido
+def fetch_tasks_from_sheet():
+    """Lee las tareas de la hoja F. Trabajo (A2:B100)"""
+    try:
+        res = sheets_batch_get(st.secrets["sheet_id"], [RANGE_TAREAS])
+        rows = res["valueRanges"][0].get("values", [])
+        
+        tasks = []
+        for i, row in enumerate(rows):
+            # Row index real (1-based) = i + 2 (porque empezamos en A2)
+            row_idx = i + 2
+            
+            desc = row[0] if len(row) > 0 else ""
+            status = row[1] if len(row) > 1 else "FALSE"
+            
+            if desc.strip(): # Solo agregar si tiene descripción
+                is_done = (status.upper() == "TRUE")
+                tasks.append({
+                    "id": row_idx, # Guardamos la fila para editar luego
+                    "desc": desc,
+                    "done": is_done
+                })
+        return tasks
+    except Exception as e:
+        st.error(f"Error leyendo tareas: {e}")
+        return []
+
+def save_new_task(desc):
+    """Agrega una tarea a la primera fila vacía."""
+    # Leemos de nuevo para encontrar el hueco sin confiar en caché
+    current_tasks = fetch_tasks_from_sheet()
+    
+    # Buscar el ID (fila) más alto ocupado
+    max_row = 1 # Header es 1
+    if current_tasks:
+        max_row = max(t["id"] for t in current_tasks)
+    
+    next_row = max_row + 1
+    
+    # Escribir en esa fila
+    range_desc = f"'{SHEET_TAREAS}'!A{next_row}"
+    range_status = f"'{SHEET_TAREAS}'!B{next_row}"
+    
+    updates = [
+        (range_desc, desc),
+        (range_status, "FALSE")
+    ]
+    batch_write(updates)
+    fetch_tasks_from_sheet.clear() # Invalidar caché
+
+def update_task_status(row_id, is_done):
+    range_status = f"'{SHEET_TAREAS}'!B{row_id}"
+    val = "TRUE" if is_done else "FALSE"
+    batch_write([(range_status, val)])
+    fetch_tasks_from_sheet.clear()
+
+def delete_task_row(row_id):
+    range_all = f"'{SHEET_TAREAS}'!A{row_id}:B{row_id}"
+    batch_write([(range_all, "")]) # Borrar contenido
+    fetch_tasks_from_sheet.clear()
+
 def batch_write(updates):
     try:
         sheets_batch_update(st.secrets["sheet_id"], updates)
         cargar_datos_trabajo.clear()
+        fetch_tasks_from_sheet.clear()
     except Exception as e:
         st.error(f"Error escritura: {e}")
 
@@ -272,7 +334,6 @@ def batch_write(updates):
 def start_work_callback(usuario, proyecto):
     info = WORK_PROJECTS[usuario][proyecto]
     now_str = ahora_str()
-    # Limpiamos otros proyectos si hubiera múltiples
     updates = [(info["est"], now_str)] + [
         (p_info["est"], "") for p, p_info in WORK_PROJECTS[usuario].items() if p != proyecto
     ]
@@ -285,7 +346,6 @@ def stop_work_callback(usuario, proyecto):
     info = WORK_PROJECTS[usuario][proyecto]
     inicio = st.session_state.get("trabajo_inicio_dt")
     
-    # Fallback de lectura si no está en sesión
     if inicio is None:
         try:
             res = sheets_batch_get(st.secrets["sheet_id"], [info["est"]])
@@ -297,8 +357,6 @@ def stop_work_callback(usuario, proyecto):
             return
 
     fin = _argentina_now_global()
-    
-    # Lógica de cruce de medianoche
     midnight = datetime.combine(inicio.date() + timedelta(days=1), dt_time(0,0)).replace(tzinfo=inicio.tzinfo)
     partes = []
     if inicio.date() == fin.date():
@@ -313,7 +371,6 @@ def stop_work_callback(usuario, proyecto):
         target_row = FILA_BASE + (p_inicio.date() - FECHA_BASE).days
         time_cell = replace_row_in_range(info["time"], target_row)
         
-        # Leer valor actual para sumar
         try:
             res = sheets_batch_get(st.secrets["sheet_id"], [time_cell])
             prev = res["valueRanges"][0].get("values", [[""]])[0][0]
@@ -329,52 +386,60 @@ def stop_work_callback(usuario, proyecto):
     pedir_rerun()
 
 # ------------------ UI TAREAS ------------------
-def render_tasks_section():
-    """Sección de tareas estilo app_habitos"""
-    if "trabajo_tareas" not in st.session_state:
-        st.session_state.trabajo_tareas = []
+def render_tasks_section(usuario):
+    """Sección de tareas conectada a Sheets, solo para Facundo"""
+    
+    # RESTRICCIÓN: SOLO FACUNDO
+    if usuario != "Facundo":
+        return
 
-    with st.expander("📋 Tareas y Pendientes", expanded=True):
+    st.markdown("---")
+    
+    # Cargar tareas desde Sheets
+    tasks = fetch_tasks_from_sheet()
+
+    with st.expander("📋 Tareas y Pendientes (F. Trabajo)", expanded=True):
         # Input para nueva tarea
         c1, c2 = st.columns([3, 1])
         with c1:
-            new_task = st.text_input("Nueva tarea", key="new_task_input", label_visibility="collapsed", placeholder="Escribe una tarea...")
-        with c2:
-            if st.button("Agregar", use_container_width=True):
-                if new_task.strip():
-                    st.session_state.trabajo_tareas.append({"desc": new_task, "done": False})
+            # Usamos un formulario para que el enter funcione mejor
+            with st.form("new_task_form", clear_on_submit=True):
+                new_task = st.text_input("Nueva tarea", placeholder="Escribí una tarea...")
+                submitted = st.form_submit_button("Agregar")
+                if submitted and new_task.strip():
+                    save_new_task(new_task)
                     st.rerun()
 
         st.markdown("---")
         
-        # Listado de tareas
-        if not st.session_state.trabajo_tareas:
-            st.caption("No hay tareas pendientes.")
+        if not tasks:
+            st.caption("No hay tareas pendientes en la hoja.")
         else:
-            for i, task in enumerate(st.session_state.trabajo_tareas):
+            # Mostrar tareas
+            for task in tasks:
                 cols = st.columns([0.1, 0.8, 0.1])
                 
-                # Checkbox visual (simulado con botón o real)
                 done = task["done"]
-                label = f"~~{task['desc']}~~" if done else task["desc"]
+                row_id = task["id"]
+                desc = task["desc"]
+                
+                label = f"~~{desc}~~" if done else desc
                 
                 with cols[0]:
-                    if st.checkbox("", value=done, key=f"check_{i}"):
-                         st.session_state.trabajo_tareas[i]["done"] = True
-                    else:
-                         st.session_state.trabajo_tareas[i]["done"] = False
+                    # Checkbox
+                    is_checked = st.checkbox("", value=done, key=f"chk_{row_id}")
+                    if is_checked != done:
+                        update_task_status(row_id, is_checked)
+                        st.rerun()
                 
                 with cols[1]:
                     st.markdown(label)
                 
                 with cols[2]:
-                    if st.button("🗑️", key=f"del_{i}"):
-                        st.session_state.trabajo_tareas.pop(i)
+                    # Botón borrar
+                    if st.button("🗑️", key=f"del_{row_id}"):
+                        delete_task_row(row_id)
                         st.rerun()
-            
-            if st.button("Limpiar completadas"):
-                st.session_state.trabajo_tareas = [t for t in st.session_state.trabajo_tareas if not t["done"]]
-                st.rerun()
 
 # ------------------ MAIN APP ------------------
 def main():
@@ -391,14 +456,13 @@ def main():
 
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
     
-    # Cargar Datos
+    # Cargar Datos Cronómetro
     datos = cargar_datos_trabajo()
     mis_proyectos = WORK_PROJECTS.get(USUARIO_ACTUAL, {})
     
     active_project = st.session_state.get("trabajo_activo")
     inicio_dt = st.session_state.get("trabajo_inicio_dt")
     
-    # Calcular tiempo actual
     tiempo_anadido = 0
     if active_project and inicio_dt:
         tiempo_anadido = int((_argentina_now_global() - inicio_dt).total_seconds())
@@ -417,7 +481,6 @@ def main():
         total_hms = segundos_a_hms(total_seg)
         badge = f'<div class="status-badge status-active">🟢 Trabajando...</div>' if en_curso else ''
         
-        # Tarjeta
         st.markdown(f"""
             <div class="work-card">
                 <div class="work-title">{proyecto}</div>
@@ -426,7 +489,6 @@ def main():
             </div>
         """, unsafe_allow_html=True)
         
-        # Controles
         c1, c2, c3 = st.columns([1, 2, 1])
         with c2:
             if en_curso:
@@ -435,10 +497,9 @@ def main():
                 disabled = (active_project is not None)
                 st.button("▶ INICIAR", key=f"start_{proyecto}", on_click=start_work_callback, args=(USUARIO_ACTUAL, proyecto), disabled=disabled, use_container_width=True)
 
-    # --- SECCIÓN TAREAS (EXPANDER) ---
-    render_tasks_section()
+    # --- SECCIÓN TAREAS (F. Trabajo, Solo Facundo) ---
+    render_tasks_section(USUARIO_ACTUAL)
     
-    # Loop de actualización si está activo
     if active_project:
         time.sleep(10)
         st.rerun()
