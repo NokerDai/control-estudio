@@ -481,13 +481,17 @@ def main():
         total_hms = segundos_a_hms(total_seg)
         badge = f'<div class="status-badge status-active">🟢 Trabajando...</div>' if en_curso else ''
         
-        st.markdown(f"""
+        html_content = f"""
             <div class="work-card">
                 <div class="work-title">{proyecto}</div>
                 {badge}
                 <div class="work-time">{total_hms}</div>
             </div>
-        """, unsafe_allow_html=True)
+        """
+        if hasattr(st, 'html'):
+            st.html(html_content)
+        else:
+            st.markdown(html_content, unsafe_allow_html=True)
         
         c1, c2, c3 = st.columns([1, 2, 1])
         with c2:
