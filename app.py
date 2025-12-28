@@ -1,4 +1,6 @@
 import streamlit as st
+from datetime import datetime
+
 import app_estudio
 import app_habitos
 import app_idiomas 
@@ -6,7 +8,6 @@ import app_biblioteca
 import app_noticias
 import app_trabajo
 
-from datetime import datetime
 try:
     # Necesitamos el ID de la sesión para el loc
     from streamlit.runtime.scriptrunner import get_script_run_ctx
