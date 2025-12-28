@@ -661,7 +661,8 @@ def main():
         m_tot, m_rate, m_obj, total_min, progreso_en_dinero = calcular_metricas(USUARIO_ACTUAL, tiempo_anadido_seg)
         pago_objetivo = m_rate * m_obj
         progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
-        if progreso_pct >= 100: st.session_state.goal_completed = True
+        if progreso_pct >= 100:
+            st.session_state.goal_completed = True
         color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
 
         objetivo_hms = segundos_a_hms(int(m_obj * 60))
