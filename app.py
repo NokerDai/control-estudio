@@ -143,20 +143,29 @@ if USUARIO_ACTUAL is not None:
 
 # Si la URL tiene ?password Y aún no estamos logueados:
 if "password" in query_params and not st.session_state.authenticated:
-    st.title("🔒 Acceso Administrativo")
-    password_input = st.text_input("Contraseña:", type="password")
     
-    if st.button("Entrar"):
-        # Verificamos contra los secrets (asumiendo que están en [auth] password)
-        if password_input == st.secrets["password"]:
-            st.session_state.authenticated = True
-            st.rerun()
-        else:
-            st.error("Contraseña incorrecta.")
-    if st.session_state.usuario_seleccionado is None:
-        handle_user_login("Facundo")
-    
-    st.stop()
+    # MODIFICADO: Solo pedir contraseña si el objetivo está completo
+    if st.session_state.goal_completed:
+        st.title("🔒 Acceso Administrativo")
+        password_input = st.text_input("Contraseña:", type="password")
+        
+        if st.button("Entrar"):
+            # Verificamos contra los secrets (asumiendo que están en [auth] password)
+            if password_input == st.secrets["password"]:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Contraseña incorrecta.")
+        
+        # Si no hay usuario seleccionado, forzamos Facundo detrás de escena antes de bloquear (legacy logic)
+        if st.session_state.usuario_seleccionado is None:
+            handle_user_login("Facundo")
+        
+        st.stop()
+    else:
+        # Si el objetivo NO está completo, entramos directo como Facundo
+        if st.session_state.usuario_seleccionado != "Facundo":
+            handle_user_login("Facundo")
     
 # Check for direct user login via URL params
 if "ivan" in query_params and st.session_state.usuario_seleccionado is None:
