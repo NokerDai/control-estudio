@@ -44,7 +44,9 @@ if "current_page" not in st.session_state:
     st.session_state.current_page = "estudio" 
 # ===> ESTADO PARA EL USUARIO SELECCIONADO <===
 if "usuario_seleccionado" not in st.session_state:
-    st.session_state.usuario_seleccionado = None 
+    st.session_state.usuario_seleccionado = None
+if "goal_completed" not in st.session_state:
+    st.session_state.goal_completed = False
 
 SESSION_ID = get_current_session_id() 
 
@@ -232,21 +234,21 @@ if st.session_state.authenticated:
     
     # Botón para ir a TRABAJO
     # Solo se muestra si NO estamos en la página "trabajo"
-    if st.session_state.current_page != "trabajo":
+    if st.session_state.current_page != "trabajo" and st.session_state.goal_completed:
         if st.sidebar.button("💼 Trabajo", use_container_width=True):
             st.session_state.current_page = "trabajo"
             st.rerun()
     
     # --- Botón para ir a NOTICIAS ---
     # Solo se muestra si NO estamos en la página "noticias" y está autenticado
-    if st.session_state.current_page != "noticias":
+    if st.session_state.current_page != "noticias" and st.session_state.goal_completed:
         if st.sidebar.button("📰 Noticias", use_container_width=True):
             st.session_state.current_page = "noticias"
             st.rerun()
     
     # Botón para ir a BIBLIOTECA ---
     # Solo se muestra si NO estamos en la página "biblioteca" y está autenticado
-    if st.session_state.current_page != "biblioteca":
+    if st.session_state.current_page != "biblioteca" and st.session_state.goal_completed:
         if st.sidebar.button("📚 Biblioteca", use_container_width=True):
             st.session_state.current_page = "biblioteca"
             st.rerun()
@@ -266,15 +268,15 @@ elif st.session_state.current_page == "idiomas":
     app_idiomas.main()
 
 # 3. Si eligió "biblioteca" Y está autenticado, mostramos Biblioteca
-elif st.session_state.current_page == "biblioteca" and st.session_state.authenticated:
+elif st.session_state.current_page == "biblioteca" and st.session_state.authenticated and st.session_state.goal_completed:
     app_biblioteca.main()
 
 # 4. Si eligió "noticias" Y está autenticado, mostramos Noticias
-elif st.session_state.current_page == "noticias" and st.session_state.authenticated:
+elif st.session_state.current_page == "noticias" and st.session_state.authenticated and st.session_state.goal_completed:
     app_noticias.main()
 
 # 5. Si eligió "trabajo" Y está autenticado, mostramos Trabajo
-elif st.session_state.current_page == "trabajo" and st.session_state.authenticated:
+elif st.session_state.current_page == "trabajo" and st.session_state.authenticated and st.session_state.goal_completed:
     app_trabajo.main()
 
 # 6. Por defecto (o si eligió "estudio"), mostramos Estudio

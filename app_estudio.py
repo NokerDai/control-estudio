@@ -1,9 +1,9 @@
 import re
 import json
 import time
-import smtplib # Nuevo
-from email.mime.text import MIMEText # Nuevo
-from email.mime.multipart import MIMEMultipart # Nuevo
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime, date, timedelta, time as dt_time
 import streamlit as st
 from google.oauth2 import service_account
@@ -646,7 +646,6 @@ def main():
             per_min = resumen_marcas[usuario]["per_min"]
             objetivo = resumen_marcas[usuario]["obj"]
             total_min = 0.0
-            progreso = 0.0
 
             for materia, info in USERS[usuario].items():
                 base_seg = hms_a_segundos(datos[usuario]["tiempos"][materia])
@@ -662,6 +661,7 @@ def main():
         m_tot, m_rate, m_obj, total_min, progreso_en_dinero = calcular_metricas(USUARIO_ACTUAL, tiempo_anadido_seg)
         pago_objetivo = m_rate * m_obj
         progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
+        if progreso_pct >= 100: st.session_state.goal_completed = True
         color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
 
         objetivo_hms = segundos_a_hms(int(m_obj * 60))
