@@ -75,8 +75,9 @@ def handle_user_login(selected_user):
             st.session_state.pop(f"force_unlock_{selected_user}") # Limpiamos la bandera
             
             if app_estudio.set_user_lock_status(selected_user, ""):
-                st.toast(f"🚨 Lock forzado y liberado para {selected_user}. Iniciando sesión...")
-                # Continuar con el login en lugar de rerun
+                st.toast(f"🚨 Lock forzado y liberado para {selected_user}. ¡Intenta iniciar sesión ahora!")
+                st.rerun() 
+                return True # Detiene la ejecución actual
             else:
                 st.error("Error al forzar la liberación del lock en Sheets.")
                 return False
@@ -145,7 +146,6 @@ if "password" in query_params and not st.session_state.authenticated:
     
     # MODIFICADO: Solo pedir contraseña si el objetivo está completo
     if st.session_state.goal_completed:
-        st.title("🔒 Acceso Administrativo")
         password_input = st.text_input("Contraseña:", type="password")
         
         if st.button("Entrar"):
