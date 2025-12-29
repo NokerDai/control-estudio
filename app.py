@@ -166,7 +166,7 @@ if "password" in query_params and not st.session_state.authenticated:
         if st.session_state.usuario_seleccionado != "Facundo":
             handle_user_login("Facundo")
     
-if st.session_state.usuario_seleccionado is None:
+if "ivan" in query_params and st.session_state.usuario_seleccionado is None:
     handle_user_login("Iván")
 
 # ---------------------------------------------------------
