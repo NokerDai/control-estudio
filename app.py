@@ -233,14 +233,16 @@ if st.session_state.current_page != "idiomas":
         st.session_state.current_page = "idiomas"
         st.rerun()
 
+# --- Botón para ir a HÁBITOS (MODIFICADO: Visible si auth O si password en query) ---
+show_habitos = st.session_state.authenticated or ("password" in query_params)
+
+if show_habitos and st.session_state.current_page != "habitos":
+    if st.sidebar.button("📅 Hábitos", use_container_width=True):
+        st.session_state.current_page = "habitos"
+        st.rerun()
+
 # Lógica solo para usuarios Autenticados
 if st.session_state.authenticated:
-    # Botón para ir a HÁBITOS
-    # Solo se muestra si NO estamos en la página "habitos"
-    if st.session_state.current_page != "habitos":
-        if st.sidebar.button("📅 Hábitos", use_container_width=True):
-            st.session_state.current_page = "habitos"
-            st.rerun()
     
     # Botón para ir a TRABAJO
     # Solo se muestra si NO estamos en la página "trabajo"
@@ -267,10 +269,12 @@ if st.session_state.authenticated:
 # ROUTER (Decide qué app mostrar)
 # ---------------------------------------------------------
 
-# 1. Si eligió "habitos" Y está autenticado, mostramos Hábitos
-if st.session_state.current_page == "habitos" and st.session_state.authenticated:
-    # Nos aseguramos que app_habitos sepa que ya pasamos la seguridad
-    st.session_state.pw_correct = True
+# 1. Si eligió "habitos" (MODIFICADO: se permite entrar si se cumple show_habitos)
+if st.session_state.current_page == "habitos":
+    # Si está autenticado globalmente, omitimos la contraseña en habitos
+    if st.session_state.authenticated:
+        st.session_state.pw_correct = True
+    # Si NO está autenticado, app_habitos se encarga de pedir la contraseña
     app_habitos.run()
 
 # 2. Si eligió "idiomas" (Autenticado o no), mostramos Idiomas
