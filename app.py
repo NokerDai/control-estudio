@@ -3,7 +3,6 @@ from datetime import datetime
 
 import app_estudio
 import app_habitos
-import app_idiomas 
 import app_biblioteca
 import app_noticias
 import app_trabajo
@@ -223,13 +222,6 @@ if st.session_state.current_page != "estudio":
         st.session_state.current_page = "estudio"
         st.rerun()
 
-# --- Botón para ir a IDIOMAS ---
-# Solo se muestra si NO estamos en la página "idiomas"
-if st.session_state.current_page != "idiomas":
-    if st.sidebar.button("🌎 Idiomas", use_container_width=True):
-        st.session_state.current_page = "idiomas"
-        st.rerun()
-
 # --- Botón para ir a HÁBITOS (MODIFICADO: Visible si auth O si password en query) ---
 show_habitos = st.session_state.authenticated or ("password" in query_params)
 
@@ -273,10 +265,6 @@ if st.session_state.current_page == "habitos":
         st.session_state.pw_correct = True
     # Si NO está autenticado, app_habitos se encarga de pedir la contraseña
     app_habitos.run()
-
-# 2. Si eligió "idiomas" (Autenticado o no), mostramos Idiomas
-elif st.session_state.current_page == "idiomas":
-    app_idiomas.main()
 
 # 3. Si eligió "biblioteca" Y está autenticado, mostramos Biblioteca
 elif st.session_state.current_page == "biblioteca" and st.session_state.authenticated and st.session_state.goal_completed:
