@@ -212,13 +212,14 @@ def get_time_row():
 
 TIME_ROW = get_time_row()
 WEEK_RANGE = f"'{SHEET_MARCAS}'!R{TIME_ROW}"
-RANGO_OBJ_TRABAJO = f"'{SHEET_FACUNDO}'!A1"
+RANGO_OBJ_REDES = f"'{SHEET_FACUNDO}'!F2"
+RANGO_OBJ_TRABAJO = f"'{SHEET_FACUNDO}'!G2"
 
 USERS = {
     "Facundo": {
-        # Z10 para Redes, Z11 para Trabajo (puedes invertir si prefieres)
+        # Z10 para Redes, Z11 para Trabajo
         "Redes":   {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z10"},
-        "Trabajo": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z11"},
+        "Trabajo": {"time": f"'{SHEET_FACUNDO}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z11"},
     }
 }
 
@@ -235,8 +236,9 @@ def cargar_datos_unificados():
             all_ranges.append(info["est"]); mapa_indices["materias"][(user, m, "est")] = idx; idx += 1
             all_ranges.append(info["time"]); mapa_indices["materias"][(user, m, "time")] = idx; idx += 1
 
-    # Agregar rango del objetivo
-    all_ranges.append(RANGO_OBJ_TRABAJO); mapa_indices["obj"] = idx; idx += 1
+    # Agregar rangos de objetivos
+    all_ranges.append(RANGO_OBJ_REDES); mapa_indices["obj_redes"] = idx; idx += 1
+    all_ranges.append(RANGO_OBJ_TRABAJO); mapa_indices["obj_trabajo"] = idx; idx += 1
 
     # --- Llamada única a Google Sheets ---
     try:
@@ -281,8 +283,9 @@ def cargar_datos_unificados():
     for key, idx_pos in mapa_indices["extras"].items():
         extras_res[key] = get_val(idx_pos, "")
 
-    # Obtener el objetivo
-    obj = parse_time_cell_to_seconds(get_val(mapa_indices["obj"]))
+    # Obtener los objetivos
+    obj_redes = parse_time_cell_to_seconds(get_val(mapa_indices["obj_redes"]))
+    obj_trabajo = parse_time_cell_to_seconds(get_val(mapa_indices["obj_trabajo"]))
 
     # --- Guardar en session_state si corresponde (igual que antes) ---
     if "usuario_seleccionado" in st.session_state:
@@ -292,7 +295,8 @@ def cargar_datos_unificados():
     return {
         "users_data": data_usuarios,
         "extras": extras_res,
-        "obj": obj
+        "obj_redes": obj_redes,
+        "obj_trabajo": obj_trabajo
     }
 
 def batch_write(updates):
@@ -424,7 +428,9 @@ def main():
     # --- Carga de datos ---
     datos_globales = cargar_datos_unificados()
     datos = datos_globales["users_data"]
-    obj = datos_globales["obj"]
+    obj_redes = datos_globales["obj_redes"]
+    obj_trabajo = datos_globales["obj_trabajo"]
+    obj_total = obj_redes + obj_trabajo
 
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
 
@@ -446,8 +452,9 @@ def main():
 
     usuario_estudiando = materia_en_curso is not None
 
-    # En la versión modificada MOSTRAMOS SÓLO el bloque "Hoy" arriba, y debajo los botones compactos.
+    # En la versión modificada MOSTRAMOS SÓLO el bloque "Hoy" arriba, y debajo las tarjetas individuales.
     placeholder_total = st.empty()
+    placeholder_materias = {m: st.empty() for m in USERS[USUARIO_ACTUAL]}
 
     while True:
         tiempo_anadido_seg = 0
@@ -456,11 +463,11 @@ def main():
         
         # Calcular métricas para la barra de progreso
         total_min = sum(hms_a_minutos(datos[USUARIO_ACTUAL]["tiempos"][m]) for m in USERS[USUARIO_ACTUAL]) + (tiempo_anadido_seg / 60)
-        obj_min = obj / 60
+        obj_min = obj_total / 60
         progreso_pct = min(total_min / max(1, obj_min), 1.0) * 100
         color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
         total_hms = segundos_a_hms(int(total_min * 60))
-        objetivo_hms = segundos_a_hms(obj)
+        objetivo_hms = segundos_a_hms(obj_total)
 
         # --- Actualizar Placeholder Total (tarjeta Hoy) ---
         with placeholder_total.container():
@@ -477,14 +484,9 @@ def main():
                 </div>
             """, unsafe_allow_html=True)
 
-        # --- Mostrar controles compactos debajo del bloque "Hoy" ---
+        # --- Mostrar tarjetas individuales para cada materia ---
         mis_materias = USERS[USUARIO_ACTUAL]
-        materias_list = list(mis_materias.keys())
-        if materias_list:
-            # Tomamos la primera materia para los controles (si quieres otra lógica, lo adaptamos)
-            materia = materias_list[0]
-            info = mis_materias[materia]
-
+        for materia, info in mis_materias.items():
             base_seg = hms_a_segundos(datos[USUARIO_ACTUAL]["tiempos"][materia])
             tiempo_total_seg = base_seg
             en_curso = materia_en_curso == materia
@@ -493,59 +495,62 @@ def main():
                 tiempo_total_seg += max(0, tiempo_anadido_seg)
 
             tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
+            badge_html = '<div class="status-badge status-active">🟢 Trabajando...</div>' if en_curso else ''
+            html_card = f"""<div class="materia-card"><div class="materia-title">{materia}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
 
-            # Renderizamos botones compactos en dos columnas
-            cols = st.columns([1,1])
-            with cols[0]:
+            with placeholder_materias[materia].container():
+                st.markdown(html_card, unsafe_allow_html=True)
+
                 key_start = sanitize_key(f"start_{USUARIO_ACTUAL}_{materia}")
                 key_stop = sanitize_key(f"stop_{USUARIO_ACTUAL}_{materia}")
                 key_disabled = sanitize_key(f"dis_{USUARIO_ACTUAL}_{materia}")
 
-                if en_curso:
-                    st.button(f"⛔ DETENER {materia[:14]}", key=key_stop, use_container_width=True,
-                              on_click=stop_materia_callback, args=(USUARIO_ACTUAL, materia))
-                else:
-                    if materia_en_curso is None:
-                        st.button("▶ INICIAR", key=key_start, use_container_width=True,
-                                  on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia))
+                cols = st.columns([1,1])
+                with cols[0]:
+                    if en_curso:
+                        st.button(f"⛔ DETENER {materia[:14]}", key=key_stop, use_container_width=True,
+                                  on_click=stop_materia_callback, args=(USUARIO_ACTUAL, materia))
                     else:
-                        st.button("...", disabled=True, key=key_disabled, use_container_width=True)
+                        if materia_en_curso is None:
+                            st.button("▶ INICIAR", key=key_start, use_container_width=True,
+                                      on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia))
+                        else:
+                            st.button("...", disabled=True, key=key_disabled, use_container_width=True)
 
-            with cols[1]:
-                # Expander para corrección manual (igual que antes, pero sin la tarjeta grande)
-                with st.expander("🛠️ Corregir tiempo manualmente"):
-                    input_key = f"input_{sanitize_key(materia)}"
-                    new_val = st.text_input("Tiempo (HH:MM:SS)", value=datos[USUARIO_ACTUAL]["tiempos"][materia], key=input_key)
+                with cols[1]:
+                    with st.expander("🛠️ Corregir tiempo manualmente"):
+                        input_key = f"input_{sanitize_key(materia)}"
+                        new_val = st.text_input("Tiempo (HH:MM:SS)", value=datos[USUARIO_ACTUAL]["tiempos"][materia], key=input_key)
 
-                    def save_correction_callback(materia_key):
-                        if st.session_state.get("materia_activa") is not None:
-                            st.error("⛔ No podés corregir el tiempo mientras estás estudiando.")
-                            pedir_rerun()
-                            return
+                        def save_correction_callback(materia_key):
+                            if st.session_state.get("materia_activa") is not None:
+                                st.error("⛔ No podés corregir el tiempo mientras estás trabajando.")
+                                pedir_rerun()
+                                return
 
-                        val = st.session_state.get(f"input_{sanitize_key(materia_key)}", "").strip()
-                        if ":" not in val:
-                            st.error("Formato inválido (debe ser HH:MM:SS)")
-                            pedir_rerun()
-                            return
+                            val = st.session_state.get(f"input_{sanitize_key(materia_key)}", "").strip()
+                            if ":" not in val:
+                                st.error("Formato inválido (debe ser HH:MM:SS)")
+                                pedir_rerun()
+                                return
 
-                        try:
-                            segs = hms_a_segundos(val)
-                            hhmmss = segundos_a_hms(segs)
-                            target_row = get_time_row()  # recalculamos por si cambió
-                            time_cell_for_row = replace_row_in_range(USERS[USUARIO_ACTUAL][materia_key]["time"], target_row)
-                            batch_write([(time_cell_for_row, hhmmss)])
-                            st.success("Tiempo corregido correctamente.")
-                        except Exception as e:
-                            st.error(f"Error al corregir el tiempo: {e}")
-                        finally:
-                            pedir_rerun()
+                            try:
+                                segs = hms_a_segundos(val)
+                                hhmmss = segundos_a_hms(segs)
+                                target_row = get_time_row()
+                                time_cell_for_row = replace_row_in_range(USERS[USUARIO_ACTUAL][materia_key]["time"], target_row)
+                                batch_write([(time_cell_for_row, hhmmss)])
+                                st.success("Tiempo corregido correctamente.")
+                            except Exception as e:
+                                st.error(f"Error al corregir el tiempo: {e}")
+                            finally:
+                                pedir_rerun()
 
-                    if en_curso or usuario_estudiando:
-                        st.info("⛔ No podés corregir el tiempo mientras estás estudiando.")
-                    else:
-                        if st.button("Guardar Corrección", key=f"save_{sanitize_key(materia)}", on_click=save_correction_callback, args=(materia,)):
-                            pass
+                        if en_curso or usuario_estudiando:
+                            st.info("⛔ No podés corregir el tiempo mientras estás trabajando.")
+                        else:
+                            if st.button("Guardar Corrección", key=f"save_{sanitize_key(materia)}", on_click=save_correction_callback, args=(materia,)):
+                                pass
                             
         # Si no hay nadie estudiando, este código sigue parándose aquí igual que antes
         if not usuario_estudiando:
