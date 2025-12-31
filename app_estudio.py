@@ -719,8 +719,7 @@ def main():
                     batch_write([(target_range, 1)])
                     pedir_rerun()
 
-                st.button("Fui a clases", key="check_day_btn", on_click=marcar_dia_callback, args=(USUARIO_ACTUAL,), use_container_width=True)
-                st.write("") # Espacio visual
+                st.sidebar.button("Fui a clases", key="check_day_btn", on_click=marcar_dia_callback, args=(USUARIO_ACTUAL,), use_container_width=True)
 
             # --- PROGRESO DEL OTRO USUARIO ---
             o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
