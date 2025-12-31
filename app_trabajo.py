@@ -211,14 +211,14 @@ def get_time_row():
     return FILA_BASE + delta
 
 TIME_ROW = get_time_row()
-MARCAS_ROW = 4
 WEEK_RANGE = f"'{SHEET_MARCAS}'!R{TIME_ROW}"
 RANGO_OBJ_TRABAJO = f"'{SHEET_FACUNDO}'!A1"
 
 USERS = {
     "Facundo": {
-        "Trabajo": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!C{MARCAS_ROW}"},
-        "Redes": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"},
+        # Z10 para Redes, Z11 para Trabajo (puedes invertir si prefieres)
+        "Redes":   {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z10"},
+        "Trabajo": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z11"},
     }
 }
 

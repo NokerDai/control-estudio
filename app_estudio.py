@@ -315,11 +315,10 @@ FECHA_BASE = date(2025, 12, 2)
 SHEET_FACUNDO = "F. Economía"
 SHEET_IVAN = "I. Física"
 SHEET_MARCAS = "marcas"
-RANGO_FECHA_MAIL = f"'{SHEET_MARCAS}'!M1"
 
-# NUEVOS RANGOS PARA EL LOCK DE SESIÓN (Se asume N37 y O37 en la hoja 'marcas')
-RANGO_LOCK_IVAN = f"'{SHEET_MARCAS}'!N37"
-RANGO_LOCK_FACUNDO = f"'{SHEET_MARCAS}'!O37"
+RANGO_FECHA_MAIL = f"'{SHEET_MARCAS}'!Z1"
+RANGO_LOCK_IVAN = f"'{SHEET_MARCAS}'!Z2"
+RANGO_LOCK_FACUNDO = f"'{SHEET_MARCAS}'!Z3"
 
 def get_time_row():
     hoy = _argentina_now_global().date()
@@ -327,19 +326,18 @@ def get_time_row():
     return FILA_BASE + delta
 
 TIME_ROW = get_time_row()
-MARCAS_ROW = 2
 WEEK_RANGE = f"'{SHEET_MARCAS}'!R{TIME_ROW}"
 
 USERS = {
     "Facundo": {
-        "Matemática 2": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"},
-        "Matemática 3": {"time": f"'{SHEET_FACUNDO}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!C{MARCAS_ROW}"},
-        "Macroeconomía 1": {"time": f"'{SHEET_FACUNDO}'!D{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!D{MARCAS_ROW}"},
-        "Historia":        {"time": f"'{SHEET_FACUNDO}'!E{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!E{MARCAS_ROW}"},
+        "Matemática 2":    {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z4"},
+        "Matemática 3":    {"time": f"'{SHEET_FACUNDO}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z5"},
+        "Macroeconomía 1": {"time": f"'{SHEET_FACUNDO}'!D{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z6"},
+        "Historia":        {"time": f"'{SHEET_FACUNDO}'!E{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z7"},
     },
     "Iván": {
-        "Física":    {"time": f"'{SHEET_IVAN}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!F{MARCAS_ROW}"},
-        "Análisis": {"time": f"'{SHEET_IVAN}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!G{MARCAS_ROW}"},
+        "Física":   {"time": f"'{SHEET_IVAN}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z8"},
+        "Análisis": {"time": f"'{SHEET_IVAN}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z9"},
     }
 }
 
