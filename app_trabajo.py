@@ -37,7 +37,8 @@ def cargar_estilos():
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
         .materia-title { font-size: 1.4rem; font-weight: bold; color: #ffffff; margin-bottom: 5px; }
-        
+        .info { font-size: 0.9rem; font-style: italic; color: #b0b0b0; margin-top: 4px; }
+                
         /* EL TIEMPO */
         .materia-time { 
             font-size: 1.6rem; 
@@ -495,8 +496,9 @@ def main():
                 tiempo_total_seg += max(0, tiempo_anadido_seg)
 
             tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
+            info_trabajo = '<div class="info"> Si no hay trabajo en sí, tengo que usarlo para acompañar a papá o completar con Redes.</div>' if materia == 'Trabajo' else ''
             badge_html = '<div class="status-badge status-active">🟢 Trabajando...</div>' if en_curso else ''
-            html_card = f"""<div class="materia-card"><div class="materia-title">{materia}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
+            html_card = f"""<div class="materia-card"><div class="materia-title">{materia}{info_trabajo}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
 
             with placeholder_materias[materia].container():
                 st.markdown(html_card, unsafe_allow_html=True)
