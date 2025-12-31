@@ -545,10 +545,7 @@ def main():
                     else:
                         if st.button("Guardar Corrección", key=f"save_{sanitize_key(materia)}", on_click=save_correction_callback, args=(materia,)):
                             pass
-        
-        with st.expander("Semana 1"):
-            st.markdown(st.secrets["trabajo_md"])
-        
+                            
         # Si no hay nadie estudiando, este código sigue parándose aquí igual que antes
         if not usuario_estudiando:
             st.stop()
