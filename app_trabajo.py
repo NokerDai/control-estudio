@@ -217,7 +217,8 @@ RANGO_OBJ_TRABAJO = f"'{SHEET_FACUNDO}'!A1"
 
 USERS = {
     "Facundo": {
-        "Trabajo": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"},
+        "Trabajo": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!C{MARCAS_ROW}"},
+        "Redes": {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!B{MARCAS_ROW}"},
     }
 }
 
