@@ -348,16 +348,21 @@ RANGO_RATE_IVAN = f"'{SHEET_MARCAS}'!B{TIME_ROW}"
 RANGO_OBJ_FACU = f"'{SHEET_MARCAS}'!P{TIME_ROW}"
 RANGO_OBJ_IVAN = f"'{SHEET_MARCAS}'!O{TIME_ROW}"
 
+# Rangos para el Checkbox de "Día"
+RANGO_CHECK_IVAN = f"'{SHEET_MARCAS}'!H{TIME_ROW}"
+RANGO_CHECK_FACU = f"'{SHEET_MARCAS}'!I{TIME_ROW}"
+
 # ------------------ CARGA UNIFICADA (cacheada) ------------------
 @st.cache_data()
 def cargar_datos_unificados():
     all_ranges = []
-    mapa_indices = {"materias": {}, "rates": {}, "objs": {}, "week": None, "mail_date": None}
+    mapa_indices = {"materias": {}, "rates": {}, "objs": {}, "checks": {}, "week": None, "mail_date": None}
     idx = 0
     for user, materias in USERS.items():
         for m, info in materias.items():
             all_ranges.append(info["est"]); mapa_indices["materias"][(user, m, "est")] = idx; idx += 1
             all_ranges.append(info["time"]); mapa_indices["materias"][(user, m, "time")] = idx; idx += 1
+    
     all_ranges.append(RANGO_RATE_FACU); mapa_indices["rates"]["Facundo"] = idx; idx += 1
     all_ranges.append(RANGO_RATE_IVAN); mapa_indices["rates"]["Iván"] = idx; idx += 1
     all_ranges.append(RANGO_OBJ_FACU); mapa_indices["objs"]["Facundo"] = idx; idx += 1
@@ -366,6 +371,10 @@ def cargar_datos_unificados():
     
     # Agregamos la fecha del mail al batch
     all_ranges.append(RANGO_FECHA_MAIL); mapa_indices["mail_date"] = idx; idx += 1
+    
+    # Agregamos los Checks de Día (Iván col H, Facundo col I)
+    all_ranges.append(RANGO_CHECK_IVAN); mapa_indices["checks"]["Iván"] = idx; idx += 1
+    all_ranges.append(RANGO_CHECK_FACU); mapa_indices["checks"]["Facundo"] = idx; idx += 1
 
     try:
         res = sheets_batch_get(st.secrets["sheet_id"], all_ranges)
@@ -411,6 +420,12 @@ def cargar_datos_unificados():
     
     last_mail_date = get_val(mapa_indices["mail_date"], "")
 
+    # Leemos checks
+    checks_data = {
+        "Iván": get_val(mapa_indices["checks"]["Iván"], ""),
+        "Facundo": get_val(mapa_indices["checks"]["Facundo"], "")
+    }
+
     if "usuario_seleccionado" in st.session_state:
         st.session_state["materia_activa"] = materia_en_curso
         st.session_state["inicio_dt"] = inicio_dt
@@ -419,7 +434,8 @@ def cargar_datos_unificados():
         "users_data": data_usuarios, 
         "resumen": resumen, 
         "balance": balance_val,
-        "last_mail_date": last_mail_date
+        "last_mail_date": last_mail_date,
+        "checks": checks_data
     }
 
 def batch_write(updates):
@@ -567,6 +583,7 @@ def main():
     resumen_marcas = datos_globales["resumen"]
     balance_val_raw = datos_globales["balance"]
     last_mail_date_str = datos_globales["last_mail_date"]
+    checks_data = datos_globales["checks"]
 
     # ------------------ LOGICA ENVIO EMAIL DIARIO ------------------
     now = _argentina_now_global()
@@ -692,6 +709,18 @@ def main():
                     </div>
                 </div>
             """, unsafe_allow_html=True)
+            
+            # --- BOTÓN CHECK DÍA (NUEVO) ---
+            # Verificamos si la celda correspondiente está vacía
+            check_actual = checks_data.get(USUARIO_ACTUAL, "1") # Default 1 para ocultar si error
+            if str(check_actual).strip() == "":
+                def marcar_dia_callback(u):
+                    target_range = RANGO_CHECK_IVAN if u == "Iván" else RANGO_CHECK_FACU
+                    batch_write([(target_range, 1)])
+                    pedir_rerun()
+
+                st.button("Fui a clases", key="check_day_btn", on_click=marcar_dia_callback, args=(USUARIO_ACTUAL,), use_container_width=True)
+                st.write("") # Espacio visual
 
             # --- PROGRESO DEL OTRO USUARIO ---
             o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
