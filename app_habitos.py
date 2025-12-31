@@ -15,36 +15,15 @@ except Exception:
 import json
 
 # ---------------------------------------------------------------
-# BLOQUEO POR CONTRASEÑA
+# BLOQUEO POR CONTRASEÑA REMOVED
 # ---------------------------------------------------------------
-def check_password():
-    """Devuelve True si la contraseña es correcta."""
-
-    # 1) Si ya está logueado, no pedirla de nuevo
-    if "pw_correct" in st.session_state and st.session_state.pw_correct:
-        return True
-
-    # 2) Interfaz normal de contraseña
-    st.title("🔒 Acceso protegido")
-    password = st.text_input("Contraseña:", type="password")
-    if st.button("Entrar"):
-        if password == st.secrets["password"]:
-            st.session_state.pw_correct = True
-            st.rerun()
-        else:
-            st.error("Contraseña incorrecta.")
-
-    return False
+# Password check now handled in app.py
 
 def run():
     st.set_page_config(
         page_title="Hábitos",
         page_icon="📅"
     )
-
-    # Si la contraseña no es correcta → NO seguir cargando la app
-    if not check_password():
-        st.stop()
 
     # -------------------------------------------------------------------
     # ZONA HORARIA ARGENTINA

@@ -45,13 +45,10 @@ if "current_page" not in st.session_state:
 # ===> ESTADO PARA EL USUARIO SELECCIONADO <===
 if "usuario_seleccionado" not in st.session_state:
     st.session_state.usuario_seleccionado = None
-if "goal_completed" not in st.session_state:
-    st.session_state.goal_completed = False
 
 SESSION_ID = get_current_session_id() 
 
-
-# ---------------------------------------------------------
+query_params = st.query_params
 # LÓGICA DE UNREGISTER/LOGOUT (MODIFICADA para liberar lock en Sheets)
 # ---------------------------------------------------------
 USUARIO_ACTUAL = st.session_state.get("usuario_seleccionado")
@@ -117,53 +114,9 @@ def handle_user_login(selected_user):
     return True
 
 # ---------------------------------------------------------
-# LÓGICA DE LOGIN (Solo si hay ?password en la URL)
+# LÓGICA DE LOGIN (Solo si hay ?password en la URL) REMOVED
 # ---------------------------------------------------------
-query_params = st.query_params
-
-if USUARIO_ACTUAL is not None:
-    # Botón explícito para desloguear y liberar el lock
-    if st.sidebar.button("🚪 Desloguear", use_container_width=True):
-        if USUARIO_ACTUAL in RESTRICTED_USERS:
-            # 1. Liberar el lock en Google Sheets
-            if app_estudio.set_user_lock_status(USUARIO_ACTUAL, ""):
-                st.toast(f"🔒 Lock de {USUARIO_ACTUAL} liberado en Sheets.")
-            else:
-                st.warning("⚠️ Error al liberar el lock de sesión en Sheets.")
-            
-        # 2. Limpiar estado de sesión local
-        st.session_state.usuario_seleccionado = None
-        st.session_state.current_page = "estudio"
-
-        if len(query_params) > 0:
-            st.query_params.clear()
-
-        st.rerun()
-
-# Si la URL tiene ?password Y aún no estamos logueados:
-if "password" in query_params and not st.session_state.authenticated:
-    
-    # MODIFICADO: Solo pedir contraseña si el objetivo está completo
-    if st.session_state.goal_completed:
-        password_input = st.text_input("Contraseña:", type="password")
-        
-        if st.button("Entrar"):
-            # Verificamos contra los secrets (asumiendo que están en [auth] password)
-            if password_input == st.secrets["password"]:
-                st.session_state.authenticated = True
-                st.rerun()
-            else:
-                st.error("Contraseña incorrecta.")
-        
-        # Si no hay usuario seleccionado, forzamos Facundo detrás de escena antes de bloquear (legacy logic)
-        if st.session_state.usuario_seleccionado is None:
-            handle_user_login("Facundo")
-        
-        st.stop()
-    else:
-        # Si el objetivo NO está completo, entramos directo como Facundo
-        if st.session_state.usuario_seleccionado != "Facundo":
-            handle_user_login("Facundo")
+# The password prompt is now handled per page for non-estudio pages.
     
 if "ivan" in query_params and st.session_state.usuario_seleccionado is None:
     handle_user_login("Iván")
@@ -231,25 +184,23 @@ if show_habitos and st.session_state.current_page != "habitos":
         st.rerun()
 
 # Lógica solo para usuarios Autenticados
-if st.session_state.authenticated:
-    
+show_other_pages = st.session_state.authenticated or ("password" in query_params)
+
+if show_other_pages:
     # Botón para ir a TRABAJO
-    # Solo se muestra si NO estamos en la página "trabajo"
-    if st.session_state.current_page != "trabajo" and st.session_state.goal_completed:
+    if st.session_state.current_page != "trabajo":
         if st.sidebar.button("💼 Trabajo", use_container_width=True):
             st.session_state.current_page = "trabajo"
             st.rerun()
     
     # --- Botón para ir a NOTICIAS ---
-    # Solo se muestra si NO estamos en la página "noticias" y está autenticado
-    if st.session_state.current_page != "noticias" and st.session_state.goal_completed:
+    if st.session_state.current_page != "noticias":
         if st.sidebar.button("📰 Noticias", use_container_width=True):
             st.session_state.current_page = "noticias"
             st.rerun()
     
     # Botón para ir a BIBLIOTECA ---
-    # Solo se muestra si NO estamos en la página "biblioteca" y está autenticado
-    if st.session_state.current_page != "biblioteca" and st.session_state.goal_completed:
+    if st.session_state.current_page != "biblioteca":
         if st.sidebar.button("📚 Biblioteca", use_container_width=True):
             st.session_state.current_page = "biblioteca"
             st.rerun()
@@ -258,24 +209,56 @@ if st.session_state.authenticated:
 # ROUTER (Decide qué app mostrar)
 # ---------------------------------------------------------
 
-# 1. Si eligió "habitos" (MODIFICADO: se permite entrar si se cumple show_habitos)
+# 1. Si eligió "habitos", mostramos Hábitos
 if st.session_state.current_page == "habitos":
-    # Si está autenticado globalmente, omitimos la contraseña en habitos
-    if st.session_state.authenticated:
-        st.session_state.pw_correct = True
-    # Si NO está autenticado, app_habitos se encarga de pedir la contraseña
+    if not st.session_state.authenticated:
+        password_input = st.text_input("Contraseña:", type="password")
+        if st.button("Entrar"):
+            if password_input == st.secrets["password"]:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Contraseña incorrecta.")
+        st.stop()
     app_habitos.run()
 
-# 3. Si eligió "biblioteca" Y está autenticado, mostramos Biblioteca
-elif st.session_state.current_page == "biblioteca" and st.session_state.authenticated and st.session_state.goal_completed:
+# 3. Si eligió "biblioteca", mostramos Biblioteca
+elif st.session_state.current_page == "biblioteca":
+    if not st.session_state.authenticated:
+        password_input = st.text_input("Contraseña:", type="password")
+        if st.button("Entrar"):
+            if password_input == st.secrets["password"]:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Contraseña incorrecta.")
+        st.stop()
     app_biblioteca.main()
 
-# 4. Si eligió "noticias" Y está autenticado, mostramos Noticias
-elif st.session_state.current_page == "noticias" and st.session_state.authenticated and st.session_state.goal_completed:
+# 4. Si eligió "noticias", mostramos Noticias
+elif st.session_state.current_page == "noticias":
+    if not st.session_state.authenticated:
+        password_input = st.text_input("Contraseña:", type="password")
+        if st.button("Entrar"):
+            if password_input == st.secrets["password"]:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Contraseña incorrecta.")
+        st.stop()
     app_noticias.main()
 
-# 5. Si eligió "trabajo" Y está autenticado, mostramos Trabajo
-elif st.session_state.current_page == "trabajo" and st.session_state.authenticated and st.session_state.goal_completed:
+# 5. Si eligió "trabajo", mostramos Trabajo
+elif st.session_state.current_page == "trabajo":
+    if not st.session_state.authenticated:
+        password_input = st.text_input("Contraseña:", type="password")
+        if st.button("Entrar"):
+            if password_input == st.secrets["password"]:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Contraseña incorrecta.")
+        st.stop()
     app_trabajo.main()
 
 # 6. Por defecto (o si eligió "estudio"), mostramos Estudio
