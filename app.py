@@ -49,6 +49,12 @@ if "usuario_seleccionado" not in st.session_state:
 SESSION_ID = get_current_session_id() 
 
 query_params = st.query_params
+
+# simple
+if "password" in query_params:
+    st.session_state.authenticated = True
+
+# ---------------------------------------------------------
 # LÓGICA DE UNREGISTER/LOGOUT (MODIFICADA para liberar lock en Sheets)
 # ---------------------------------------------------------
 def handle_user_login(selected_user):
