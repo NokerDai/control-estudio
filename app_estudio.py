@@ -76,6 +76,8 @@ def parse_datetime(s):
         raise ValueError("Marca vacía")
     s = str(s).strip()
     TZ = _argentina_now_global().tzinfo
+    
+    # 1. Intentar ISO format directo (con manejo de Z)
     try:
         dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
         if dt.tzinfo is None:
@@ -83,7 +85,18 @@ def parse_datetime(s):
         return dt.astimezone(TZ)
     except:
         pass
-    fmts = ["%Y-%m-%d %H:%M:%S%z", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S"]
+    
+    # 2. Intentar formatos comunes, incluyendo los que usa Google Sheets (DD/MM/YYYY)
+    fmts = [
+        "%Y-%m-%d %H:%M:%S%z", 
+        "%Y-%m-%dT%H:%M:%S%z", 
+        "%Y-%m-%d %H:%M:%S",
+        "%d/%m/%Y %H:%M:%S", # Formato común de Sheets
+        "%d-%m-%Y %H:%M:%S",
+        "%d/%m/%Y %H:%M",
+        "%Y/%m/%d %H:%M:%S"
+    ]
+    
     for fmt in fmts:
         try:
             dt = datetime.strptime(s, fmt)
@@ -92,6 +105,8 @@ def parse_datetime(s):
             return dt.astimezone(TZ)
         except:
             continue
+            
+    # Si falla, lanzamos error pero permitimos que la app siga (devuelve True en puede_enviar_mail)
     raise ValueError(f"Formato inválido: {s}")
 
 def hms_a_segundos(hms):
@@ -204,8 +219,13 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
         password = st.secrets["password_mail"]
         recipients = st.secrets["recipients"]
 
+        # Verificación extra para evitar errores de configuración
+        if isinstance(recipients, str):
+            st.error("Error de configuración: 'recipients' en secrets es una cadena, debería ser una lista.")
+            return False
+
         if len(recipients) < 2:
-            print("Error: Se esperan al menos dos correos en la lista 'recipients'.")
+            st.error("Error: Se esperan al menos dos correos en la lista 'recipients'.")
             return False
 
         USER_EMAIL_MAP = {
@@ -286,14 +306,15 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
                 server.sendmail(sender, email, msg.as_string())
                 print(f"Email de balance enviado a {user} ({email})")
             except Exception as e:
-                print(f"Error enviando email a {user} ({email}): {e}")
+                # IMPORTANTÍSIMO: Mostrar error en UI para debug
+                st.error(f"Error enviando email a {user} ({email}): {e}")
                 exito = False
 
         server.quit()
         return exito
 
     except Exception as e:
-        print(f"Error crítico en el proceso de envío de email: {e}")
+        st.error(f"Error crítico conectando al servidor SMTP: {e}")
         return False
 
 # ------------------ CONSTANTES ESTRUCTURALES (FIJAS) ------------------
@@ -308,9 +329,6 @@ RANGO_LOCK_IVAN = f"'{SHEET_MARCAS}'!Z2"
 RANGO_LOCK_FACUNDO = f"'{SHEET_MARCAS}'!Z3"
 
 # ------------------ CONFIGURACIÓN DINÁMICA DEL DÍA ------------------
-# Esta función reemplaza las constantes globales que causaban el bug.
-# Calcula los rangos basándose en el momento en que se llama.
-
 def get_day_config(target_date=None):
     if target_date is None:
         target_date = _argentina_now_global().date()
@@ -345,11 +363,10 @@ def get_day_config(target_date=None):
     }
 
 # ------------------ CARGA UNIFICADA (cacheada por fecha) ------------------
-# Agregamos fecha_str como argumento para que el cache se invalide al cambiar el día
 @st.cache_data()
 def cargar_datos_unificados(fecha_str):
     # Obtenemos la config para el día actual
-    cfg = get_day_config() # Usa la fecha actual por defecto (que coincide con fecha_str)
+    cfg = get_day_config() 
     USERS_LOCAL = cfg["USERS"]
     
     all_ranges = []
@@ -541,9 +558,6 @@ def stop_materia_callback(usuario, materia):
             target_row = FILA_BASE + (p_inicio.date() - FECHA_BASE).days
             
             # Reconstruimos el rango de tiempo usando la fila correcta
-            # Usamos una instancia temporal de config para obtener la columna base
-            # Como la columna B/C/D no cambia, usamos la config actual para obtener la letra
-            # y reemplazamos el número de fila.
             current_time_range = cfg["USERS"][usuario][materia]["time"]
             time_cell_for_row = replace_row_in_range(current_time_range, target_row)
             
@@ -611,6 +625,8 @@ def main():
         try:
             last_dt = parse_datetime(last_mail_str)
         except Exception:
+            # Si falla el parseo (fecha basura o formato raro), asumimos que hay que enviar
+            # para sobrescribirla con una buena.
             return True
 
         diff = now - last_dt
@@ -621,6 +637,8 @@ def main():
         if exito:
             st.toast("📧 Reporte enviado")
             batch_write([(RANGO_FECHA_MAIL, ahora_str())])
+        # Si falla (exito=False), el error se muestra en pantalla gracias al cambio en enviar_reporte_email
+        # y volverá a intentar en el siguiente rerun.
 
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
     OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
