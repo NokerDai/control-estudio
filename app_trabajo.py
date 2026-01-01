@@ -201,7 +201,7 @@ def sheets_batch_update(spreadsheet_id, updates):
         raise RuntimeError(f"Error HTTP en batchUpdate al escribir en la hoja: {e}")
 
 # ------------------ CONSTANTES Y ESTRUCTURAS ------------------
-FILA_BASE = 2
+FILA_BASE = 3
 FECHA_BASE = date(2026, 1, 1)
 SHEET_FACUNDO = "F. Trabajo"
 SHEET_MARCAS = "marcas"
