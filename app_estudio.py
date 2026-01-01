@@ -310,7 +310,7 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
         return False
 
 # ------------------ CONSTANTES Y ESTRUCTURAS ------------------
-FILA_BASE = 3
+FILA_BASE = 5
 FECHA_BASE = date(2026, 1, 1)
 SHEET_FACUNDO = "F. Economía"
 SHEET_IVAN = "I. Física"
