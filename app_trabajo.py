@@ -200,39 +200,51 @@ def sheets_batch_update(spreadsheet_id, updates):
     except RequestException as e:
         raise RuntimeError(f"Error HTTP en batchUpdate al escribir en la hoja: {e}")
 
-# ------------------ CONSTANTES Y ESTRUCTURAS ------------------
+# ------------------ CONSTANTES ESTRUCTURALES ------------------
 FILA_BASE = 3
 FECHA_BASE = date(2026, 1, 1)
 SHEET_FACUNDO = "F. Trabajo"
 SHEET_MARCAS = "marcas"
 
-def get_time_row():
-    hoy = _argentina_now_global().date()
-    delta = (hoy - FECHA_BASE).days
-    return FILA_BASE + delta
-
-TIME_ROW = get_time_row()
-WEEK_RANGE = f"'{SHEET_MARCAS}'!R{TIME_ROW}"
 RANGO_OBJ_REDES = f"'{SHEET_FACUNDO}'!F2"
 RANGO_OBJ_TRABAJO = f"'{SHEET_FACUNDO}'!G2"
 
-USERS = {
-    "Facundo": {
-        # Z10 para Redes, Z11 para Trabajo
-        "Redes":   {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z10"},
-        "Trabajo": {"time": f"'{SHEET_FACUNDO}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z11"},
-    }
-}
+# ------------------ CONFIGURACIÓN DINÁMICA DEL DÍA ------------------
+# Eliminamos la variable global TIME_ROW y la hacemos dinámica
 
-# ------------------ CARGA UNIFICADA (cacheada) ------------------
+def get_day_config(target_date=None):
+    if target_date is None:
+        target_date = _argentina_now_global().date()
+    
+    delta = (target_date - FECHA_BASE).days
+    time_row = FILA_BASE + delta
+    
+    users_dict = {
+        "Facundo": {
+            "Redes":   {"time": f"'{SHEET_FACUNDO}'!B{time_row}", "est": f"'{SHEET_MARCAS}'!Z10"},
+            "Trabajo": {"time": f"'{SHEET_FACUNDO}'!C{time_row}", "est": f"'{SHEET_MARCAS}'!Z11"},
+        }
+    }
+    
+    return {
+        "TIME_ROW": time_row,
+        "USERS": users_dict,
+        "WEEK_RANGE": f"'{SHEET_MARCAS}'!R{time_row}"
+    }
+
+# ------------------ CARGA UNIFICADA (cacheada por fecha) ------------------
+# Agregamos fecha_str para que el caché expire al cambiar el día
 @st.cache_data()
-def cargar_datos_unificados():
+def cargar_datos_unificados(fecha_str):
+    cfg = get_day_config() # Recalcula usando la fecha actual
+    USERS_LOCAL = cfg["USERS"]
+    
     all_ranges = []
     mapa_indices = {"materias": {}, "extras": {}}
     idx = 0
 
-    # --- Construir lista de ranges para materias (igual que antes) ---
-    for user, materias in USERS.items():
+    # --- Construir lista de ranges para materias usando config dinámica ---
+    for user, materias in USERS_LOCAL.items():
         for m, info in materias.items():
             all_ranges.append(info["est"]); mapa_indices["materias"][(user, m, "est")] = idx; idx += 1
             all_ranges.append(info["time"]); mapa_indices["materias"][(user, m, "time")] = idx; idx += 1
@@ -241,7 +253,6 @@ def cargar_datos_unificados():
     all_ranges.append(RANGO_OBJ_REDES); mapa_indices["obj_redes"] = idx; idx += 1
     all_ranges.append(RANGO_OBJ_TRABAJO); mapa_indices["obj_trabajo"] = idx; idx += 1
 
-    # --- Llamada única a Google Sheets ---
     try:
         res = sheets_batch_get(st.secrets["sheet_id"], all_ranges)
     except Exception as e:
@@ -256,12 +267,11 @@ def cargar_datos_unificados():
         if not rows: return default
         return rows[0][0] if rows[0] else default
 
-    # --- Reconstruir estructura de usuarios como antes ---
-    data_usuarios = {u: {"estado": {}, "tiempos": {}, "inicio_dt": None, "materia_activa": None} for u in USERS}
+    data_usuarios = {u: {"estado": {}, "tiempos": {}, "inicio_dt": None, "materia_activa": None} for u in USERS_LOCAL}
     materia_en_curso = None
     inicio_dt = None
 
-    for user, materias in USERS.items():
+    for user, materias in USERS_LOCAL.items():
         for m in materias:
             idx_est = mapa_indices["materias"][(user, m, "est")]
             raw_est = get_val(idx_est)
@@ -279,16 +289,13 @@ def cargar_datos_unificados():
                 except Exception:
                     pass
 
-    # --- Extraer los strings leídos en extras ---
     extras_res = {}
     for key, idx_pos in mapa_indices["extras"].items():
         extras_res[key] = get_val(idx_pos, "")
 
-    # Obtener los objetivos
     obj_redes = parse_time_cell_to_seconds(get_val(mapa_indices["obj_redes"]))
     obj_trabajo = parse_time_cell_to_seconds(get_val(mapa_indices["obj_trabajo"]))
 
-    # --- Guardar en session_state si corresponde (igual que antes) ---
     if "usuario_seleccionado" in st.session_state:
         st.session_state["materia_activa"] = materia_en_curso
         st.session_state["inicio_dt"] = inicio_dt
@@ -310,11 +317,13 @@ def batch_write(updates):
 
 def start_materia_callback(usuario, materia):
     try:
-        info = USERS[usuario][materia]
+        cfg = get_day_config()
+        info = cfg["USERS"][usuario][materia]
+        
         now_str = ahora_str()
         updates = [(info["est"], now_str)] + [
             (m_datos["est"], "")
-            for m_datos in USERS[usuario].values()
+            for m_datos in cfg["USERS"][usuario].values()
             if m_datos is not None and m_datos is not info
         ]
         batch_write(updates)
@@ -327,7 +336,9 @@ def start_materia_callback(usuario, materia):
 
 def stop_materia_callback(usuario, materia):
     try:
-        info = USERS[usuario][materia]
+        cfg = get_day_config()
+        info = cfg["USERS"][usuario][materia]
+        
         inicio = st.session_state.get("inicio_dt")
         prev_est = ""
         if inicio is None or st.session_state.get("materia_activa") != materia:
@@ -364,8 +375,14 @@ def stop_materia_callback(usuario, materia):
         updates = []
         for (p_inicio, p_fin) in partes:
             segs = int((p_fin - p_inicio).total_seconds())
+            
+            # Cálculo dinámico de fila para este fragmento de tiempo
             target_row = FILA_BASE + (p_inicio.date() - FECHA_BASE).days
-            time_cell_for_row = replace_row_in_range(info["time"], target_row)
+            
+            # Reconstruir rango de tiempo
+            current_time_range = cfg["USERS"][usuario][materia]["time"]
+            time_cell_for_row = replace_row_in_range(current_time_range, target_row)
+            
             try:
                 res2 = sheets_batch_get(st.secrets["sheet_id"], [time_cell_for_row])
                 vr2 = res2.get("valueRanges", [{}])[0]
@@ -427,7 +444,13 @@ def main():
             st.stop()
 
     # --- Carga de datos ---
-    datos_globales = cargar_datos_unificados()
+    hoy_str = _argentina_now_global().strftime("%Y-%m-%d")
+    datos_globales = cargar_datos_unificados(hoy_str)
+    
+    # Config dinámica local
+    cfg = get_day_config()
+    USERS_LOCAL = cfg["USERS"]
+    
     datos = datos_globales["users_data"]
     obj_redes = datos_globales["obj_redes"]
     obj_trabajo = datos_globales["obj_trabajo"]
@@ -453,24 +476,21 @@ def main():
 
     usuario_estudiando = materia_en_curso is not None
 
-    # En la versión modificada MOSTRAMOS SÓLO el bloque "Hoy" arriba, y debajo las tarjetas individuales.
     placeholder_total = st.empty()
-    placeholder_materias = {m: st.empty() for m in USERS[USUARIO_ACTUAL]}
+    placeholder_materias = {m: st.empty() for m in USERS_LOCAL[USUARIO_ACTUAL]}
 
     while True:
         tiempo_anadido_seg = 0
         if usuario_estudiando and inicio_dt is not None:
             tiempo_anadido_seg = int((_argentina_now_global() - inicio_dt).total_seconds())
         
-        # Calcular métricas para la barra de progreso
-        total_min = sum(hms_a_minutos(datos[USUARIO_ACTUAL]["tiempos"][m]) for m in USERS[USUARIO_ACTUAL]) + (tiempo_anadido_seg / 60)
+        total_min = sum(hms_a_minutos(datos[USUARIO_ACTUAL]["tiempos"][m]) for m in USERS_LOCAL[USUARIO_ACTUAL]) + (tiempo_anadido_seg / 60)
         obj_min = obj_total / 60
         progreso_pct = min(total_min / max(1, obj_min), 1.0) * 100
         color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
         total_hms = segundos_a_hms(int(total_min * 60))
         objetivo_hms = segundos_a_hms(obj_total)
 
-        # --- Actualizar Placeholder Total (tarjeta Hoy) ---
         with placeholder_total.container():
             st.markdown(f"""
                 <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
@@ -485,8 +505,7 @@ def main():
                 </div>
             """, unsafe_allow_html=True)
 
-        # --- Mostrar tarjetas individuales para cada materia ---
-        mis_materias = USERS[USUARIO_ACTUAL]
+        mis_materias = USERS_LOCAL[USUARIO_ACTUAL]
         for materia, info in mis_materias.items():
             base_seg = hms_a_segundos(datos[USUARIO_ACTUAL]["tiempos"][materia])
             tiempo_total_seg = base_seg
@@ -539,8 +558,9 @@ def main():
                             try:
                                 segs = hms_a_segundos(val)
                                 hhmmss = segundos_a_hms(segs)
-                                target_row = get_time_row()
-                                time_cell_for_row = replace_row_in_range(USERS[USUARIO_ACTUAL][materia_key]["time"], target_row)
+                                # Config dinámica para escritura
+                                cfg_corr = get_day_config()
+                                time_cell_for_row = cfg_corr["USERS"][USUARIO_ACTUAL][materia_key]["time"]
                                 batch_write([(time_cell_for_row, hhmmss)])
                                 st.success("Tiempo corregido correctamente.")
                             except Exception as e:
@@ -554,7 +574,6 @@ def main():
                             if st.button("Guardar Corrección", key=f"save_{sanitize_key(materia)}", on_click=save_correction_callback, args=(materia,)):
                                 pass
                             
-        # Si no hay nadie estudiando, este código sigue parándose aquí igual que antes
         if not usuario_estudiando:
             st.stop()
 

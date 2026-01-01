@@ -202,11 +202,8 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
     try:
         sender = st.secrets["sender"]
         password = st.secrets["password_mail"]
-        # Asumimos que la lista de recipients es: [email_facundo, email_ivan]
         recipients = st.secrets["recipients"]
 
-        # Mapa de usuario a email
-        # Asumiendo que Facundo es el primero y Iván el segundo en la lista de secrets.toml
         if len(recipients) < 2:
             print("Error: Se esperan al menos dos correos en la lista 'recipients'.")
             return False
@@ -216,10 +213,7 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
             "Iván": recipients[1],
         }
 
-        # --- Lógica de Formato de Balance con Color y Signo ---
         def format_balance_html(value, user):
-            """Aplica la lógica de signo (Iván: tal cual, Facundo: inverso) y formato con color."""
-            # Facundo lo ve inverso (-número) e Iván lo ve directo (número).
             final_value = -value if user == "Facundo" else value
             
             if final_value > 0:
@@ -232,10 +226,8 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
                 color = "#ffffff" # Blanco
                 sign_str = "$0.00"
 
-            # Retorna el valor formateado con HTML para el color
             return f'<div style="color: {color}; font-size: 2.5rem; font-weight: bold; text-align: center; padding: 20px;">{sign_str}</div>'
 
-        # 2. Abrir conexión SMTP una sola vez
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
         server.login(sender, password)
@@ -246,17 +238,15 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
             if not email:
                 continue
 
-            # 3. Generar contenido personalizado
             balance_html = format_balance_html(balance_raw, user)
             now = _argentina_now_global()
             fecha_hora = now.strftime("%d/%m %H:%M")
 
             msg = MIMEMultipart()
             msg['From'] = sender
-            msg['To'] = email # Un solo destinatario por correo
+            msg['To'] = email 
             msg['Subject'] = f"📊 Tu Balance Acumulado - {fecha_hora}" 
 
-            # Contenido simplificado sin mencionar al otro usuario.
             html_content = f"""
             <html>
             <body style="
@@ -292,7 +282,6 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
             
             msg.attach(MIMEText(html_content, 'html'))
             
-            # 4. Enviar mail
             try:
                 server.sendmail(sender, email, msg.as_string())
                 print(f"Email de balance enviado a {user} ({email})")
@@ -300,8 +289,6 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
                 print(f"Error enviando email a {user} ({email}): {e}")
                 exito = False
 
-
-        # 5. Cerrar conexión
         server.quit()
         return exito
 
@@ -309,7 +296,7 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
         print(f"Error crítico en el proceso de envío de email: {e}")
         return False
 
-# ------------------ CONSTANTES Y ESTRUCTURAS ------------------
+# ------------------ CONSTANTES ESTRUCTURALES (FIJAS) ------------------
 FILA_BASE = 5
 FECHA_BASE = date(2026, 1, 1)
 SHEET_FACUNDO = "F. Economía"
@@ -320,59 +307,70 @@ RANGO_FECHA_MAIL = f"'{SHEET_MARCAS}'!Z1"
 RANGO_LOCK_IVAN = f"'{SHEET_MARCAS}'!Z2"
 RANGO_LOCK_FACUNDO = f"'{SHEET_MARCAS}'!Z3"
 
-def get_time_row():
-    hoy = _argentina_now_global().date()
-    delta = (hoy - FECHA_BASE).days
-    return FILA_BASE + delta
+# ------------------ CONFIGURACIÓN DINÁMICA DEL DÍA ------------------
+# Esta función reemplaza las constantes globales que causaban el bug.
+# Calcula los rangos basándose en el momento en que se llama.
 
-TIME_ROW = get_time_row()
-WEEK_RANGE = f"'{SHEET_MARCAS}'!R{TIME_ROW-2}"
-
-USERS = {
-    "Facundo": {
-        "Matemática 2":    {"time": f"'{SHEET_FACUNDO}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z4"},
-        "Matemática 3":    {"time": f"'{SHEET_FACUNDO}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z5"},
-        "Macroeconomía 1": {"time": f"'{SHEET_FACUNDO}'!D{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z6"},
-        "Historia":        {"time": f"'{SHEET_FACUNDO}'!E{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z7"},
-    },
-    "Iván": {
-        "Física":   {"time": f"'{SHEET_IVAN}'!B{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z8"},
-        "Análisis": {"time": f"'{SHEET_IVAN}'!C{TIME_ROW}", "est": f"'{SHEET_MARCAS}'!Z9"},
+def get_day_config(target_date=None):
+    if target_date is None:
+        target_date = _argentina_now_global().date()
+    
+    delta = (target_date - FECHA_BASE).days
+    time_row = FILA_BASE + delta
+    
+    # Construimos los rangos dinámicamente usando time_row actual
+    users_dict = {
+        "Facundo": {
+            "Matemática 2":    {"time": f"'{SHEET_FACUNDO}'!B{time_row}", "est": f"'{SHEET_MARCAS}'!Z4"},
+            "Matemática 3":    {"time": f"'{SHEET_FACUNDO}'!C{time_row}", "est": f"'{SHEET_MARCAS}'!Z5"},
+            "Macroeconomía 1": {"time": f"'{SHEET_FACUNDO}'!D{time_row}", "est": f"'{SHEET_MARCAS}'!Z6"},
+            "Historia":        {"time": f"'{SHEET_FACUNDO}'!E{time_row}", "est": f"'{SHEET_MARCAS}'!Z7"},
+        },
+        "Iván": {
+            "Física":   {"time": f"'{SHEET_IVAN}'!B{time_row}", "est": f"'{SHEET_MARCAS}'!Z8"},
+            "Análisis": {"time": f"'{SHEET_IVAN}'!C{time_row}", "est": f"'{SHEET_MARCAS}'!Z9"},
+        }
     }
-}
+    
+    return {
+        "TIME_ROW": time_row,
+        "USERS": users_dict,
+        "WEEK_RANGE": f"'{SHEET_MARCAS}'!R{time_row-2}",
+        "RANGO_RATE_FACU": f"'{SHEET_MARCAS}'!C{time_row-2}",
+        "RANGO_RATE_IVAN": f"'{SHEET_MARCAS}'!B{time_row-2}",
+        "RANGO_OBJ_FACU": f"'{SHEET_MARCAS}'!P{time_row-2}",
+        "RANGO_OBJ_IVAN": f"'{SHEET_MARCAS}'!O{time_row-2}",
+        "RANGO_CHECK_IVAN": f"'{SHEET_MARCAS}'!H{time_row-2}",
+        "RANGO_CHECK_FACU": f"'{SHEET_MARCAS}'!I{time_row-2}",
+    }
 
-RANGO_RATE_FACU = f"'{SHEET_MARCAS}'!C{TIME_ROW-2}"
-RANGO_RATE_IVAN = f"'{SHEET_MARCAS}'!B{TIME_ROW-2}"
-RANGO_OBJ_FACU = f"'{SHEET_MARCAS}'!P{TIME_ROW-2}"
-RANGO_OBJ_IVAN = f"'{SHEET_MARCAS}'!O{TIME_ROW-2}"
-
-# Rangos para el Checkbox de "Día"
-RANGO_CHECK_IVAN = f"'{SHEET_MARCAS}'!H{TIME_ROW-2}"
-RANGO_CHECK_FACU = f"'{SHEET_MARCAS}'!I{TIME_ROW-2}"
-
-# ------------------ CARGA UNIFICADA (cacheada) ------------------
+# ------------------ CARGA UNIFICADA (cacheada por fecha) ------------------
+# Agregamos fecha_str como argumento para que el cache se invalide al cambiar el día
 @st.cache_data()
-def cargar_datos_unificados():
+def cargar_datos_unificados(fecha_str):
+    # Obtenemos la config para el día actual
+    cfg = get_day_config() # Usa la fecha actual por defecto (que coincide con fecha_str)
+    USERS_LOCAL = cfg["USERS"]
+    
     all_ranges = []
     mapa_indices = {"materias": {}, "rates": {}, "objs": {}, "checks": {}, "week": None, "mail_date": None}
     idx = 0
-    for user, materias in USERS.items():
+    
+    for user, materias in USERS_LOCAL.items():
         for m, info in materias.items():
             all_ranges.append(info["est"]); mapa_indices["materias"][(user, m, "est")] = idx; idx += 1
             all_ranges.append(info["time"]); mapa_indices["materias"][(user, m, "time")] = idx; idx += 1
     
-    all_ranges.append(RANGO_RATE_FACU); mapa_indices["rates"]["Facundo"] = idx; idx += 1
-    all_ranges.append(RANGO_RATE_IVAN); mapa_indices["rates"]["Iván"] = idx; idx += 1
-    all_ranges.append(RANGO_OBJ_FACU); mapa_indices["objs"]["Facundo"] = idx; idx += 1
-    all_ranges.append(RANGO_OBJ_IVAN); mapa_indices["objs"]["Iván"] = idx; idx += 1
-    all_ranges.append(WEEK_RANGE); mapa_indices["week"] = idx; idx += 1
+    all_ranges.append(cfg["RANGO_RATE_FACU"]); mapa_indices["rates"]["Facundo"] = idx; idx += 1
+    all_ranges.append(cfg["RANGO_RATE_IVAN"]); mapa_indices["rates"]["Iván"] = idx; idx += 1
+    all_ranges.append(cfg["RANGO_OBJ_FACU"]); mapa_indices["objs"]["Facundo"] = idx; idx += 1
+    all_ranges.append(cfg["RANGO_OBJ_IVAN"]); mapa_indices["objs"]["Iván"] = idx; idx += 1
+    all_ranges.append(cfg["WEEK_RANGE"]); mapa_indices["week"] = idx; idx += 1
     
-    # Agregamos la fecha del mail al batch
     all_ranges.append(RANGO_FECHA_MAIL); mapa_indices["mail_date"] = idx; idx += 1
     
-    # Agregamos los Checks de Día (Iván col H, Facundo col I)
-    all_ranges.append(RANGO_CHECK_IVAN); mapa_indices["checks"]["Iván"] = idx; idx += 1
-    all_ranges.append(RANGO_CHECK_FACU); mapa_indices["checks"]["Facundo"] = idx; idx += 1
+    all_ranges.append(cfg["RANGO_CHECK_IVAN"]); mapa_indices["checks"]["Iván"] = idx; idx += 1
+    all_ranges.append(cfg["RANGO_CHECK_FACU"]); mapa_indices["checks"]["Facundo"] = idx; idx += 1
 
     try:
         res = sheets_batch_get(st.secrets["sheet_id"], all_ranges)
@@ -387,11 +385,11 @@ def cargar_datos_unificados():
         if not rows: return default
         return rows[0][0] if rows[0] else default
 
-    data_usuarios = {u: {"estado": {}, "tiempos": {}, "inicio_dt": None, "materia_activa": None} for u in USERS}
+    data_usuarios = {u: {"estado": {}, "tiempos": {}, "inicio_dt": None, "materia_activa": None} for u in USERS_LOCAL}
     materia_en_curso = None
     inicio_dt = None
 
-    for user, materias in USERS.items():
+    for user, materias in USERS_LOCAL.items():
         for m in materias:
             idx_est = mapa_indices["materias"][(user, m, "est")]
             raw_est = get_val(idx_est)
@@ -418,7 +416,6 @@ def cargar_datos_unificados():
     
     last_mail_date = get_val(mapa_indices["mail_date"], "")
 
-    # Leemos checks
     checks_data = {
         "Iván": get_val(mapa_indices["checks"]["Iván"], ""),
         "Facundo": get_val(mapa_indices["checks"]["Facundo"], "")
@@ -439,56 +436,54 @@ def cargar_datos_unificados():
 def batch_write(updates):
     try:
         sheets_batch_update(st.secrets["sheet_id"], updates)
+        # Limpiamos el cache usando la fecha actual
         cargar_datos_unificados.clear()
     except Exception as e:
         st.error(f"Error escribiendo Google Sheets: {e}")
         st.stop()
         
-# ------------------ FUNCIONES DE LOCKEO DE SESIÓN (NUEVO) ------------------
+# ------------------ FUNCIONES DE LOCKEO DE SESIÓN ------------------
 
 def get_lock_range(user):
-    """Devuelve el rango de la celda de lock para un usuario restringido."""
     if user == "Facundo":
         return RANGO_LOCK_FACUNDO
     elif user == "Iván":
         return RANGO_LOCK_IVAN
     return None
 
-@st.cache_data(ttl=2) # Cacheamos por un corto tiempo (2 segundos)
+@st.cache_data(ttl=2)
 def get_user_lock_status(user):
-    """Lee el valor del lock de sesión desde Google Sheets."""
     range_str = get_lock_range(user)
     if not range_str: return ""
     try:
         res = sheets_batch_get(st.secrets["sheet_id"], [range_str])
         vr = res.get("valueRanges", [{}])[0]
-        # Devuelve el contenido de la celda (será el ID de sesión o "")
         return str(vr.get("values", [[""]])[0][0] if vr.get("values") else "").strip()
     except Exception as e:
         st.error(f"Error leyendo estado de lock para {user}: {e}")
         return "ERROR_READING_LOCK"
 
 def set_user_lock_status(user, lock_value):
-    """Escribe un valor (ID de sesión para lock, o "" para unlock) en Google Sheets."""
     range_str = get_lock_range(user)
     if not range_str: return False
     try:
-        # Escribir el valor (el ID de sesión para bloquear, o "" para liberar)
         sheets_batch_update(st.secrets["sheet_id"], [(range_str, lock_value)])
-        # Limpiar caché de lectura para que el próximo get obtenga el nuevo valor
         get_user_lock_status.clear()
         return True
     except Exception as e:
         st.error(f"Error escribiendo estado de lock para {user}: {e}")
         return False
 
+# ------------------ CALLBACKS ACTUALIZADOS ------------------
 def start_materia_callback(usuario, materia):
     try:
-        info = USERS[usuario][materia]
+        cfg = get_day_config() # Obtenemos configuración dinámica
+        info = cfg["USERS"][usuario][materia]
+        
         now_str = ahora_str()
         updates = [(info["est"], now_str)] + [
             (m_datos["est"], "")
-            for m_datos in USERS[usuario].values()
+            for m_datos in cfg["USERS"][usuario].values()
             if m_datos is not None and m_datos is not info
         ]
         batch_write(updates)
@@ -501,7 +496,9 @@ def start_materia_callback(usuario, materia):
 
 def stop_materia_callback(usuario, materia):
     try:
-        info = USERS[usuario][materia]
+        cfg = get_day_config() # Config actual
+        info = cfg["USERS"][usuario][materia]
+        
         inicio = st.session_state.get("inicio_dt")
         prev_est = ""
         if inicio is None or st.session_state.get("materia_activa") != materia:
@@ -538,8 +535,18 @@ def stop_materia_callback(usuario, materia):
         updates = []
         for (p_inicio, p_fin) in partes:
             segs = int((p_fin - p_inicio).total_seconds())
+            
+            # --- Corrección dinámica de fila para cada fragmento de tiempo ---
+            # Si cruza la medianoche, esto escribe en la fila correspondiente al día del fragmento
             target_row = FILA_BASE + (p_inicio.date() - FECHA_BASE).days
-            time_cell_for_row = replace_row_in_range(info["time"], target_row)
+            
+            # Reconstruimos el rango de tiempo usando la fila correcta
+            # Usamos una instancia temporal de config para obtener la columna base
+            # Como la columna B/C/D no cambia, usamos la config actual para obtener la letra
+            # y reemplazamos el número de fila.
+            current_time_range = cfg["USERS"][usuario][materia]["time"]
+            time_cell_for_row = replace_row_in_range(current_time_range, target_row)
+            
             try:
                 res2 = sheets_batch_get(st.secrets["sheet_id"], [time_cell_for_row])
                 vr2 = res2.get("valueRanges", [{}])[0]
@@ -569,14 +576,18 @@ def main():
         st.session_state["_do_rerun"] = False
         st.rerun()
         
-    # Ahora la sesión debe tener el usuario_seleccionado
     if "usuario_seleccionado" not in st.session_state or st.session_state["usuario_seleccionado"] not in ["Facundo", "Iván"]:
-        # Esto no debería pasar si app.py funciona, pero es un fallback.
         st.error("Error: Usuario no seleccionado en la sesión. Reinicia la aplicación.")
         st.stop()
         
     # --- Carga de datos ---
-    datos_globales = cargar_datos_unificados()
+    hoy_str = _argentina_now_global().strftime("%Y-%m-%d")
+    datos_globales = cargar_datos_unificados(hoy_str) # Pasamos la fecha string para cache key
+    
+    # Recargamos la config local para usar en la UI
+    cfg = get_day_config()
+    USERS_LOCAL = cfg["USERS"]
+    
     datos = datos_globales["users_data"]
     resumen_marcas = datos_globales["resumen"]
     balance_val_raw = datos_globales["balance"]
@@ -591,31 +602,25 @@ def main():
     INTERVALO_HORAS = 2
 
     def puede_enviar_mail(now, last_mail_str):
-        # Fuera del horario permitido
         if not (HORA_INICIO <= now.hour < HORA_FIN):
             return False
 
-        # Nunca se envió mail
         if not last_mail_str or str(last_mail_str).strip() == "":
             return True
 
         try:
             last_dt = parse_datetime(last_mail_str)
         except Exception:
-            # Si el formato es inválido, permitimos enviar
             return True
 
-        # Diferencia en horas
         diff = now - last_dt
         return diff >= timedelta(hours=INTERVALO_HORAS)
 
-    # --- LÓGICA FINAL ---
     if puede_enviar_mail(now, last_mail_date_str):
         exito = enviar_reporte_email(datos, resumen_marcas, balance_val_raw)
         if exito:
             st.toast("📧 Reporte enviado")
             batch_write([(RANGO_FECHA_MAIL, ahora_str())])
-    # ----------------------------------------------------------------
 
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
     OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
@@ -650,7 +655,7 @@ def main():
     circle_otro = circle("#00e676" if otro_estudiando else "#ffffff")
 
     placeholder_total = st.empty()
-    placeholder_materias = {m: st.empty() for m in USERS[USUARIO_ACTUAL]}
+    placeholder_materias = {m: st.empty() for m in USERS_LOCAL[USUARIO_ACTUAL]}
 
     while True:
         tiempo_anadido_seg = 0
@@ -662,7 +667,8 @@ def main():
             objetivo = resumen_marcas[usuario]["obj"]
             total_min = 0.0
 
-            for materia, info in USERS[usuario].items():
+            # Usamos USERS_LOCAL (dinámico)
+            for materia, info in USERS_LOCAL[usuario].items():
                 base_seg = hms_a_segundos(datos[usuario]["tiempos"][materia])
                 segs_materia = base_seg
                 if usuario_estudiando and usuario == USUARIO_ACTUAL and materia == materia_en_curso:
@@ -708,18 +714,16 @@ def main():
                 </div>
             """, unsafe_allow_html=True)
             
-            # --- BOTÓN CHECK DÍA (NUEVO) ---
-            # Verificamos si la celda correspondiente está vacía
-            check_actual = checks_data.get(USUARIO_ACTUAL, "1") # Default 1 para ocultar si error
+            check_actual = checks_data.get(USUARIO_ACTUAL, "1")
             if str(check_actual).strip() == "":
                 def marcar_dia_callback(u):
-                    target_range = RANGO_CHECK_IVAN if u == "Iván" else RANGO_CHECK_FACU
+                    cfg_cb = get_day_config()
+                    target_range = cfg_cb["RANGO_CHECK_IVAN"] if u == "Iván" else cfg_cb["RANGO_CHECK_FACU"]
                     batch_write([(target_range, 1)])
                     pedir_rerun()
 
                 st.sidebar.button("Fui a clases", key="check_day_btn", on_click=marcar_dia_callback, args=(USUARIO_ACTUAL,), use_container_width=True)
 
-            # --- PROGRESO DEL OTRO USUARIO ---
             o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
             o_pago_obj = o_rate * o_obj
             o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
@@ -729,7 +733,6 @@ def main():
 
             materia_visible = 'visible' if materia_otro else 'hidden'
             materia_nombre_html = f'<span style="color:#00e676; margin-left:6px; visibility:{materia_visible};">{materia_otro if materia_otro else ""}</span>'
-            o_obj_color = "#00e676" if otro_estudiando else "#888"
 
             with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
                  st.markdown(f"""
@@ -750,13 +753,12 @@ def main():
                     </div>
                 """, unsafe_allow_html=True)
 
-            # --- MANIFIESTO ---
             with st.expander("ℹ️ No pensar, actuar."):
                 md_content = st.secrets["facundo_md"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ivan_md"]
                 st.markdown(md_content)
         
         # --- Actualizar Placeholders de Materias y Botones ---
-        mis_materias = USERS[USUARIO_ACTUAL]
+        mis_materias = USERS_LOCAL[USUARIO_ACTUAL]
         for materia, info in mis_materias.items():
 
             base_seg = hms_a_segundos(datos[USUARIO_ACTUAL]["tiempos"][materia])
@@ -792,6 +794,7 @@ def main():
                 with cols[1]:
                     with st.expander("🛠️ Corregir tiempo manualmente"):
                         input_key = f"input_{sanitize_key(materia)}"
+                        # Usamos el tiempo actual de datos, que puede venir de cache pero es razonablemente reciente
                         new_val = st.text_input("Tiempo (HH:MM:SS)", value=datos[USUARIO_ACTUAL]["tiempos"][materia], key=input_key)
 
                         def save_correction_callback(materia_key):
@@ -809,8 +812,9 @@ def main():
                             try:
                                 segs = hms_a_segundos(val)
                                 hhmmss = segundos_a_hms(segs)
-                                target_row = get_time_row()  # recalculamos por si cambió
-                                time_cell_for_row = replace_row_in_range(USERS[USUARIO_ACTUAL][materia_key]["time"], target_row)
+                                # Usamos config dinámica para saber en qué celda escribir AHORA
+                                cfg_corr = get_day_config()
+                                time_cell_for_row = cfg_corr["USERS"][USUARIO_ACTUAL][materia_key]["time"]
                                 batch_write([(time_cell_for_row, hhmmss)])
                                 st.success("Tiempo corregido correctamente.")
                             except Exception as e:
