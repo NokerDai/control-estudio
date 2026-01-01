@@ -326,7 +326,7 @@ def get_time_row():
     return FILA_BASE + delta
 
 TIME_ROW = get_time_row()
-WEEK_RANGE = f"'{SHEET_MARCAS}'!R{TIME_ROW}"
+WEEK_RANGE = f"'{SHEET_MARCAS}'!R{TIME_ROW-2}"
 
 USERS = {
     "Facundo": {
