@@ -342,6 +342,8 @@ def get_day_config(target_date=None):
         "RANGO_OBJ_IVAN": f"'{SHEET_MARCAS}'!O{time_row-2}",
         "RANGO_CHECK_IVAN": f"'{SHEET_MARCAS}'!H{time_row-2}",
         "RANGO_CHECK_FACU": f"'{SHEET_MARCAS}'!I{time_row-2}",
+        "RANGO_POZO_IVAN": f"'{SHEET_MARCAS}'!W{time_row-2}",
+        "RANGO_POZO_FACU": f"'{SHEET_MARCAS}'!X{time_row-2}",
     }
 
 # ------------------ CARGA UNIFICADA (cacheada por fecha) ------------------
@@ -371,6 +373,9 @@ def cargar_datos_unificados(fecha_str):
     
     all_ranges.append(cfg["RANGO_CHECK_IVAN"]); mapa_indices["checks"]["Iván"] = idx; idx += 1
     all_ranges.append(cfg["RANGO_CHECK_FACU"]); mapa_indices["checks"]["Facundo"] = idx; idx += 1
+
+    all_ranges.append(cfg["RANGO_POZO_IVAN"]); mapa_indices["pozo_ivan"] = idx; idx += 1
+    all_ranges.append(cfg["RANGO_POZO_FACU"]); mapa_indices["pozo_facu"] = idx; idx += 1
 
     try:
         res = sheets_batch_get(st.secrets["sheet_id"], all_ranges)
@@ -421,6 +426,9 @@ def cargar_datos_unificados(fecha_str):
         "Facundo": get_val(mapa_indices["checks"]["Facundo"], "")
     }
 
+    pozo_ivan_val = parse_float_or_zero(get_val(mapa_indices["pozo_ivan"]))
+    pozo_facu_val = parse_float_or_zero(get_val(mapa_indices["pozo_facu"]))
+
     if "usuario_seleccionado" in st.session_state:
         st.session_state["materia_activa"] = materia_en_curso
         st.session_state["inicio_dt"] = inicio_dt
@@ -430,7 +438,9 @@ def cargar_datos_unificados(fecha_str):
         "resumen": resumen, 
         "balance": balance_val,
         "last_mail_date": last_mail_date,
-        "checks": checks_data
+        "checks": checks_data,
+        "pozo_ivan": pozo_ivan_val,
+        "pozo_facu": pozo_facu_val
     }
 
 def batch_write(updates):
@@ -594,6 +604,9 @@ def main():
     last_mail_date_str = datos_globales["last_mail_date"]
     checks_data = datos_globales["checks"]
 
+    pozo_ivan = datos_globales["pozo_ivan"]
+    pozo_facu = datos_globales["pozo_facu"]
+
     # ------------------ LOGICA ENVIO EMAIL DIARIO ------------------
     now = _argentina_now_global()
 
@@ -697,12 +710,17 @@ def main():
         balance_val += progreso_en_dinero
         balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa"
         balance_str = f"+${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
+        pozo_valor = pozo_facu if USUARIO_ACTUAL == "Facundo" else pozo_ivan
+        pozo_str = f"<div style='color:{balance_color}; font-size:0.9rem;'>${pozo_valor:.2f}</div>"
 
         # --- Actualizar Placeholder Global ---
         with placeholder_total.container():
             st.markdown(f"""
                 <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                    <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
+                        {pozo_str}
+                    </div>
                     <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${m_tot:.2f}</div>
                     <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
                         <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
