@@ -719,9 +719,9 @@ def main():
                 <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <div style="font-size: 1.2rem; color: #aaa;">Hoy</div>
-                        <div style="text-align:right;">
-                            <div style="font-size: 0.9rem; color: #aaa;">Pozo: </div>
-                            <div style='color:{pozo_color}; font-size: 0.9rem;'>${pozo_valor:.2f}</div>
+                        <div style="display:flex; align-items:center; gap:6px; font-size:0.9rem;">
+                            <span style="color:#aaa;">Pozo:</span>
+                            <span style="color:{pozo_color};">${pozo_valor:.2f}</span>
                         </div>
                     </div>
                     <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${m_tot:.2f}</div>
