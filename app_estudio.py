@@ -354,8 +354,11 @@ def cargar_datos_unificados(fecha_str):
     cfg = get_day_config() # Usa la fecha actual por defecto (que coincide con fecha_str)
     USERS_LOCAL = cfg["USERS"]
     
+    yesterday = _argentina_now_global().date() - timedelta(days=1)
+    cfg_yesterday = get_day_config(yesterday)
+    
     all_ranges = []
-    mapa_indices = {"materias": {}, "rates": {}, "objs": {}, "checks": {}, "week": None, "mail_date": None}
+    mapa_indices = {"materias": {}, "rates": {}, "objs": {}, "checks": {}, "week": None, "week_ayer": None, "mail_date": None}
     idx = 0
     
     for user, materias in USERS_LOCAL.items():
@@ -368,6 +371,7 @@ def cargar_datos_unificados(fecha_str):
     all_ranges.append(cfg["RANGO_OBJ_FACU"]); mapa_indices["objs"]["Facundo"] = idx; idx += 1
     all_ranges.append(cfg["RANGO_OBJ_IVAN"]); mapa_indices["objs"]["Iván"] = idx; idx += 1
     all_ranges.append(cfg["WEEK_RANGE"]); mapa_indices["week"] = idx; idx += 1
+    all_ranges.append(cfg_yesterday["WEEK_RANGE"]); mapa_indices["week_ayer"] = idx; idx += 1
     
     all_ranges.append(RANGO_FECHA_MAIL); mapa_indices["mail_date"] = idx; idx += 1
     
@@ -419,6 +423,9 @@ def cargar_datos_unificados(fecha_str):
     raw_week = get_val(mapa_indices["week"], "0")
     balance_val = parse_float_or_zero(raw_week)
     
+    raw_week_ayer = get_val(mapa_indices["week_ayer"], "0")
+    balance_val_ayer = parse_float_or_zero(raw_week_ayer)
+    
     last_mail_date = get_val(mapa_indices["mail_date"], "")
 
     checks_data = {
@@ -437,6 +444,7 @@ def cargar_datos_unificados(fecha_str):
         "users_data": data_usuarios, 
         "resumen": resumen, 
         "balance": balance_val,
+        "balance_ayer": balance_val_ayer,
         "last_mail_date": last_mail_date,
         "checks": checks_data,
         "pozo_ivan": pozo_ivan_val,
@@ -601,6 +609,7 @@ def main():
     datos = datos_globales["users_data"]
     resumen_marcas = datos_globales["resumen"]
     balance_val_raw = datos_globales["balance"]
+    balance_val_ayer_raw = datos_globales["balance_ayer"]
     last_mail_date_str = datos_globales["last_mail_date"]
     checks_data = datos_globales["checks"]
 
@@ -704,10 +713,10 @@ def main():
         objetivo_hms = segundos_a_hms(int(m_obj * 60))
         total_hms = segundos_a_hms(int(total_min * 60))
 
-        balance_val = balance_val_raw
+        balance_val = balance_val_ayer_raw
         if USUARIO_ACTUAL == "Facundo":
             balance_val = -balance_val
-        balance_val += progreso_en_dinero
+        balance_val += m_tot
         balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa"
         balance_str = f"+${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
         pozo_valor = pozo_facu if USUARIO_ACTUAL == "Facundo" else pozo_ivan
