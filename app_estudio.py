@@ -712,7 +712,7 @@ def main():
         balance_str = f"+${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
         pozo_valor = pozo_facu if USUARIO_ACTUAL == "Facundo" else pozo_ivan
         pozo_color = "#00e676" if balance_val != 0 else "#aaa"
-        pozo_str = f"<div style='color:{pozo_color}; font-size:0.9rem;'>${pozo_valor:.2f}</div>"
+        pozo_str = f"<div style='color:{pozo_color}; font-size: 0.9rem;'>${pozo_valor:.2f}</div>"
 
         # --- Actualizar Placeholder Global ---
         with placeholder_total.container():
@@ -720,7 +720,7 @@ def main():
                 <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
                     <div style="display:flex; justify-content:space-between;">
                         <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
-                        {pozo_str}
+                        <div style="font-size: 0.9rem; color: #aaa;">{pozo_str}
                     </div>
                     <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${m_tot:.2f}</div>
                     <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
