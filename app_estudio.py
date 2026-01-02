@@ -711,7 +711,8 @@ def main():
         balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa"
         balance_str = f"+${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
         pozo_valor = pozo_facu if USUARIO_ACTUAL == "Facundo" else pozo_ivan
-        pozo_str = f"<div style='color:{balance_color}; font-size:0.9rem;'>${pozo_valor:.2f}</div>"
+        pozo_color = "#00e676" if balance_val != 0 else "#aaa"
+        pozo_str = f"<div style='color:{pozo_color}; font-size:0.9rem;'>${pozo_valor:.2f}</div>"
 
         # --- Actualizar Placeholder Global ---
         with placeholder_total.container():
