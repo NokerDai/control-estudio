@@ -712,7 +712,7 @@ def main():
         a = pozo_valor - progreso_en_dinero if pozo_valor - progreso_en_dinero < 0 else 0
         dinero_hoy = m_tot + a
         pozo_valor -= progreso_en_dinero_real
-        pozo_color = "#00e676" if balance_val != 0 else "#aaa"
+        pozo_color = "#00e676" if round(balance_val) != 0 else "#aaa"
         balance_val += progreso_en_dinero_real
         balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa"
         balance_str = f"+${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
