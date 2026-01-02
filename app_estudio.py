@@ -707,12 +707,15 @@ def main():
         balance_val = balance_val_raw
         if USUARIO_ACTUAL == "Facundo":
             balance_val = -balance_val
-        balance_val += progreso_en_dinero
+        pozo_valor = pozo_facu if USUARIO_ACTUAL == "Facundo" else pozo_ivan
+        progreso_en_dinero_real = min(progreso_en_dinero, pozo_valor)
+        a = pozo_valor - progreso_en_dinero if pozo_valor - progreso_en_dinero < 0 else 0
+        dinero_hoy = m_tot + a
+        pozo_valor -= progreso_en_dinero_real
+        pozo_color = "#00e676" if balance_val != 0 else "#aaa"
+        balance_val += progreso_en_dinero_real
         balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa"
         balance_str = f"+${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
-        pozo_valor = pozo_facu if USUARIO_ACTUAL == "Facundo" else pozo_ivan
-        pozo_valor -= progreso_en_dinero
-        pozo_color = "#00e676" if balance_val != 0 else "#aaa"
 
         # --- Actualizar Placeholder Global ---
         with placeholder_total.container():
@@ -725,7 +728,7 @@ def main():
                             <span style="color:{pozo_color};">${pozo_valor:.2f}</span>
                         </div>
                     </div>
-                    <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${m_tot:.2f}</div>
+                    <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${dinero_hoy:.2f}</div>
                     <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
                         <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
                     </div>
