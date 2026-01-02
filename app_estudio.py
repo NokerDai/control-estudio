@@ -717,9 +717,9 @@ def main():
         with placeholder_total.container():
             st.markdown(f"""
                 <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                    <div style="display:flex; justify-content:space-between;">
-                        <div style="font-size: 1.2rem; color: #aaa; margin-bottom: 5px;">Hoy</div>
-                        <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="font-size: 1.2rem; color: #aaa;">Hoy</div>
+                        <div style="text-align:right;">
                             <div style="font-size: 0.9rem; color: #aaa;">Pozo: </div>
                             <div style='color:{pozo_color}; font-size: 0.9rem;'>${pozo_valor:.2f}</div>
                         </div>
