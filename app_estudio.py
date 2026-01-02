@@ -718,7 +718,7 @@ def main():
         if pozo_valor < 0:
             m_tot += pozo_valor
             pozo_valor = 0.0
-        pozo_color = "#00e676" if balance_val != 0 else "#aaa"
+        pozo_color = "#00e676" if round(pozo_valor) != 0 else "#aaa"
 
         balance_val = balance_val_ayer_raw
         if USUARIO_ACTUAL == "Facundo":
