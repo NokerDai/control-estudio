@@ -807,18 +807,19 @@ def main():
         objetivo_hms = segundos_a_hms(int(m_obj * 60))
         total_hms = segundos_a_hms(int(total_min * 60))
 
+        pozo_valor = pozo_facu if USUARIO_ACTUAL == "Facundo" else pozo_ivan
+        pozo_valor -= m_tot
+        if pozo_valor < 0:
+            m_tot += pozo_valor
+            pozo_valor = 0.0
+        pozo_color = "#00e676" if round(pozo_valor) != 0 else "#aaa"
+
         balance_val = balance_val_ayer_raw
         if USUARIO_ACTUAL == "Facundo":
             balance_val = -balance_val
         balance_val += m_tot
         balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa"
         balance_str = f"+${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
-        pozo_valor = pozo_facu if USUARIO_ACTUAL == "Facundo" else pozo_ivan
-        pozo_valor -= m_tot
-        if pozo_valor < 0:
-            m_tot += pozo_valor
-            pozo_valor = 0.0
-        pozo_color = "#00e676" if balance_val != 0 else "#aaa"
 
         # --- Actualizar Placeholder Global ---
         with placeholder_total.container():
