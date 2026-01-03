@@ -296,6 +296,75 @@ def enviar_reporte_email(datos_usuarios, resumen, balance_raw):
         print(f"Error crítico en el proceso de envío de email: {e}")
         return False
 
+def enviar_alerta_vago(usuarios_vagos):
+    """Envía un mail a los usuarios que no han estudiado nada hoy."""
+    try:
+        sender = st.secrets["sender"]
+        password = st.secrets["password_mail"]
+        recipients = st.secrets["recipients"]
+
+        if len(recipients) < 2:
+            return False
+
+        USER_EMAIL_MAP = {
+            "Facundo": recipients[0],
+            "Iván": recipients[1],
+        }
+
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender, password)
+        
+        exito = True
+
+        for user in usuarios_vagos:
+            email = USER_EMAIL_MAP.get(user)
+            if not email:
+                continue
+
+            now = _argentina_now_global()
+            fecha_hora = now.strftime("%H:%M")
+
+            msg = MIMEMultipart()
+            msg['From'] = sender
+            msg['To'] = email 
+            msg['Subject'] = f"🚨 DALE REPELOTUDO PONETE LAS PILAS ({fecha_hora})" 
+
+            html_content = f"""
+            <html>
+                <div style="text-align: center; margin-top: 30px;">
+                    <a href="https://estudio.streamlit.app/" style="
+                        background-color: #00e676;
+                        color: #000;
+                        padding: 15px 30px;
+                        text-decoration: none;
+                        font-weight: bold;
+                        border-radius: 5px;
+                        font-size: 1.1rem;
+                    ">
+                        IR A ESTUDIAR AHORA
+                    </a>
+                </div>
+            </body>
+            </html>
+            """
+            
+            msg.attach(MIMEText(html_content, 'html'))
+            
+            try:
+                server.sendmail(sender, email, msg.as_string())
+                print(f"Email de vago enviado a {user}")
+            except Exception as e:
+                print(f"Error enviando email a {user}: {e}")
+                exito = False
+
+        server.quit()
+        return exito
+
+    except Exception as e:
+        print(f"Error en alerta vago: {e}")
+        return False
+
 # ------------------ CONSTANTES ESTRUCTURALES (FIJAS) ------------------
 FILA_BASE = 5
 FECHA_BASE = date(2026, 1, 1)
@@ -306,6 +375,7 @@ SHEET_MARCAS = "marcas"
 RANGO_FECHA_MAIL = f"'{SHEET_MARCAS}'!Z1"
 RANGO_LOCK_IVAN = f"'{SHEET_MARCAS}'!Z2"
 RANGO_LOCK_FACUNDO = f"'{SHEET_MARCAS}'!Z3"
+RANGO_FECHA_MAIL_VAGO = f"'{SHEET_MARCAS}'!Z12" 
 
 # ------------------ CONFIGURACIÓN DINÁMICA DEL DÍA ------------------
 # Esta función reemplaza las constantes globales que causaban el bug.
@@ -358,7 +428,7 @@ def cargar_datos_unificados(fecha_str):
     cfg_yesterday = get_day_config(yesterday)
     
     all_ranges = []
-    mapa_indices = {"materias": {}, "rates": {}, "objs": {}, "checks": {}, "week": None, "week_ayer": None, "mail_date": None}
+    mapa_indices = {"materias": {}, "rates": {}, "objs": {}, "checks": {}, "week": None, "week_ayer": None, "mail_date": None, "mail_vago": None}
     idx = 0
     
     for user, materias in USERS_LOCAL.items():
@@ -374,6 +444,7 @@ def cargar_datos_unificados(fecha_str):
     all_ranges.append(cfg_yesterday["WEEK_RANGE"]); mapa_indices["week_ayer"] = idx; idx += 1
     
     all_ranges.append(RANGO_FECHA_MAIL); mapa_indices["mail_date"] = idx; idx += 1
+    all_ranges.append(RANGO_FECHA_MAIL_VAGO); mapa_indices["mail_vago"] = idx; idx += 1
     
     all_ranges.append(cfg["RANGO_CHECK_IVAN"]); mapa_indices["checks"]["Iván"] = idx; idx += 1
     all_ranges.append(cfg["RANGO_CHECK_FACU"]); mapa_indices["checks"]["Facundo"] = idx; idx += 1
@@ -427,6 +498,7 @@ def cargar_datos_unificados(fecha_str):
     balance_val_ayer = parse_float_or_zero(raw_week_ayer)
     
     last_mail_date = get_val(mapa_indices["mail_date"], "")
+    last_mail_vago = get_val(mapa_indices["mail_vago"], "")
 
     checks_data = {
         "Iván": get_val(mapa_indices["checks"]["Iván"], ""),
@@ -446,6 +518,7 @@ def cargar_datos_unificados(fecha_str):
         "balance": balance_val,
         "balance_ayer": balance_val_ayer,
         "last_mail_date": last_mail_date,
+        "last_mail_vago": last_mail_vago,
         "checks": checks_data,
         "pozo_ivan": pozo_ivan_val,
         "pozo_facu": pozo_facu_val
@@ -611,6 +684,7 @@ def main():
     balance_val_raw = datos_globales["balance"]
     balance_val_ayer_raw = datos_globales["balance_ayer"]
     last_mail_date_str = datos_globales["last_mail_date"]
+    last_mail_vago_str = datos_globales["last_mail_vago"]
     checks_data = datos_globales["checks"]
 
     pozo_ivan = datos_globales["pozo_ivan"]
@@ -621,9 +695,8 @@ def main():
 
     HORA_INICIO = 7
     HORA_FIN = 22
-    INTERVALO_HORAS = 2
-
-    def puede_enviar_mail(now, last_mail_str):
+    
+    def puede_enviar_mail(now, last_mail_str, intervalo_horas):
         if not (HORA_INICIO <= now.hour < HORA_FIN):
             return False
 
@@ -636,13 +709,34 @@ def main():
             return True
 
         diff = now - last_dt
-        return diff >= timedelta(hours=INTERVALO_HORAS)
+        return diff >= timedelta(hours=intervalo_horas)
 
-    if puede_enviar_mail(now, last_mail_date_str):
+    # 1. Reporte de Balance (Cada 2 horas)
+    if puede_enviar_mail(now, last_mail_date_str, 2):
         exito = enviar_reporte_email(datos, resumen_marcas, balance_val_raw)
         if exito:
             st.toast("📧 Reporte enviado")
             batch_write([(RANGO_FECHA_MAIL, ahora_str())])
+            
+    # 2. Alerta "Vago" (Cada 1 hora, si el tiempo es 0)
+    if puede_enviar_mail(now, last_mail_vago_str, 1):
+        usuarios_vagos = []
+        for u in ["Facundo", "Iván"]:
+            # Calculamos el tiempo total de este usuario
+            total_seg = 0
+            if u in datos and "tiempos" in datos[u]:
+                for t_str in datos[u]["tiempos"].values():
+                    total_seg += hms_a_segundos(t_str)
+            
+            # Si el total es 0, lo agregamos a la lista de la vergüenza
+            if total_seg == 0:
+                usuarios_vagos.append(u)
+        
+        if usuarios_vagos:
+            exito = enviar_alerta_vago(usuarios_vagos)
+            if exito:
+                st.toast(f"📧 Alerta de inactividad enviada a: {', '.join(usuarios_vagos)}")
+                batch_write([(RANGO_FECHA_MAIL_VAGO, ahora_str())])
 
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
     OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
