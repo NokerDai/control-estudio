@@ -719,7 +719,7 @@ def main():
             batch_write([(RANGO_FECHA_MAIL, ahora_str())])
             
     # 2. Alerta "Vago" (Cada 1 hora, si el tiempo es 0)
-    if puede_enviar_mail(now, last_mail_vago_str, 1):
+    if puede_enviar_mail(now, last_mail_vago_str, 1) and 0 == 1:
         usuarios_vagos = []
         for u in ["Facundo", "Iván"]:
             # Calculamos el tiempo total de este usuario
