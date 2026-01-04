@@ -863,7 +863,7 @@ def main():
             materia_visible = 'visible' if materia_otro else 'hidden'
             materia_nombre_html = f'<span style="color:#00e676; margin-left:6px; visibility:{materia_visible};">{materia_otro if materia_otro else ""}</span>'
 
-            with st.expander(f"Progreso de {OTRO_USUARIO}.", expanded=True):
+            with st.expander(f"Progreso de {OTRO_USUARIO}."):
                  st.markdown(f"""
                     <div style="margin-bottom: 10px;">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
