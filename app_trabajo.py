@@ -207,7 +207,6 @@ SHEET_FACUNDO = "F. Trabajo"
 SHEET_MARCAS = "marcas"
 
 RANGO_OBJ_REDES = f"'{SHEET_FACUNDO}'!F2"
-RANGO_OBJ_TRABAJO = f"'{SHEET_FACUNDO}'!G2"
 
 # ------------------ CONFIGURACIÓN DINÁMICA DEL DÍA ------------------
 # Eliminamos la variable global TIME_ROW y la hacemos dinámica
@@ -222,7 +221,6 @@ def get_day_config(target_date=None):
     users_dict = {
         "Facundo": {
             "Redes":   {"time": f"'{SHEET_FACUNDO}'!B{time_row}", "est": f"'{SHEET_MARCAS}'!Z10"},
-            "Trabajo": {"time": f"'{SHEET_FACUNDO}'!C{time_row}", "est": f"'{SHEET_MARCAS}'!Z11"},
         }
     }
     
@@ -251,7 +249,6 @@ def cargar_datos_unificados(fecha_str):
 
     # Agregar rangos de objetivos
     all_ranges.append(RANGO_OBJ_REDES); mapa_indices["obj_redes"] = idx; idx += 1
-    all_ranges.append(RANGO_OBJ_TRABAJO); mapa_indices["obj_trabajo"] = idx; idx += 1
 
     try:
         res = sheets_batch_get(st.secrets["sheet_id"], all_ranges)
@@ -294,7 +291,6 @@ def cargar_datos_unificados(fecha_str):
         extras_res[key] = get_val(idx_pos, "")
 
     obj_redes = parse_time_cell_to_seconds(get_val(mapa_indices["obj_redes"]))
-    obj_trabajo = parse_time_cell_to_seconds(get_val(mapa_indices["obj_trabajo"]))
 
     if "usuario_seleccionado" in st.session_state:
         st.session_state["materia_activa"] = materia_en_curso
@@ -303,8 +299,7 @@ def cargar_datos_unificados(fecha_str):
     return {
         "users_data": data_usuarios,
         "extras": extras_res,
-        "obj_redes": obj_redes,
-        "obj_trabajo": obj_trabajo
+        "obj_redes": obj_redes
     }
 
 def batch_write(updates):
@@ -404,7 +399,7 @@ def stop_materia_callback(usuario, materia):
 def main():
     cargar_estilos()
     st.set_page_config(
-        page_title="Trabajo",
+        page_title="Redes",
         page_icon="💼",
     )
 
@@ -453,8 +448,7 @@ def main():
     
     datos = datos_globales["users_data"]
     obj_redes = datos_globales["obj_redes"]
-    obj_trabajo = datos_globales["obj_trabajo"]
-    obj_total = obj_redes + obj_trabajo
+    obj_total = obj_redes
 
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
 
@@ -515,9 +509,8 @@ def main():
                 tiempo_total_seg += max(0, tiempo_anadido_seg)
 
             tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
-            info_trabajo = '<div class="info"> Si no hay trabajo en sí, tengo que usarlo para acompañar a papá o completar con Redes.</div>' if materia == 'Trabajo' else ''
             badge_html = '<div class="status-badge status-active">🟢 Trabajando...</div>' if en_curso else ''
-            html_card = f"""<div class="materia-card"><div class="materia-title">{materia}{info_trabajo}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
+            html_card = f"""<div class="materia-card"><div class="materia-title">{materia}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
 
             with placeholder_materias[materia].container():
                 st.markdown(html_card, unsafe_allow_html=True)
