@@ -234,9 +234,9 @@ if show_other_pages:
             st.session_state.current_page = "biblioteca"
             st.rerun()
 
-# ---------------------------------------------------------
+# --------------------------------------------------------
 # ROUTER (Decide qué app mostrar)
-# ---------------------------------------------------------
+# --------------------------------------------------------
 
 # 1. Si eligió "habitos", mostramos Hábitos
 if st.session_state.current_page == "habitos":

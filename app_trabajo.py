@@ -508,13 +508,7 @@ def main():
             if en_curso:
                 tiempo_total_seg += max(0, tiempo_anadido_seg)
 
-            tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
-            badge_html = '<div class="status-badge status-active">🟢 Trabajando...</div>' if en_curso else ''
-            html_card = f"""<div class="materia-card"><div class="materia-title">{materia}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
-
             with placeholder_materias[materia].container():
-                st.markdown(html_card, unsafe_allow_html=True)
-
                 key_start = sanitize_key(f"start_{USUARIO_ACTUAL}_{materia}")
                 key_stop = sanitize_key(f"stop_{USUARIO_ACTUAL}_{materia}")
                 key_disabled = sanitize_key(f"dis_{USUARIO_ACTUAL}_{materia}")
