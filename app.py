@@ -172,9 +172,9 @@ if st.session_state.usuario_seleccionado is None:
 
     st.stop() 
 
-# ---------------------------------------------------------
+# --------------------------------------------------------
 # RE-VALIDACIÓN DEL LOCK EN CADA RERUN (Para usuarios restringidos)
-# ---------------------------------------------------------
+# --------------------------------------------------------
 # Si el usuario es restringido y ya está logueado, verificamos que el lock en Sheets
 # siga siendo el de esta sesión (SESSION_ID).
 if USUARIO_ACTUAL in RESTRICTED_USERS:
