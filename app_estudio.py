@@ -1,7 +1,6 @@
 import re
 import json
 import time
-import smtplib
 from datetime import datetime, date, timedelta, time as dt_time
 import streamlit as st
 from google.oauth2 import service_account
