@@ -2,9 +2,9 @@ name: Firebase Sheet Monitor
 
 on:
   schedule:
-    # Cada 30 minutos
+    # Ejecuta cada 30 minutos
     - cron: '*/30 * * * *'
-  workflow_dispatch: # Permite correrlo manualmente desde GitHub
+  workflow_dispatch: # Permite ejecutar manualmente
 
 jobs:
   run-monitor:
@@ -25,8 +25,14 @@ jobs:
           pip install requests google-auth google-auth-oauthlib google-auth-httplib2
 
       - name: Save service account
-        run: echo "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" > service_account.json
+        # Usa printf para preservar correctamente JSON multilinea
+        run: |
+          printf '%s' "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" > service_account.json
 
+      - name: Validar service account JSON
+        run: |
+          python -c "import json; json.load(open('service_account.json'))"
+          
       - name: Run monitor script
         env:
           SERVICE_ACCOUNT_FILE: service_account.json
