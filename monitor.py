@@ -10,7 +10,7 @@ import os
 
 # ================== CONFIGURACIÓN ==================
 
-SERVICE_ACCOUNT_FILE = os.environ.get("SERVICE_ACCOUNT_FILE", "")
+SERVICE_ACCOUNT_FILE = os.environ.get("SERVICE_ACCOUNT_FILE", "service_account.json")
 PROJECT_ID = os.environ.get("PROJECT_ID", "")
 CSV_URL = os.environ.get("CSV_URL", "")
 
