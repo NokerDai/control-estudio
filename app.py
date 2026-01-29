@@ -5,7 +5,6 @@ import app_estudio
 import app_habitos
 import app_biblioteca
 import app_noticias
-import app_trabajo
 
 try:
     # Necesitamos el ID de la sesión para el loc
@@ -216,11 +215,6 @@ if show_habitos and st.session_state.current_page != "habitos":
 show_other_pages = st.session_state.authenticated or ("password" in query_params)
 
 if show_other_pages:
-    # Botón para ir a TRABAJO
-    if st.session_state.current_page != "trabajo":
-        if st.sidebar.button("💼 Trabajo", use_container_width=True):
-            st.session_state.current_page = "trabajo"
-            st.rerun()
     
     # --- Botón para ir a NOTICIAS ---
     if st.session_state.current_page != "noticias":
@@ -277,19 +271,7 @@ elif st.session_state.current_page == "noticias":
         st.stop()
     app_noticias.main()
 
-# 5. Si eligió "trabajo", mostramos Trabajo
-elif st.session_state.current_page == "trabajo":
-    if not st.session_state.authenticated:
-        password_input = st.text_input("Contraseña:", type="password")
-        if st.button("Entrar"):
-            if password_input == st.secrets["password"]:
-                st.session_state.authenticated = True
-                st.rerun()
-            else:
-                st.error("Contraseña incorrecta.")
-        st.stop()
-    app_trabajo.main()
-
 # 6. Por defecto (o si eligió "estudio"), mostramos Estudio
 else:
+
     app_estudio.main()
