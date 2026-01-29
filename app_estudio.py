@@ -219,11 +219,11 @@ def get_day_config(target_date=None):
     # Construimos los rangos dinámicamente usando time_row actual
     users_dict = {
         "Facundo": {
-            "Trabajo":         {"time": f"'{SHEET_FACUNDO}'!F{time_row}", "est": f"'{SHEET_MARCAS}'!Z10"},
-            "Matemática 2":    {"time": f"'{SHEET_FACUNDO}'!B{time_row}", "est": f"'{SHEET_MARCAS}'!Z4"},
-            "Matemática 3":    {"time": f"'{SHEET_FACUNDO}'!C{time_row}", "est": f"'{SHEET_MARCAS}'!Z5"},
-            "Macroeconomía 1": {"time": f"'{SHEET_FACUNDO}'!D{time_row}", "est": f"'{SHEET_MARCAS}'!Z6"},
-            "Historia":        {"time": f"'{SHEET_FACUNDO}'!E{time_row}", "est": f"'{SHEET_MARCAS}'!Z7"},
+            "Trabajo":         {"time": f"'{SHEET_FACUNDO}'!B{time_row}", "est": f"'{SHEET_MARCAS}'!Z10"},
+            "Matemática 2":    {"time": f"'{SHEET_FACUNDO}'!C{time_row}", "est": f"'{SHEET_MARCAS}'!Z4"},
+            "Matemática 3":    {"time": f"'{SHEET_FACUNDO}'!D{time_row}", "est": f"'{SHEET_MARCAS}'!Z5"},
+            "Macroeconomía 1": {"time": f"'{SHEET_FACUNDO}'!E{time_row}", "est": f"'{SHEET_MARCAS}'!Z6"},
+            "Historia":        {"time": f"'{SHEET_FACUNDO}'!F{time_row}", "est": f"'{SHEET_MARCAS}'!Z7"},
         },
         "Iván": {
             "Física":   {"time": f"'{SHEET_IVAN}'!B{time_row}", "est": f"'{SHEET_MARCAS}'!Z8"},
