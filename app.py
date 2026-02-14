@@ -92,13 +92,16 @@ def handle_user_login(selected_user):
             with col_btn:
                 # El nuevo botón "Error" / Forzar deslogueo
                 # on_click establece una bandera en session_state y fuerza un rerun para ejecutar el Paso 2.
-                if st.button(
-                    "⚠️ Error", 
-                    key=f"force_unlock_btn_{selected_user}",
-                    use_container_width=True,
-                    on_click=lambda: st.session_state.update({f"force_unlock_{selected_user}": True})
-                ):
-                    pass
+                if f"force_unlock_btn_rendered_{selected_user}" not in st.session_state:
+                    st.session_state[f"force_unlock_btn_rendered_{selected_user}"] = True
+                
+                    if st.button(
+                        "⚠️ Error", 
+                        key=f"force_unlock_btn_{selected_user}_{SESSION_ID}",
+                        use_container_width=True,
+                        on_click=lambda: st.session_state.update({f"force_unlock_{selected_user}": True})
+                    ):
+                        pass
 
             return False # Bloquear el login y detener el proceso en este punto
         # =========================================
@@ -275,3 +278,4 @@ elif st.session_state.current_page == "noticias":
 else:
 
     app_estudio.main()
+
