@@ -462,7 +462,9 @@ def stop_materia_callback(usuario, materia):
             
             # --- Corrección dinámica de fila para cada fragmento de tiempo ---
             # Si cruza la medianoche, esto escribe en la fila correspondiente al día del fragmento
-            target_row = FILA_BASE + (p_inicio.date() - FECHA_BASE).days
+            # Usar la base correcta según el usuario
+            base_correcta = FILA_BASE2 if usuario == "Facundo" else FILA_BASE
+            target_row = base_correcta + (p_inicio.date() - FECHA_BASE).days
             
             # Reconstruimos el rango de tiempo usando la fila correcta
             # Usamos una instancia temporal de config para obtener la columna base
