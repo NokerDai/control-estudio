@@ -194,7 +194,8 @@ def sheets_batch_update(spreadsheet_id, updates):
         raise RuntimeError(f"Error HTTP en batchUpdate al escribir en la hoja: {e}")
 
 # ------------------ CONSTANTES ESTRUCTURALES (FIJAS) ------------------
-FILA_BASE = 11
+FILA_BASE = 5
+FILA_BASE2 = 10
 FECHA_BASE = date(2026, 1, 1)
 SHEET_FACUNDO = "F. Economía"
 SHEET_IVAN = "I. Física"
@@ -215,19 +216,22 @@ def get_day_config(target_date=None):
     
     delta = (target_date - FECHA_BASE).days
     time_row = FILA_BASE + delta
+    time_row2 = FILA_BASE2 + delta
     
     # Construimos los rangos dinámicamente usando time_row actual
     users_dict = {
         "Facundo": {
-            "Trabajo":         {"time": f"'{SHEET_FACUNDO}'!B{time_row}", "est": f"'{SHEET_MARCAS}'!Z10"},
-            "Matemática 2":    {"time": f"'{SHEET_FACUNDO}'!C{time_row}", "est": f"'{SHEET_MARCAS}'!Z4"},
-            "Matemática 3":    {"time": f"'{SHEET_FACUNDO}'!D{time_row}", "est": f"'{SHEET_MARCAS}'!Z5"},
-            "Macroeconomía 1": {"time": f"'{SHEET_FACUNDO}'!E{time_row}", "est": f"'{SHEET_MARCAS}'!Z6"},
-            "Historia":        {"time": f"'{SHEET_FACUNDO}'!F{time_row}", "est": f"'{SHEET_MARCAS}'!Z7"},
+            "Trabajo":         {"time": f"'{SHEET_FACUNDO}'!B{time_row2}", "est": f"'{SHEET_MARCAS}'!Z10"},
+            "Cursado":         {"time": f"'{SHEET_FACUNDO}'!C{time_row2}", "est": f"'{SHEET_MARCAS}'!Z14"},
+            "Estadística I":    {"time": f"'{SHEET_FACUNDO}'!D{time_row2}", "est": f"'{SHEET_MARCAS}'!Z4"},
+            "Int. Contabilidad":    {"time": f"'{SHEET_FACUNDO}'!E{time_row2}", "est": f"'{SHEET_MARCAS}'!Z5"},
+            "Sociología": {"time": f"'{SHEET_FACUNDO}'!F{time_row2}", "est": f"'{SHEET_MARCAS}'!Z6"},
+            "Derecho Público":        {"time": f"'{SHEET_FACUNDO}'!G{time_row2}", "est": f"'{SHEET_MARCAS}'!Z7"},
         },
         "Iván": {
             "Física":   {"time": f"'{SHEET_IVAN}'!B{time_row}", "est": f"'{SHEET_MARCAS}'!Z8"},
             "Análisis": {"time": f"'{SHEET_IVAN}'!C{time_row}", "est": f"'{SHEET_MARCAS}'!Z9"},
+            "Álgebra": {"time": f"'{SHEET_IVAN}'!D{time_row}", "est": f"'{SHEET_MARCAS}'!Z13"},
         }
     }
     
