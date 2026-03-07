@@ -194,7 +194,7 @@ def sheets_batch_update(spreadsheet_id, updates):
         raise RuntimeError(f"Error HTTP en batchUpdate al escribir en la hoja: {e}")
 
 # ------------------ CONSTANTES ESTRUCTURALES (FIJAS) ------------------
-FILA_BASE = 5
+FILA_BASE = 11
 FECHA_BASE = date(2026, 1, 1)
 SHEET_FACUNDO = "F. Economía"
 SHEET_IVAN = "I. Física"
