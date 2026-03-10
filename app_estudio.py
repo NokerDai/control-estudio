@@ -631,7 +631,7 @@ def main():
                         <div style="display:flex; align-items:center; gap:6px; font-size:0.9rem;">
                             <span style="color:#aaa;">Pozo:</span>
                             <span style="color:{pozo_color};">
-                                <strong>{pozo_horas_decimal:.2f}h</strong> 
+                                <strong>{pozo_horas_decimal:.2f}hs</strong> 
                                 <span style="color:#666; margin-left:4px;">(${pozo_valor:.2f})</span>
                             </span>
                         </div>
