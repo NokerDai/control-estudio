@@ -584,21 +584,6 @@ def main():
 
         # ... (dentro del bucle while True, después de calcular_metricas)
         m_tot, m_rate, m_obj, total_min, progreso_en_dinero = calcular_metricas(USUARIO_ACTUAL, tiempo_anadido_seg)
-        
-        # --- NUEVO CÁLCULO: Tiempo equivalente del Pozo ---
-        # m_rate es $/minuto, por lo que (m_rate * 60) es $/hora
-        paga_por_hora = m_rate * 60
-        if paga_por_hora > 0:
-            pozo_horas_decimal = pozo_valor / paga_por_hora
-            # Convertimos a formato HH:MM para que sea más legible
-            pozo_hms = segundos_a_hms(int(pozo_horas_decimal * 3600))
-        else:
-            pozo_hms = "00:00:00"
-
-        pago_objetivo = m_rate * m_obj
-        # ... (resto del código de porcentajes y colores)
-
-        m_tot, m_rate, m_obj, total_min, progreso_en_dinero = calcular_metricas(USUARIO_ACTUAL, tiempo_anadido_seg)
         pago_objetivo = m_rate * m_obj
         progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
         if progreso_pct >= 100 and "password_triggered" not in st.session_state:
@@ -616,6 +601,19 @@ def main():
             m_tot += pozo_valor
             pozo_valor = 0.0
         pozo_color = "#00e676" if round(pozo_valor) != 0 else "#aaa"
+
+        # --- NUEVO CÁLCULO: Tiempo equivalente del Pozo ---
+        # m_rate es $/minuto, por lo que (m_rate * 60) es $/hora
+        paga_por_hora = m_rate * 60
+        if paga_por_hora > 0:
+            pozo_horas_decimal = pozo_valor / paga_por_hora
+            # Convertimos a formato HH:MM para que sea más legible
+            pozo_hms = segundos_a_hms(int(pozo_horas_decimal * 3600))
+        else:
+            pozo_hms = "00:00:00"
+
+        pago_objetivo = m_rate * m_obj
+        # ... (resto del código de porcentajes y colores)
 
         balance_val = balance_val_ayer_raw
         if USUARIO_ACTUAL == "Facundo":
