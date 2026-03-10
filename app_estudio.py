@@ -629,16 +629,6 @@ def main():
                     </div>
                 </div>
             """, unsafe_allow_html=True)
-            
-            check_actual = checks_data.get(USUARIO_ACTUAL, "1")
-            if str(check_actual).strip() == "":
-                def marcar_dia_callback(u):
-                    cfg_cb = get_day_config()
-                    target_range = cfg_cb["RANGO_CHECK_IVAN"] if u == "Iván" else cfg_cb["RANGO_CHECK_FACU"]
-                    batch_write([(target_range, 1)])
-                    pedir_rerun()
-
-                st.sidebar.button("Fui a clases", key="check_day_btn", on_click=marcar_dia_callback, args=(USUARIO_ACTUAL,), use_container_width=True)
 
             o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
             o_pago_obj = o_rate * o_obj
