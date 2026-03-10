@@ -603,14 +603,14 @@ def main():
         pozo_color = "#00e676" if round(pozo_valor) != 0 else "#aaa"
 
         # --- NUEVO CÁLCULO: Tiempo equivalente del Pozo ---
-        # m_rate es $/minuto, por lo que (m_rate * 60) es $/hora
+        m_tot, m_rate, m_obj, total_min, progreso_en_dinero = calcular_metricas(USUARIO_ACTUAL, tiempo_anadido_seg)
+        
+        # --- CÁLCULO DEL TIEMPO DEL POZO EN FORMATO DECIMAL ---
         paga_por_hora = m_rate * 60
         if paga_por_hora > 0:
             pozo_horas_decimal = pozo_valor / paga_por_hora
-            # Convertimos a formato HH:MM para que sea más legible
-            pozo_hms = segundos_a_hms(int(pozo_horas_decimal * 3600))
         else:
-            pozo_hms = "00:00:00"
+            pozo_horas_decimal = 0.0
 
         pago_objetivo = m_rate * m_obj
         # ... (resto del código de porcentajes y colores)
@@ -630,7 +630,10 @@ def main():
                         <div style="font-size: 1.2rem; color: #aaa;">Hoy</div>
                         <div style="display:flex; align-items:center; gap:6px; font-size:0.9rem;">
                             <span style="color:#aaa;">Pozo:</span>
-                            <span style="color:{pozo_color};">${pozo_valor:.2f} <small style="color:#666;">({pozo_hms})</small></span>
+                            <span style="color:{pozo_color};">
+                                <strong>{pozo_horas_decimal:.2f} horas</strong> 
+                                <span style="color:#666; margin-left:4px;">(${pozo_valor:.2f})</span>
+                            </span>
                         </div>
                     </div>
                     <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${m_tot:.2f}</div>
