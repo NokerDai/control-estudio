@@ -600,7 +600,7 @@ def main():
         if pozo_valor < 0:
             m_tot += pozo_valor
             pozo_valor = 0.0
-        pozo_color = "#00e676" if round(pozo_valor) != 0 else "#aaa"
+        pozo_color = "#ff1744" if round(pozo_valor) != 0 else "#aaa"
 
         # --- NUEVO CÁLCULO: Tiempo equivalente del Pozo ---
         m_tot, m_rate, m_obj, total_min, progreso_en_dinero = calcular_metricas(USUARIO_ACTUAL, tiempo_anadido_seg)
@@ -631,7 +631,7 @@ def main():
                         <div style="display:flex; align-items:center; gap:6px; font-size:0.9rem;">
                             <span style="color:#aaa;">Pozo:</span>
                             <span style="color:{pozo_color};">
-                                <strong>{pozo_horas_decimal:.2f} horas</strong> 
+                                <strong>{pozo_horas_decimal:.2f}h</strong> 
                                 <span style="color:#666; margin-left:4px;">(${pozo_valor:.2f})</span>
                             </span>
                         </div>
