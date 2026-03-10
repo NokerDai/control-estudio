@@ -18,6 +18,8 @@ if "current_page" not in st.session_state:
     st.session_state.current_page = "estudio" 
 if "usuario_seleccionado" not in st.session_state:
     st.session_state.usuario_seleccionado = None
+if "auto_login_done" not in st.session_state:
+    st.session_state.auto_login_done = False
 
 query_params = st.query_params
 
@@ -32,6 +34,15 @@ def handle_user_login(selected_user):
     st.session_state.usuario_seleccionado = selected_user
     st.rerun()
 
+# Auto-ingreso automático (Solo ocurre en la primera carga)
+if not st.session_state.auto_login_done and st.session_state.usuario_seleccionado is None:
+    st.session_state.auto_login_done = True # Marcamos para que no vuelva a forzar el ingreso si cierran sesión
+    if "password" in query_params:
+        handle_user_login("Facundo")
+    else:
+        # Cualquier otra URL (sin parámetros o con cualquier cosa que no sea password) va a Iván
+        handle_user_login("Iván")
+
 USUARIO_ACTUAL = st.session_state.get("usuario_seleccionado")
 
 # Botón para salir/cambiar de usuario
@@ -42,13 +53,6 @@ if USUARIO_ACTUAL is not None:
         if len(query_params) > 0:
             st.query_params.clear()
         st.rerun()
-
-# Auto-ingreso mediante parámetros en la URL
-if "password" in query_params and st.session_state.usuario_seleccionado is None:
-    handle_user_login("Facundo")
-    
-if "ivan" in query_params and st.session_state.usuario_seleccionado is None:
-    handle_user_login("Iván")
 
 # ---------------------------------------------------------
 # SELECCIÓN DE USUARIO (INTERFAZ)
@@ -76,6 +80,9 @@ if st.session_state.usuario_seleccionado is None:
 # NAVEGACIÓN EN SIDEBAR
 # ---------------------------------------------------------
 
+# Variable estricta para permisos de administrador:
+is_admin = (st.session_state.usuario_seleccionado == "Facundo") and st.session_state.authenticated
+
 # --- Botón para ir a ESTUDIO ---
 if st.session_state.current_page != "estudio":
     if st.sidebar.button("📖 Estudio", use_container_width=True):
@@ -83,17 +90,13 @@ if st.session_state.current_page != "estudio":
         st.rerun()
 
 # --- Botón para ir a HÁBITOS ---
-show_habitos = st.session_state.authenticated or ("password" in query_params)
-
-if show_habitos and st.session_state.current_page != "habitos":
+if is_admin and st.session_state.current_page != "habitos":
     if st.sidebar.button("📅 Hábitos", use_container_width=True):
         st.session_state.current_page = "habitos"
         st.rerun()
 
-# Lógica solo para usuarios Autenticados
-show_other_pages = st.session_state.authenticated or ("password" in query_params)
-
-if show_other_pages:
+# Lógica estricta para usuarios Autenticados (Facundo)
+if is_admin:
     # --- Botón para ir a NOTICIAS ---
     if st.session_state.current_page != "noticias":
         if st.sidebar.button("📰 Noticias", use_container_width=True):
@@ -111,41 +114,52 @@ if show_other_pages:
 # --------------------------------------------------------
 
 if st.session_state.current_page == "habitos":
-    if not st.session_state.authenticated:
-        password_input = st.text_input("Contraseña:", type="password")
-        if st.button("Entrar"):
-            if password_input == st.secrets["password"]:
-                st.session_state.authenticated = True
-                st.rerun()
-            else:
-                st.error("Contraseña incorrecta.")
-        st.stop()
+    if not is_admin:
+        if st.session_state.usuario_seleccionado != "Facundo":
+            st.error("Solo Facundo tiene permisos para acceder a esta sección.")
+            st.stop()
+        else:
+            password_input = st.text_input("Contraseña:", type="password")
+            if st.button("Entrar"):
+                if password_input == st.secrets["password"]:
+                    st.session_state.authenticated = True
+                    st.rerun()
+                else:
+                    st.error("Contraseña incorrecta.")
+            st.stop()
     app_habitos.run()
 
 elif st.session_state.current_page == "biblioteca":
-    if not st.session_state.authenticated:
-        password_input = st.text_input("Contraseña:", type="password")
-        if st.button("Entrar"):
-            if password_input == st.secrets["password"]:
-                st.session_state.authenticated = True
-                st.rerun()
-            else:
-                st.error("Contraseña incorrecta.")
-        st.stop()
+    if not is_admin:
+        if st.session_state.usuario_seleccionado != "Facundo":
+            st.error("Solo Facundo tiene permisos para acceder a esta sección.")
+            st.stop()
+        else:
+            password_input = st.text_input("Contraseña:", type="password")
+            if st.button("Entrar"):
+                if password_input == st.secrets["password"]:
+                    st.session_state.authenticated = True
+                    st.rerun()
+                else:
+                    st.error("Contraseña incorrecta.")
+            st.stop()
     app_biblioteca.main()
 
 elif st.session_state.current_page == "noticias":
-    if not st.session_state.authenticated:
-        password_input = st.text_input("Contraseña:", type="password")
-        if st.button("Entrar"):
-            if password_input == st.secrets["password"]:
-                st.session_state.authenticated = True
-                st.rerun()
-            else:
-                st.error("Contraseña incorrecta.")
-        st.stop()
+    if not is_admin:
+        if st.session_state.usuario_seleccionado != "Facundo":
+            st.error("Solo Facundo tiene permisos para acceder a esta sección.")
+            st.stop()
+        else:
+            password_input = st.text_input("Contraseña:", type="password")
+            if st.button("Entrar"):
+                if password_input == st.secrets["password"]:
+                    st.session_state.authenticated = True
+                    st.rerun()
+                else:
+                    st.error("Contraseña incorrecta.")
+            st.stop()
     app_noticias.main()
 
 else:
     app_estudio.main()
-
