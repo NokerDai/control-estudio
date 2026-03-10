@@ -66,6 +66,10 @@ if st.session_state.usuario_seleccionado is None:
         if st.button("👤 Iván", key="btn_ivan", use_container_width=True):
             handle_user_login("Iván")
 
+    # --- El cartel de advertencia ---
+    st.markdown("---") # Una línea divisoria para separar
+    st.warning("⚠️ **Atención:** Nunca usar la aplicación en dos dispositivos a la vez.", icon="🚫")
+
     st.stop() 
 
 # ---------------------------------------------------------
@@ -144,3 +148,4 @@ elif st.session_state.current_page == "noticias":
 
 else:
     app_estudio.main()
+
