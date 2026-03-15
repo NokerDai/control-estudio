@@ -7,8 +7,8 @@ import app_noticias
 
 # 1. Configuración global
 st.set_page_config(
-    page_title="Selector de Usuario", 
-    page_icon="⏳", 
+    page_title="Estudio", 
+    page_icon="📖", 
     layout="centered",
     initial_sidebar_state="collapsed"
 )
