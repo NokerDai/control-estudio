@@ -69,13 +69,24 @@ if st.session_state.get("switching_user", False):
 # ---------------------------------------------------------
 # BOTÓN EN LA BARRA LATERAL (DISPARADOR)
 # ---------------------------------------------------------
-# Botón para cambiar de usuario
+# Botón para salir/cambiar de usuario
 if USUARIO_ACTUAL is not None:
     if st.sidebar.button("🚪 Cambiar Usuario", use_container_width=True):
-        st.session_state.switching_user = True
+        # 1. Mostramos el mensaje directamente en la barra lateral
+        st.sidebar.warning("⚠️ **Atención:** Nunca usar la aplicación en dos dispositivos a la vez.", icon="🚫")
+        
+        # 2. Hacemos la pausa de 1 segundo para que se lea
+        time.sleep(1)
+        
+        # 3. Alternamos el usuario directamente
+        nuevo_usuario = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
+        st.session_state.usuario_seleccionado = nuevo_usuario
         st.session_state.current_page = "estudio"
-        if len(query_params) > 0:
+        
+        if len(st.query_params) > 0:
             st.query_params.clear()
+            
+        # 4. Recargamos la aplicación
         st.rerun()
 
 # ---------------------------------------------------------
