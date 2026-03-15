@@ -55,7 +55,7 @@ USUARIO_ACTUAL = st.session_state.get("usuario_seleccionado")
 if st.session_state.get("switching_user", False):
     st.title("⏳ Cambiando de usuario...")
     st.markdown("---")
-    st.warning("⚠️ **Atención:** Nunca usar la aplicación en dos dispositivos a la vez.")
+    st.warning("**Atención:** Nunca usar la aplicación en dos dispositivos a la vez.", icon="⚠️")
     
     # Pausa de 1.5 segundos para que se alcance a leer el cartel
     time.sleep(1.5) 
