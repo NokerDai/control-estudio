@@ -20,10 +20,6 @@ import json
 # Password check now handled in app.py
 
 def run():
-    st.set_page_config(
-        page_title="Hábitos",
-        page_icon="📅"
-    )
 
     # -------------------------------------------------------------------
     # ZONA HORARIA ARGENTINA
