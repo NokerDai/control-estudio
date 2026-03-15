@@ -9,7 +9,8 @@ import app_noticias
 st.set_page_config(
     page_title="Selector de Usuario", 
     page_icon="⏳", 
-    layout="centered"
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
 
 # 2. Inicialización de Estado de Sesión
