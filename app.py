@@ -1,4 +1,5 @@
 import streamlit as st
+import time
 import app_estudio
 import app_habitos
 import app_biblioteca
@@ -20,6 +21,8 @@ if "usuario_seleccionado" not in st.session_state:
     st.session_state.usuario_seleccionado = None
 if "auto_login_done" not in st.session_state:
     st.session_state.auto_login_done = False
+if "switching_user" not in st.session_state:
+    st.session_state.switching_user = False
 
 query_params = st.query_params
 
@@ -45,10 +48,30 @@ if not st.session_state.auto_login_done and st.session_state.usuario_seleccionad
 
 USUARIO_ACTUAL = st.session_state.get("usuario_seleccionado")
 
-# Botón para salir/cambiar de usuario
+# ---------------------------------------------------------
+# PANTALLA DE CARGA (TRANSICIÓN)
+# ---------------------------------------------------------
+if st.session_state.get("switching_user", False):
+    st.title("⏳ Cambiando de usuario...")
+    st.markdown("---")
+    st.warning("⚠️ **Atención:** Nunca usar la aplicación en dos dispositivos a la vez.", icon="🚫")
+    
+    # Pausa de 1.5 segundos para que se alcance a leer el cartel
+    time.sleep(1.5) 
+    
+    # Lógica para alternar el usuario directamente
+    nuevo_usuario = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
+    st.session_state.usuario_seleccionado = nuevo_usuario
+    st.session_state.switching_user = False
+    st.rerun()
+
+# ---------------------------------------------------------
+# BOTÓN EN LA BARRA LATERAL (DISPARADOR)
+# ---------------------------------------------------------
+# Botón para cambiar de usuario
 if USUARIO_ACTUAL is not None:
     if st.sidebar.button("🚪 Cambiar Usuario", use_container_width=True):
-        st.session_state.usuario_seleccionado = None
+        st.session_state.switching_user = True
         st.session_state.current_page = "estudio"
         if len(query_params) > 0:
             st.query_params.clear()
