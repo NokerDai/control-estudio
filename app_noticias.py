@@ -111,10 +111,6 @@ def resolve_url(url: str, timeout: int = 6) -> str:
 # --- APP PRINCIPAL ---
 
 def main():
-    st.set_page_config(
-        page_title="Noticias", 
-        page_icon="📰"
-    )
 
     # 1. INDEC arriba de todo
     mostrar_alerta_indec()
