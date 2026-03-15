@@ -39,7 +39,6 @@ def main():
         "Michel Foucault",
     ]
 
-    st.set_page_config(page_title="Biblioteca Filosófica", layout="wide")
     st.title("Biblioteca Filosófica (orden cronológico)")
 
     # Estado
