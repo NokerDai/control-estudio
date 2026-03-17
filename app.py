@@ -131,18 +131,18 @@ if is_admin and st.session_state.current_page != "habitos":
         st.rerun()
 
 # Lógica estricta para usuarios Autenticados (Facundo)
-if is_admin:
+# if is_admin:
     # --- Botón para ir a NOTICIAS ---
-    if st.session_state.current_page != "noticias":
-        if st.sidebar.button("📰 Noticias", use_container_width=True):
-            st.session_state.current_page = "noticias"
-            st.rerun()
+    # if st.session_state.current_page != "noticias":
+    #     if st.sidebar.button("📰 Noticias", use_container_width=True):
+    #         st.session_state.current_page = "noticias"
+    #         st.rerun()
     
     # --- Botón para ir a BIBLIOTECA ---
-    if st.session_state.current_page != "biblioteca":
-        if st.sidebar.button("📚 Biblioteca", use_container_width=True):
-            st.session_state.current_page = "biblioteca"
-            st.rerun()
+    # if st.session_state.current_page != "biblioteca":
+    #     if st.sidebar.button("📚 Biblioteca", use_container_width=True):
+    #         st.session_state.current_page = "biblioteca"
+    #         st.rerun()
 
 # --------------------------------------------------------
 # ROUTER (Decide qué app mostrar)
