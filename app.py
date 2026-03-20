@@ -129,6 +129,7 @@ if is_admin and st.session_state.current_page != "habitos":
     if st.sidebar.button("📅 Hábitos", use_container_width=True):
         st.session_state.current_page = "habitos"
         st.rerun()
+    if st.sidebar.link_button("NotebookLM", "https://notebooklm.google.com/")
 
 # Lógica estricta para usuarios Autenticados (Facundo)
 # if is_admin:
