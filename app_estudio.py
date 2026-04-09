@@ -227,7 +227,7 @@ def get_day_config(target_date=None):
             "Int. Contabilidad":    {"time": f"'{SHEET_FACUNDO}'!E{time_row2}", "est": f"'{SHEET_MARCAS}'!Z5"},
             "Sociología": {"time": f"'{SHEET_FACUNDO}'!F{time_row2}", "est": f"'{SHEET_MARCAS}'!Z6"},
             "Derecho Público":        {"time": f"'{SHEET_FACUNDO}'!G{time_row2}", "est": f"'{SHEET_MARCAS}'!Z7"},
-            "Social":               {"time": f"'{SHEET_FACUNDO}'!Q{time_row2}", "est": f"'{SHEET_MARCAS}'!Z15"}
+            "Social": {"time": f"'{SHEET_FACUNDO}'!Q{time_row2}", "est": f"'{SHEET_MARCAS}'!Z15", "excluir": True},
         },
         "Iván": {
             "Física":   {"time": f"'{SHEET_IVAN}'!B{time_row}", "est": f"'{SHEET_MARCAS}'!Z8"},
@@ -569,6 +569,8 @@ def main():
 
             # Usamos USERS_LOCAL (dinámico)
             for materia, info in USERS_LOCAL[usuario].items():
+                if info.get("excluir"):
+                    continue
                 base_seg = hms_a_segundos(datos[usuario]["tiempos"][materia])
                 segs_materia = base_seg
                 if usuario_estudiando and usuario == USUARIO_ACTUAL and materia == materia_en_curso:
