@@ -227,6 +227,7 @@ def get_day_config(target_date=None):
             "Int. Contabilidad":    {"time": f"'{SHEET_FACUNDO}'!E{time_row2}", "est": f"'{SHEET_MARCAS}'!Z5"},
             "Sociología": {"time": f"'{SHEET_FACUNDO}'!F{time_row2}", "est": f"'{SHEET_MARCAS}'!Z6"},
             "Derecho Público":        {"time": f"'{SHEET_FACUNDO}'!G{time_row2}", "est": f"'{SHEET_MARCAS}'!Z7"},
+            "Social":               {"time": f"'{SHEET_FACUNDO}'!Q{time_row2}", "est": f"'{SHEET_MARCAS}'!Z15"}
         },
         "Iván": {
             "Física":   {"time": f"'{SHEET_IVAN}'!B{time_row}", "est": f"'{SHEET_MARCAS}'!Z8"},
