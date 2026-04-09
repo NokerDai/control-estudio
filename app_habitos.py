@@ -1,6 +1,7 @@
 import streamlit as st
 import gspread
 from datetime import datetime, timedelta
+
 try:
     from zoneinfo import ZoneInfo
     _HAS_ZONEINFO = True
@@ -43,11 +44,10 @@ def run():
     # -------------------------------------------------------------------
     # CONFIG DESDE SECRETS
     # -------------------------------------------------------------------
-
     GOOGLE_SHEET_NAME = st.secrets["google_sheet_name"]
     WORKSHEET_NAME = st.secrets["worksheet_name"]
     BOUNDARY_COLUMN = st.secrets["boundary_column"]
-    
+
     # -------------------------------------------------------------------
     # CONEXIÓN A GOOGLE SHEETS
     # -------------------------------------------------------------------
@@ -67,16 +67,13 @@ def run():
                 spreadsheet = gc.open(GOOGLE_SHEET_NAME)
                 worksheet = spreadsheet.worksheet(WORKSHEET_NAME)
                 return worksheet
-            
+
             return None
 
         except Exception as e:
             st.error(f"Error al conectar a Google Sheets: {e}")
             return None
 
-    # -------------------------------------------------------------------
-    # LOG DE RACHA 
-    # -------------------------------------------------------------------
     # -------------------------------------------------------------------
     # HÁBITOS DESDE SECRETS
     # -------------------------------------------------------------------
@@ -94,22 +91,21 @@ def run():
             return []
 
     # -------------------------------------------------------------------
-    # CONFIGURACIÓN DEL ESTADO DIARIO (LÓGICA CORREGIDA)
+    # CONFIGURACIÓN DEL ESTADO DIARIO
     # -------------------------------------------------------------------
     def setup_daily_state(worksheet):
         today_str = get_argentina_date_str()
-        
-        # El resto de la lógica (hábitos del grid) se mantiene
+
         pending_habits_list = []
         if worksheet is not None:
             try:
                 all_dates = worksheet.col_values(1)
                 date_row_index = all_dates.index(today_str) if today_str in all_dates else -1
-                
+
                 if date_row_index != -1:
                     today_row = worksheet.row_values(date_row_index + 1)
                     headers = worksheet.row_values(1)
-                    
+
                     for habit in st.session_state.all_habits:
                         name = habit["name"]
 
@@ -119,11 +115,10 @@ def run():
                                 pending_habits_list.append(name)
                         else:
                             pending_habits_list.append(name)
-            except:
-                 pass
-        
-        st.session_state.todays_pending_habits = pending_habits_list
+            except Exception:
+                pass
 
+        st.session_state.todays_pending_habits = pending_habits_list
 
     def log_habit_grid(habit_name, worksheet):
         try:
@@ -133,7 +128,7 @@ def run():
                 date_row = all_dates.index(today_str) + 1
                 headers = worksheet.row_values(1)
 
-                log_value = 1 
+                log_value = 1
 
                 if habit_name in headers:
                     col = headers.index(habit_name) + 1
@@ -149,7 +144,7 @@ def run():
                             col = boundary + 1
                     else:
                         col = len(headers) + 1
-                
+
                 worksheet.update_cell(date_row, col, log_value)
 
                 if habit_name not in headers:
@@ -185,8 +180,31 @@ def run():
     # -------------------------
     pending = st.session_state.get("todays_pending_habits", [])
 
+    # Cartel en rojo con el total pendiente * 2000
+    faltantes = len(pending)
+    multa = faltantes * 2000
+
+    st.markdown(
+        f"""
+        <div style="
+            border: 2px solid #ff4d4d;
+            background-color: #ffe6e6;
+            color: #b30000;
+            padding: 16px 20px;
+            border-radius: 14px;
+            text-align: center;
+            font-size: 2.2rem;
+            font-weight: 800;
+            margin: 10px 0 18px 0;
+        ">
+            ${multa}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
     grouped = {1: [], 2: [], 3: []}
-    for h in st.session_state.habits: 
+    for h in st.session_state.habits:
         if h["name"] in pending:
             grouped[h["group"]].append(h["name"])
 
