@@ -218,7 +218,8 @@ def run():
                     key=f"habit_{group_num}_{i}",
                     on_click=log_habit_grid,
                     args=(habit_name, sheet),
-                    use_container_width=True
+                    use_container_width=True,
+                    disabled=(habit_name == "Social")
                 )
 
     if st.session_state.get("needs_rerun", False):
