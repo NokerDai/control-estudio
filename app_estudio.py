@@ -559,11 +559,6 @@ def main():
     circle_usuario = circle("#00e676" if usuario_estudiando else "#ffffff")
     circle_otro = circle("#00e676" if otro_estudiando else "#ffffff")
 
-    # --- BOTÓN DE ACTUALIZACIÓN MANUAL ---
-    if st.button("🔄 Actualizar", use_container_width=True):
-        cargar_datos_unificados.clear()
-        st.rerun()
-
     tiempo_anadido_seg = 0
     if usuario_estudiando and inicio_dt is not None:
         tiempo_anadido_seg = int((_argentina_now_global() - inicio_dt).total_seconds())
@@ -663,6 +658,10 @@ def main():
         with st.expander("ℹ️ No pensar, actuar."):
             md_content = st.secrets["facundo_md"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ivan_md"]
             st.markdown(md_content)
+            
+        if st.button("🔄 Actualizar", use_container_width=True):
+            cargar_datos_unificados.clear()
+            st.rerun()
     
     # --- Actualizar Placeholders de Materias y Botones ---
     mis_materias = USERS_LOCAL[USUARIO_ACTUAL]
