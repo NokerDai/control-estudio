@@ -18,6 +18,7 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "current_page" not in st.session_state:
     st.session_state.current_page = "estudio" 
+    st.session_state.clear_cache_estudio = True # Bandera para limpiar el caché al inicio
 if "usuario_seleccionado" not in st.session_state:
     st.session_state.usuario_seleccionado = None
 if "auto_login_done" not in st.session_state:
@@ -36,6 +37,7 @@ if "password" in query_params:
 # ---------------------------------------------------------
 def handle_user_login(selected_user):
     st.session_state.usuario_seleccionado = selected_user
+    st.session_state.clear_cache_estudio = True # Limpiar caché al seleccionar usuario
     st.rerun()
 
 # Auto-ingreso automático (Solo ocurre en la primera carga)
@@ -64,6 +66,7 @@ if st.session_state.get("switching_user", False):
     nuevo_usuario = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
     st.session_state.usuario_seleccionado = nuevo_usuario
     st.session_state.switching_user = False
+    st.session_state.clear_cache_estudio = True # Limpiar caché al cambiar usuario
     st.rerun()
 
 # ---------------------------------------------------------
@@ -82,6 +85,7 @@ if USUARIO_ACTUAL is not None:
         nuevo_usuario = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
         st.session_state.usuario_seleccionado = nuevo_usuario
         st.session_state.current_page = "estudio"
+        st.session_state.clear_cache_estudio = True # Limpiar caché al volver a estudio
         
         if len(st.query_params) > 0:
             st.query_params.clear()
@@ -122,6 +126,7 @@ is_admin = (st.session_state.usuario_seleccionado == "Facundo") and st.session_s
 if st.session_state.current_page != "estudio":
     if st.sidebar.button("📖 Estudio", use_container_width=True):
         st.session_state.current_page = "estudio"
+        st.session_state.clear_cache_estudio = True # Limpiar caché al entrar a la página
         st.rerun()
 
 # --- Botón para ir a HÁBITOS ---
@@ -129,20 +134,6 @@ if is_admin and st.session_state.current_page != "habitos":
     if st.sidebar.button("📅 Hábitos", use_container_width=True):
         st.session_state.current_page = "habitos"
         st.rerun()
-
-# Lógica estricta para usuarios Autenticados (Facundo)
-# if is_admin:
-    # --- Botón para ir a NOTICIAS ---
-    # if st.session_state.current_page != "noticias":
-    #     if st.sidebar.button("📰 Noticias", use_container_width=True):
-    #         st.session_state.current_page = "noticias"
-    #         st.rerun()
-    
-    # --- Botón para ir a BIBLIOTECA ---
-    # if st.session_state.current_page != "biblioteca":
-    #     if st.sidebar.button("📚 Biblioteca", use_container_width=True):
-    #         st.session_state.current_page = "biblioteca"
-    #         st.rerun()
 
 # --------------------------------------------------------
 # ROUTER (Decide qué app mostrar)
