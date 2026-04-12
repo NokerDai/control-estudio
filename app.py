@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. Inicialización de Estado de Sesión
+# 2. Inicialización de Estado de  Sesión
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "current_page" not in st.session_state:
