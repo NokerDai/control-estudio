@@ -52,6 +52,8 @@ def cargar_estilos():
 
         div.stButton > button { font-size: 1.2rem !important; font-weight: bold !important; border-radius: 12px !important; }
         .btn-grande div[data-testid="stButton"] button { height: 3.5rem !important; }
+
+        div[data-testid="stColumns"] { align-items: flex-start !important; }
         </style>
     """, unsafe_allow_html=True)
 
