@@ -701,6 +701,7 @@ def main():
                 st.markdown('</div>', unsafe_allow_html=True)
 
             with cols[1]:
+                st.markdown('<div class="btn-grande">', unsafe_allow_html=True)
                 with st.expander("🛠️ Corregir tiempo manualmente"):
                     input_key = f"input_{sanitize_key(materia)}"
                     # Usamos el tiempo actual de datos, que puede venir de cache pero es razonablemente reciente
@@ -736,6 +737,7 @@ def main():
                     else:
                         if st.button("Guardar Corrección", key=f"save_{sanitize_key(materia)}", on_click=save_correction_callback, args=(materia,)):
                             pass
+                st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     try:
