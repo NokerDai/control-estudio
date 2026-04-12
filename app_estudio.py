@@ -495,6 +495,11 @@ def stop_materia_callback(usuario, materia):
 def main():
     cargar_estilos()
 
+    # Borrar caché si se acaba de entrar a la página (controlado por app.py)
+    if st.session_state.get("clear_cache_estudio", False):
+        cargar_datos_unificados.clear()
+        st.session_state["clear_cache_estudio"] = False
+
     if st.session_state.get("_do_rerun", False):
         st.session_state["_do_rerun"] = False
         st.rerun()
@@ -554,188 +559,181 @@ def main():
     circle_usuario = circle("#00e676" if usuario_estudiando else "#ffffff")
     circle_otro = circle("#00e676" if otro_estudiando else "#ffffff")
 
-    placeholder_total = st.empty()
-    placeholder_materias = {m: st.empty() for m in USERS_LOCAL[USUARIO_ACTUAL]}
+    # --- BOTÓN DE ACTUALIZACIÓN MANUAL ---
+    if st.button("🔄 Actualizar", use_container_width=True):
+        cargar_datos_unificados.clear()
+        st.rerun()
 
-    while True:
-        tiempo_anadido_seg = 0
-        if usuario_estudiando and inicio_dt is not None:
-            tiempo_anadido_seg = int((_argentina_now_global() - inicio_dt).total_seconds())
+    tiempo_anadido_seg = 0
+    if usuario_estudiando and inicio_dt is not None:
+        tiempo_anadido_seg = int((_argentina_now_global() - inicio_dt).total_seconds())
 
-        def calcular_metricas(usuario, tiempo_activo_seg_local=0):
-            per_min = resumen_marcas[usuario]["per_min"]
-            objetivo = resumen_marcas[usuario]["obj"]
-            total_min = 0.0
+    def calcular_metricas(usuario, tiempo_activo_seg_local=0):
+        per_min = resumen_marcas[usuario]["per_min"]
+        objetivo = resumen_marcas[usuario]["obj"]
+        total_min = 0.0
 
-            # Usamos USERS_LOCAL (dinámico)
-            for materia, info in USERS_LOCAL[usuario].items():
-                if info.get("excluir"):
-                    continue
-                base_seg = hms_a_segundos(datos[usuario]["tiempos"][materia])
-                segs_materia = base_seg
-                if usuario_estudiando and usuario == USUARIO_ACTUAL and materia == materia_en_curso:
-                    segs_materia += tiempo_activo_seg_local
-                total_min += segs_materia / 60
+        # Usamos USERS_LOCAL (dinámico)
+        for materia, info in USERS_LOCAL[usuario].items():
+            if info.get("excluir"):
+                continue
+            base_seg = hms_a_segundos(datos[usuario]["tiempos"][materia])
+            segs_materia = base_seg
+            if usuario_estudiando and usuario == USUARIO_ACTUAL and materia == materia_en_curso:
+                segs_materia += tiempo_activo_seg_local
+            total_min += segs_materia / 60
 
-            progreso_en_dinero = (tiempo_activo_seg_local / 60) * per_min
-            m_tot = total_min * per_min
-            return m_tot, per_min, objetivo, total_min, progreso_en_dinero
+        progreso_en_dinero = (tiempo_activo_seg_local / 60) * per_min
+        m_tot = total_min * per_min
+        return m_tot, per_min, objetivo, total_min, progreso_en_dinero
 
-        # ... (dentro del bucle while True, después de calcular_metricas)
-        m_tot, m_rate, m_obj, total_min, progreso_en_dinero = calcular_metricas(USUARIO_ACTUAL, tiempo_anadido_seg)
-        pago_objetivo = m_rate * m_obj
-        progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
-        if progreso_pct >= 100 and "password_triggered" not in st.session_state:
-            st.session_state.goal_completed = True
-            st.session_state.password_triggered = True
-            st.rerun()
-        color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
+    m_tot, m_rate, m_obj, total_min, progreso_en_dinero = calcular_metricas(USUARIO_ACTUAL, tiempo_anadido_seg)
+    pago_objetivo = m_rate * m_obj
+    progreso_pct = min(m_tot / max(1, pago_objetivo), 1.0) * 100
+    if progreso_pct >= 100 and "password_triggered" not in st.session_state:
+        st.session_state.goal_completed = True
+        st.session_state.password_triggered = True
+        st.rerun()
+    color_bar = "#00e676" if progreso_pct >= 90 else "#ffeb3b" if progreso_pct >= 50 else "#ff1744"
 
-        objetivo_hms = segundos_a_hms(int(m_obj * 60))
-        total_hms = segundos_a_hms(int(total_min * 60))
+    objetivo_hms = segundos_a_hms(int(m_obj * 60))
+    total_hms = segundos_a_hms(int(total_min * 60))
 
-        pozo_valor = pozo_facu if USUARIO_ACTUAL == "Facundo" else pozo_ivan
-        pozo_valor -= m_tot
-        if pozo_valor < 0:
-            m_tot += pozo_valor
-            pozo_valor = 0.0
-        pozo_color = "#ff1744" if round(pozo_valor) != 0 else "#aaa"
+    pozo_valor = pozo_facu if USUARIO_ACTUAL == "Facundo" else pozo_ivan
+    pozo_valor -= m_tot
+    if pozo_valor < 0:
+        m_tot += pozo_valor
+        pozo_valor = 0.0
+    pozo_color = "#ff1744" if round(pozo_valor) != 0 else "#aaa"
 
-        # --- NUEVO CÁLCULO: Tiempo equivalente del Pozo ---
-        m_tot, m_rate, m_obj, total_min, progreso_en_dinero = calcular_metricas(USUARIO_ACTUAL, tiempo_anadido_seg)
-        
-        # --- CÁLCULO DEL TIEMPO DEL POZO EN FORMATO DECIMAL ---
-        paga_por_hora = m_rate * 60
-        if paga_por_hora > 0:
-            pozo_horas_decimal = pozo_valor / paga_por_hora
-        else:
-            pozo_horas_decimal = 0.0
+    # --- NUEVO CÁLCULO: Tiempo equivalente del Pozo ---
+    m_tot, m_rate, m_obj, total_min, progreso_en_dinero = calcular_metricas(USUARIO_ACTUAL, tiempo_anadido_seg)
+    
+    # --- CÁLCULO DEL TIEMPO DEL POZO EN FORMATO DECIMAL ---
+    paga_por_hora = m_rate * 60
+    if paga_por_hora > 0:
+        pozo_horas_decimal = pozo_valor / paga_por_hora
+    else:
+        pozo_horas_decimal = 0.0
 
-        pago_objetivo = m_rate * m_obj
-        # ... (resto del código de porcentajes y colores)
+    pago_objetivo = m_rate * m_obj
 
-        balance_val = balance_val_ayer_raw
-        if USUARIO_ACTUAL == "Facundo":
-            balance_val = -balance_val
-        balance_val += m_tot
-        balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa"
-        balance_str = f"+${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
+    balance_val = balance_val_ayer_raw
+    if USUARIO_ACTUAL == "Facundo":
+        balance_val = -balance_val
+    balance_val += m_tot
+    balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa"
+    balance_str = f"+${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
 
-        # --- Actualizar Placeholder Global ---
-        with placeholder_total.container():
-            st.markdown(f"""
-                <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div style="font-size: 1.2rem; color: #aaa;">Hoy</div>
-                        <div style="display:flex; align-items:center; gap:6px; font-size:0.9rem;">
-                            <span style="color:#aaa;">Pozo:</span>
-                            <span style="color:{pozo_color};">
-                                <strong>{pozo_horas_decimal:.2f}hs</strong> 
-                                <span style="color:#666; margin-left:4px;">(${pozo_valor:.2f})</span>
-                            </span>
-                        </div>
-                    </div>
-                    <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${m_tot:.2f}</div>
-                    <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
-                        <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; color:#888;">
-                        <div>Balance: <span style="color:{balance_color};">{balance_str}</span></div>
-                        <div>{objetivo_hms} | ${pago_objetivo:.2f}</div>
+    # --- Actualizar Placeholder Global ---
+    with st.container():
+        st.markdown(f"""
+            <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size: 1.2rem; color: #aaa;">Hoy</div>
+                    <div style="display:flex; align-items:center; gap:6px; font-size:0.9rem;">
+                        <span style="color:#aaa;">Pozo:</span>
+                        <span style="color:{pozo_color};">
+                            <strong>{pozo_horas_decimal:.2f}hs</strong> 
+                            <span style="color:#666; margin-left:4px;">(${pozo_valor:.2f})</span>
+                        </span>
                     </div>
                 </div>
-            """, unsafe_allow_html=True)
+                <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${m_tot:.2f}</div>
+                <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
+                    <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; color:#888;">
+                    <div>Balance: <span style="color:{balance_color};">{balance_str}</span></div>
+                    <div>{objetivo_hms} | ${pago_objetivo:.2f}</div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
-            o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
-            o_pago_obj = o_rate * o_obj
-            o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
-            o_color_bar = "#00e676" if o_progreso_pct >= 90 else "#ffeb3b" if o_progreso_pct >= 50 else "#ff1744"
-            o_obj_hms = segundos_a_hms(int(o_obj * 60))
-            o_total_hms = segundos_a_hms(int(total_min_otro * 60))
+        o_tot, o_rate, o_obj, total_min_otro, _ = calcular_metricas(OTRO_USUARIO)
+        o_pago_obj = o_rate * o_obj
+        o_progreso_pct = min(o_tot / max(1, o_pago_obj), 1.0) * 100
+        o_color_bar = "#00e676" if o_progreso_pct >= 90 else "#ffeb3b" if o_progreso_pct >= 50 else "#ff1744"
+        o_obj_hms = segundos_a_hms(int(o_obj * 60))
+        o_total_hms = segundos_a_hms(int(total_min_otro * 60))
 
-            materia_visible = 'visible' if materia_otro else 'hidden'
-            materia_nombre_html = f'<span style="color:#00e676; margin-left:6px; visibility:{materia_visible};">{materia_otro if materia_otro else ""}</span>'
+        materia_visible = 'visible' if materia_otro else 'hidden'
+        materia_nombre_html = f'<span style="color:#00e676; margin-left:6px; visibility:{materia_visible};">{materia_otro if materia_otro else ""}</span>'
 
-            with st.expander("ℹ️ No pensar, actuar."):
-                md_content = st.secrets["facundo_md"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ivan_md"]
-                st.markdown(md_content)
-        
-        # --- Actualizar Placeholders de Materias y Botones ---
-        mis_materias = USERS_LOCAL[USUARIO_ACTUAL]
-        for materia, info in mis_materias.items():
+        with st.expander("ℹ️ No pensar, actuar."):
+            md_content = st.secrets["facundo_md"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ivan_md"]
+            st.markdown(md_content)
+    
+    # --- Actualizar Placeholders de Materias y Botones ---
+    mis_materias = USERS_LOCAL[USUARIO_ACTUAL]
+    for materia, info in mis_materias.items():
 
-            base_seg = hms_a_segundos(datos[USUARIO_ACTUAL]["tiempos"][materia])
-            tiempo_total_seg = base_seg
-            en_curso = materia_en_curso == materia
+        base_seg = hms_a_segundos(datos[USUARIO_ACTUAL]["tiempos"][materia])
+        tiempo_total_seg = base_seg
+        en_curso = materia_en_curso == materia
 
-            if en_curso:
-                tiempo_total_seg += max(0, tiempo_anadido_seg)
+        if en_curso:
+            tiempo_total_seg += max(0, tiempo_anadido_seg)
 
-            tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
-            badge_html = f'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''
-            html_card = f"""<div class="materia-card"><div class="materia-title">{materia}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
+        tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
+        badge_html = f'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''
+        html_card = f"""<div class="materia-card"><div class="materia-title">{materia}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
 
-            with placeholder_materias[materia].container():
-                st.markdown(html_card, unsafe_allow_html=True)
+        with st.container():
+            st.markdown(html_card, unsafe_allow_html=True)
 
-                key_start = sanitize_key(f"start_{USUARIO_ACTUAL}_{materia}")
-                key_stop = sanitize_key(f"stop_{USUARIO_ACTUAL}_{materia}")
-                key_disabled = sanitize_key(f"dis_{USUARIO_ACTUAL}_{materia}")
+            key_start = sanitize_key(f"start_{USUARIO_ACTUAL}_{materia}")
+            key_stop = sanitize_key(f"stop_{USUARIO_ACTUAL}_{materia}")
+            key_disabled = sanitize_key(f"dis_{USUARIO_ACTUAL}_{materia}")
 
-                cols = st.columns([1,1,1])
-                with cols[0]:
-                    if en_curso:
-                        st.button(f"⛔ DETENER {materia[:14]}", key=key_stop, use_container_width=True,
-                                  on_click=stop_materia_callback, args=(USUARIO_ACTUAL, materia))
+            cols = st.columns([1,1,1])
+            with cols[0]:
+                if en_curso:
+                    st.button(f"⛔ DETENER {materia[:14]}", key=key_stop, use_container_width=True,
+                              on_click=stop_materia_callback, args=(USUARIO_ACTUAL, materia))
+                else:
+                    if materia_en_curso is None:
+                        st.button("▶ INICIAR", key=key_start, use_container_width=True,
+                                  on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia))
                     else:
-                        if materia_en_curso is None:
-                            st.button("▶ INICIAR", key=key_start, use_container_width=True,
-                                      on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia))
-                        else:
-                            st.button("...", disabled=True, key=key_disabled, use_container_width=True)
+                        st.button("...", disabled=True, key=key_disabled, use_container_width=True)
 
-                with cols[1]:
-                    with st.expander("🛠️ Corregir tiempo manualmente"):
-                        input_key = f"input_{sanitize_key(materia)}"
-                        # Usamos el tiempo actual de datos, que puede venir de cache pero es razonablemente reciente
-                        new_val = st.text_input("Tiempo (HH:MM:SS)", value=datos[USUARIO_ACTUAL]["tiempos"][materia], key=input_key)
+            with cols[1]:
+                with st.expander("🛠️ Corregir tiempo manualmente"):
+                    input_key = f"input_{sanitize_key(materia)}"
+                    # Usamos el tiempo actual de datos, que puede venir de cache pero es razonablemente reciente
+                    new_val = st.text_input("Tiempo (HH:MM:SS)", value=datos[USUARIO_ACTUAL]["tiempos"][materia], key=input_key)
 
-                        def save_correction_callback(materia_key):
-                            if st.session_state.get("materia_activa") is not None:
-                                st.error("⛔ No podés corregir el tiempo mientras estás estudiando.")
-                                pedir_rerun()
-                                return
+                    def save_correction_callback(materia_key):
+                        if st.session_state.get("materia_activa") is not None:
+                            st.error("⛔ No podés corregir el tiempo mientras estás estudiando.")
+                            pedir_rerun()
+                            return
 
-                            val = st.session_state.get(f"input_{sanitize_key(materia_key)}", "").strip()
-                            if ":" not in val:
-                                st.error("Formato inválido (debe ser HH:MM:SS)")
-                                pedir_rerun()
-                                return
+                        val = st.session_state.get(f"input_{sanitize_key(materia_key)}", "").strip()
+                        if ":" not in val:
+                            st.error("Formato inválido (debe ser HH:MM:SS)")
+                            pedir_rerun()
+                            return
 
-                            try:
-                                segs = hms_a_segundos(val)
-                                hhmmss = segundos_a_hms(segs)
-                                # Usamos config dinámica para saber en qué celda escribir AHORA
-                                cfg_corr = get_day_config()
-                                time_cell_for_row = cfg_corr["USERS"][USUARIO_ACTUAL][materia_key]["time"]
-                                batch_write([(time_cell_for_row, hhmmss)])
-                                st.success("Tiempo corregido correctamente.")
-                            except Exception as e:
-                                st.error(f"Error al corregir el tiempo: {e}")
-                            finally:
-                                pedir_rerun()
+                        try:
+                            segs = hms_a_segundos(val)
+                            hhmmss = segundos_a_hms(segs)
+                            # Usamos config dinámica para saber en qué celda escribir AHORA
+                            cfg_corr = get_day_config()
+                            time_cell_for_row = cfg_corr["USERS"][USUARIO_ACTUAL][materia_key]["time"]
+                            batch_write([(time_cell_for_row, hhmmss)])
+                            st.success("Tiempo corregido correctamente.")
+                        except Exception as e:
+                            st.error(f"Error al corregir el tiempo: {e}")
+                        finally:
+                            pedir_rerun()
 
-                        if en_curso or usuario_estudiando:
-                            st.info("⛔ No podés corregir el tiempo mientras estás estudiando.")
-                        else:
-                            if st.button("Guardar Corrección", key=f"save_{sanitize_key(materia)}", on_click=save_correction_callback, args=(materia,)):
-                                pass
-
-        if not usuario_estudiando:
-            st.stop()
-
-        time.sleep(10)
-        st.rerun()
+                    if en_curso or usuario_estudiando:
+                        st.info("⛔ No podés corregir el tiempo mientras estás estudiando.")
+                    else:
+                        if st.button("Guardar Corrección", key=f"save_{sanitize_key(materia)}", on_click=save_correction_callback, args=(materia,)):
+                            pass
 
 if __name__ == "__main__":
     try:
