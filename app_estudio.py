@@ -50,7 +50,13 @@ def cargar_estilos():
         .status-badge { display: inline-block; padding: 5px 10px; border-radius: 12px; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; }
         .status-active { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
 
-        div.stButton > button { height: 3.5rem; font-size: 1.2rem !important; font-weight: bold !important; border-radius: 12px !important; }
+        /* Sólo los botones primarios (Iniciar/Detener) serán grandes */
+        div.stButton > button[kind="primary"], div.stButton > button[data-testid="baseButton-primary"] { 
+            height: 3.5rem; 
+            font-size: 1.2rem !important; 
+            font-weight: bold !important; 
+            border-radius: 12px !important; 
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -207,9 +213,6 @@ RANGO_LOCK_FACUNDO = f"'{SHEET_MARCAS}'!Z3"
 RANGO_FECHA_MAIL_VAGO = f"'{SHEET_MARCAS}'!Z12" 
 
 # ------------------ CONFIGURACIÓN DINÁMICA DEL DÍA ------------------
-# Esta función reemplaza las constantes globales que causaban el bug.
-# Calcula los rangos basándose en el momento en que se llama.
-
 def get_day_config(target_date=None):
     if target_date is None:
         target_date = _argentina_now_global().date()
@@ -218,7 +221,6 @@ def get_day_config(target_date=None):
     time_row = FILA_BASE + delta
     time_row2 = FILA_BASE2 + delta
     
-    # Construimos los rangos dinámicamente usando time_row actual
     users_dict = {
         "Facundo": {
             "Trabajo":         {"time": f"'{SHEET_FACUNDO}'!B{time_row2}", "est": f"'{SHEET_MARCAS}'!Z10"},
@@ -251,11 +253,9 @@ def get_day_config(target_date=None):
     }
 
 # ------------------ CARGA UNIFICADA (cacheada por fecha) ------------------
-# Agregamos fecha_str como argumento para que el cache se invalide al cambiar el día
 @st.cache_data()
 def cargar_datos_unificados(fecha_str):
-    # Obtenemos la config para el día actual
-    cfg = get_day_config() # Usa la fecha actual por defecto (que coincide con fecha_str)
+    cfg = get_day_config() 
     USERS_LOCAL = cfg["USERS"]
     
     yesterday = _argentina_now_global().date() - timedelta(days=1)
@@ -361,7 +361,6 @@ def cargar_datos_unificados(fecha_str):
 def batch_write(updates):
     try:
         sheets_batch_update(st.secrets["sheet_id"], updates)
-        # Limpiamos el cache usando la fecha actual
         cargar_datos_unificados.clear()
     except Exception as e:
         st.error(f"Error escribiendo Google Sheets: {e}")
@@ -402,7 +401,7 @@ def set_user_lock_status(user, lock_value):
 # ------------------ CALLBACKS ACTUALIZADOS ------------------
 def start_materia_callback(usuario, materia):
     try:
-        cfg = get_day_config() # Obtenemos configuración dinámica
+        cfg = get_day_config() 
         info = cfg["USERS"][usuario][materia]
         
         now_str = ahora_str()
@@ -421,7 +420,7 @@ def start_materia_callback(usuario, materia):
 
 def stop_materia_callback(usuario, materia):
     try:
-        cfg = get_day_config() # Config actual
+        cfg = get_day_config() 
         info = cfg["USERS"][usuario][materia]
         
         inicio = st.session_state.get("inicio_dt")
@@ -461,16 +460,9 @@ def stop_materia_callback(usuario, materia):
         for (p_inicio, p_fin) in partes:
             segs = int((p_fin - p_inicio).total_seconds())
             
-            # --- Corrección dinámica de fila para cada fragmento de tiempo ---
-            # Si cruza la medianoche, esto escribe en la fila correspondiente al día del fragmento
-            # Usar la base correcta según el usuario
             base_correcta = FILA_BASE2 if usuario == "Facundo" else FILA_BASE
             target_row = base_correcta + (p_inicio.date() - FECHA_BASE).days
             
-            # Reconstruimos el rango de tiempo usando la fila correcta
-            # Usamos una instancia temporal de config para obtener la columna base
-            # Como la columna B/C/D no cambia, usamos la config actual para obtener la letra
-            # y reemplazamos el número de fila.
             current_time_range = cfg["USERS"][usuario][materia]["time"]
             time_cell_for_row = replace_row_in_range(current_time_range, target_row)
             
@@ -495,7 +487,6 @@ def stop_materia_callback(usuario, materia):
 def main():
     cargar_estilos()
 
-    # Borrar caché si se acaba de entrar a la página (controlado por app.py)
     if st.session_state.get("clear_cache_estudio", False):
         cargar_datos_unificados.clear()
         st.session_state["clear_cache_estudio"] = False
@@ -508,11 +499,9 @@ def main():
         st.error("Error: Usuario no seleccionado en la sesión. Reinicia la aplicación.")
         st.stop()
         
-    # --- Carga de datos ---
     hoy_str = _argentina_now_global().strftime("%Y-%m-%d")
-    datos_globales = cargar_datos_unificados(hoy_str) # Pasamos la fecha string para cache key
+    datos_globales = cargar_datos_unificados(hoy_str) 
     
-    # Recargamos la config local para usar en la UI
     cfg = get_day_config()
     USERS_LOCAL = cfg["USERS"]
     
@@ -573,7 +562,6 @@ def main():
         objetivo = resumen_marcas[usuario]["obj"]
         total_min = 0.0
 
-        # Usamos USERS_LOCAL (dinámico)
         for materia, info in USERS_LOCAL[usuario].items():
             if info.get("excluir"):
                 continue
@@ -606,10 +594,6 @@ def main():
         pozo_valor = 0.0
     pozo_color = "#ff1744" if round(pozo_valor) != 0 else "#aaa"
 
-    # --- NUEVO CÁLCULO: Tiempo equivalente del Pozo ---
-    m_tot, m_rate, m_obj, total_min, progreso_en_dinero = calcular_metricas(USUARIO_ACTUAL, tiempo_anadido_seg)
-    
-    # --- CÁLCULO DEL TIEMPO DEL POZO EN FORMATO DECIMAL ---
     paga_por_hora = m_rate * 60
     if paga_por_hora > 0:
         pozo_horas_decimal = pozo_valor / paga_por_hora
@@ -660,9 +644,11 @@ def main():
         materia_visible = 'visible' if materia_otro else 'hidden'
         materia_nombre_html = f'<span style="color:#00e676; margin-left:6px; visibility:{materia_visible};">{materia_otro if materia_otro else ""}</span>'
 
-        with st.expander("ℹ️ No pensar, actuar."):
-            md_content = st.secrets["facundo_md"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ivan_md"]
-            st.markdown(md_content)
+        # Validación para mostrar bloque "No pensar, actuar" sólo si hay texto en secrets
+        md_content = st.secrets.get("facundo_md", "") if USUARIO_ACTUAL == "Facundo" else st.secrets.get("ivan_md", "")
+        if md_content and str(md_content).strip():
+            with st.expander("ℹ️ No pensar, actuar."):
+                st.markdown(md_content)
     
     # --- Actualizar Placeholders de Materias y Botones ---
     mis_materias = USERS_LOCAL[USUARIO_ACTUAL]
@@ -689,19 +675,18 @@ def main():
             cols = st.columns([1,1,1])
             with cols[0]:
                 if en_curso:
-                    st.button(f"⛔ DETENER {materia[:14]}", key=key_stop, use_container_width=True,
+                    st.button(f"⛔ DETENER {materia[:14]}", key=key_stop, use_container_width=True, type="primary",
                               on_click=stop_materia_callback, args=(USUARIO_ACTUAL, materia))
                 else:
                     if materia_en_curso is None:
-                        st.button("▶ INICIAR", key=key_start, use_container_width=True,
+                        st.button("▶ INICIAR", key=key_start, use_container_width=True, type="primary",
                                   on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia))
                     else:
-                        st.button("...", disabled=True, key=key_disabled, use_container_width=True)
+                        st.button("...", disabled=True, key=key_disabled, use_container_width=True, type="primary")
 
             with cols[1]:
                 with st.expander("🛠️ Corregir tiempo manualmente"):
                     input_key = f"input_{sanitize_key(materia)}"
-                    # Usamos el tiempo actual de datos, que puede venir de cache pero es razonablemente reciente
                     new_val = st.text_input("Tiempo (HH:MM:SS)", value=datos[USUARIO_ACTUAL]["tiempos"][materia], key=input_key)
 
                     def save_correction_callback(materia_key):
@@ -719,7 +704,6 @@ def main():
                         try:
                             segs = hms_a_segundos(val)
                             hhmmss = segundos_a_hms(segs)
-                            # Usamos config dinámica para saber en qué celda escribir AHORA
                             cfg_corr = get_day_config()
                             time_cell_for_row = cfg_corr["USERS"][USUARIO_ACTUAL][materia_key]["time"]
                             batch_write([(time_cell_for_row, hhmmss)])
