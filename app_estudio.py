@@ -50,7 +50,8 @@ def cargar_estilos():
         .status-badge { display: inline-block; padding: 5px 10px; border-radius: 12px; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; }
         .status-active { background-color: rgba(0, 230, 118, 0.2); color: #00e676; border: 1px solid #00e676; }
 
-        div.stButton > button { height: 3.5rem; font-size: 1.2rem !important; font-weight: bold !important; border-radius: 12px !important; }
+        div.stButton > button { font-size: 1.2rem !important; font-weight: bold !important; border-radius: 12px !important; }
+        .btn-grande div[data-testid="stButton"] button { height: 3.5rem !important; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -687,6 +688,7 @@ def main():
 
             cols = st.columns([1,1,1])
             with cols[0]:
+                st.markdown('<div class="btn-grande">', unsafe_allow_html=True)
                 if en_curso:
                     st.button(f"⛔ DETENER {materia[:14]}", key=key_stop, use_container_width=True,
                               on_click=stop_materia_callback, args=(USUARIO_ACTUAL, materia))
@@ -696,6 +698,7 @@ def main():
                                   on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia))
                     else:
                         st.button("...", disabled=True, key=key_disabled, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
 
             with cols[1]:
                 with st.expander("🛠️ Corregir tiempo manualmente"):
