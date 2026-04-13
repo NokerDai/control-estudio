@@ -626,15 +626,21 @@ def main():
     # --- LÓGICA DE CONDICIONAL PARA MOSTRAR DINERO ---
     mostrar_dinero = (USUARIO_ACTUAL == "Facundo")
 
-    if mostrar_dinero:
+    # --- LÓGICA DE CONDICIONAL PARA MOSTRAR DINERO ---
+    mostrar_dinero_detallado = (USUARIO_ACTUAL == "Facundo")
+
+    if mostrar_dinero_detallado:
+        # Caso Facundo: Muestra dinero en todos lados
         pozo_html = f'<strong>{pozo_horas_decimal:.2f}hs</strong> <span style="color:#666; margin-left:4px;">(${pozo_valor:.2f})</span>'
         total_html = f'{total_hms} | ${m_tot:.2f}'
         balance_html = f'<div>Balance: <span style="color:{balance_color};">{balance_str}</span></div>'
         objetivo_html = f'<div>{objetivo_hms} | ${pago_objetivo:.2f}</div>'
     else:
+        # Caso Iván: Solo muestra dinero en el Balance con el nuevo texto
         pozo_html = f'<strong>{pozo_horas_decimal:.2f}hs</strong>'
         total_html = f'{total_hms}'
-        balance_html = f'<div></div>' # Elemento vacío para mantener la alineación flexbox
+        # Aquí activamos el balance para Iván con tu frase personalizada
+        balance_html = f'<div>Facu te debe: <span style="color:{balance_color};">{balance_str}</span></div>'
         objetivo_html = f'<div>{objetivo_hms}</div>'
 
     # --- Actualizar Placeholder Global ---
