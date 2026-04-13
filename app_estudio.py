@@ -623,6 +623,20 @@ def main():
     balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa"
     balance_str = f"+${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
 
+    # --- LÓGICA DE CONDICIONAL PARA MOSTRAR DINERO ---
+    mostrar_dinero = (USUARIO_ACTUAL == "Facundo")
+
+    if mostrar_dinero:
+        pozo_html = f'<strong>{pozo_horas_decimal:.2f}hs</strong> <span style="color:#666; margin-left:4px;">(${pozo_valor:.2f})</span>'
+        total_html = f'{total_hms} | ${m_tot:.2f}'
+        balance_html = f'<div>Balance: <span style="color:{balance_color};">{balance_str}</span></div>'
+        objetivo_html = f'<div>{objetivo_hms} | ${pago_objetivo:.2f}</div>'
+    else:
+        pozo_html = f'<strong>{pozo_horas_decimal:.2f}hs</strong>'
+        total_html = f'{total_hms}'
+        balance_html = f'<div></div>' # Elemento vacío para mantener la alineación flexbox
+        objetivo_html = f'<div>{objetivo_hms}</div>'
+
     # --- Actualizar Placeholder Global ---
     with st.container():
         st.markdown(f"""
@@ -632,18 +646,17 @@ def main():
                     <div style="display:flex; align-items:center; gap:6px; font-size:0.9rem;">
                         <span style="color:#aaa;">Pozo:</span>
                         <span style="color:{pozo_color};">
-                            <strong>{pozo_horas_decimal:.2f}hs</strong> 
-                            <span style="color:#666; margin-left:4px;">(${pozo_valor:.2f})</span>
+                            {pozo_html}
                         </span>
                     </div>
                 </div>
-                <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_hms} | ${m_tot:.2f}</div>
+                <div style="width: 100%; font-size: 2.2rem; font-weight: bold; color: #fff; line-height: 1;">{total_html}</div>
                 <div style="width:100%; background-color:#333; border-radius:10px; height:12px; margin: 15px 0;">
                     <div style="width:{progreso_pct}%; background-color:{color_bar}; height:100%; border-radius:10px; transition: width 0.5s;"></div>
                 </div>
                 <div style="display:flex; justify-content:space-between; color:#888;">
-                    <div>Balance: <span style="color:{balance_color};">{balance_str}</span></div>
-                    <div>{objetivo_hms} | ${pago_objetivo:.2f}</div>
+                    {balance_html}
+                    {objetivo_html}
                 </div>
             </div>
         """, unsafe_allow_html=True)
