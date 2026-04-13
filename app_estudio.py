@@ -622,7 +622,7 @@ def main():
     if USUARIO_ACTUAL == "Facundo":
         balance_val += m_tot
     balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa"
-    balance_str = f"+${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
+    balance_str = f"${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
 
     # --- LÓGICA DE CONDICIONAL PARA MOSTRAR DINERO ---
     mostrar_dinero = (USUARIO_ACTUAL == "Facundo")
