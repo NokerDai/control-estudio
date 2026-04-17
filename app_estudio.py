@@ -632,6 +632,9 @@ def main():
     balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa"
     balance_str = f"${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
 
+    deuda_color = "#00e676" if deuda_facu > 0 else "#ff1744" if deuda_facu < 0 else "#aaa"
+    deuda_str = f"${deuda_facu:.2f}" if deuda_facu > 0 else (f"-${abs(deuda_facu):.2f}" if deuda_facu < 0 else "$0.00")
+
     # --- LÓGICA DE CONDICIONAL PARA MOSTRAR DINERO ---
     mostrar_dinero = (USUARIO_ACTUAL == "Facundo")
 
@@ -642,7 +645,12 @@ def main():
         # Caso Facundo: Muestra dinero en todos lados
         pozo_html = f'<strong>{pozo_horas_decimal:.2f}hs</strong> <span style="color:#666; margin-left:4px;">(${pozo_valor:.2f})</span>'
         total_html = f'{total_hms} | ${m_tot:.2f}'
-        balance_html = f'<div>Balance: <span style="color:{balance_color};">{balance_str}</span><br><span style="color:#ff4d4d; font-size: 0.85rem;">deuda semanal: -${deuda_facu:.2f}</span></div>'
+        balance_html = (
+            f'<div style="display:flex; flex-direction:column; gap:4px;">'
+            f'  <div>Balance: <span style="color:{balance_color};">{balance_str}</span></div>'
+            f'  <div>Deuda semanal: <span style="color:{deuda_color};">{deuda_str}</span></div>'
+            f'</div>'
+        )
         objetivo_html = f'<div>{objetivo_hms} | ${pago_objetivo:.2f}</div>'
     else:
         # Caso Iván: Solo muestra dinero en el Balance con el nuevo texto
