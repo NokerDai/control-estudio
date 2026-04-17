@@ -648,7 +648,7 @@ def main():
         balance_html = (
             f'<div style="display:flex; flex-direction:column; gap:4px;">'
             f'  <div>Balance: <span style="color:{balance_color};">{balance_str}</span></div>'
-            f'  <div>Deuda semanal: <span style="color:{deuda_color};">{deuda_str}</span></div>'
+            f'  <div>Esta semana: <span style="color:{deuda_color};">{deuda_str}</span></div>'
             f'</div>'
         )
         objetivo_html = f'<div>{objetivo_hms} | ${pago_objetivo:.2f}</div>'
