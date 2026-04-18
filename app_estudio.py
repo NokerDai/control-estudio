@@ -251,7 +251,6 @@ def get_day_config(target_date=None):
         "RANGO_CHECK_FACU": f"'{SHEET_MARCAS}'!I{time_row-2}",
         "RANGO_POZO_IVAN": f"'{SHEET_MARCAS}'!W{time_row-2}",
         "RANGO_POZO_FACU": f"'{SHEET_MARCAS}'!X{time_row-2}",
-        "RANGO_DEUDA_FACU": f"'{SHEET_FACUNDO}'!J{time_row2}",
     }
 
 # ------------------ CARGA UNIFICADA (cacheada por fecha) ------------------
@@ -289,8 +288,6 @@ def cargar_datos_unificados(fecha_str):
 
     all_ranges.append(cfg["RANGO_POZO_IVAN"]); mapa_indices["pozo_ivan"] = idx; idx += 1
     all_ranges.append(cfg["RANGO_POZO_FACU"]); mapa_indices["pozo_facu"] = idx; idx += 1
-
-    all_ranges.append(cfg["RANGO_DEUDA_FACU"]); mapa_indices["deuda_facu"] = idx; idx += 1
 
     try:
         res = sheets_batch_get(st.secrets["sheet_id"], all_ranges)
@@ -348,8 +345,6 @@ def cargar_datos_unificados(fecha_str):
     pozo_ivan_val = parse_float_or_zero(get_val(mapa_indices["pozo_ivan"]))
     pozo_facu_val = parse_float_or_zero(get_val(mapa_indices["pozo_facu"]))
 
-    deuda_facu_val = parse_float_or_zero(get_val(mapa_indices["deuda_facu"]))
-
     if "usuario_seleccionado" in st.session_state:
         st.session_state["materia_activa"] = materia_en_curso
         st.session_state["inicio_dt"] = inicio_dt
@@ -363,8 +358,7 @@ def cargar_datos_unificados(fecha_str):
         "last_mail_vago": last_mail_vago,
         "checks": checks_data,
         "pozo_ivan": pozo_ivan_val,
-        "pozo_facu": pozo_facu_val,
-        "deuda_facu": deuda_facu_val
+        "pozo_facu": pozo_facu_val
     }
 
 def batch_write(updates):
@@ -536,8 +530,6 @@ def main():
     pozo_ivan = datos_globales["pozo_ivan"]
     pozo_facu = datos_globales["pozo_facu"]
 
-    deuda_facu = datos_globales["deuda_facu"]
-
     USUARIO_ACTUAL = st.session_state["usuario_seleccionado"]
     OTRO_USUARIO = "Iván" if USUARIO_ACTUAL == "Facundo" else "Facundo"
 
@@ -632,9 +624,6 @@ def main():
     balance_color = "#00e676" if balance_val > 0 else "#ff1744" if balance_val < 0 else "#aaa"
     balance_str = f"${balance_val:.2f}" if balance_val > 0 else (f"-${abs(balance_val):.2f}" if balance_val < 0 else "$0.00")
 
-    deuda_color = "#00e676" if deuda_facu > 0 else "#ff1744" if deuda_facu < 0 else "#aaa"
-    deuda_str = f"${deuda_facu:.2f}" if deuda_facu > 0 else (f"-${abs(deuda_facu):.2f}" if deuda_facu < 0 else "$0.00")
-
     # --- LÓGICA DE CONDICIONAL PARA MOSTRAR DINERO ---
     mostrar_dinero = (USUARIO_ACTUAL == "Facundo")
 
@@ -645,12 +634,7 @@ def main():
         # Caso Facundo: Muestra dinero en todos lados
         pozo_html = f'<strong>{pozo_horas_decimal:.2f}hs</strong> <span style="color:#666; margin-left:4px;">(${pozo_valor:.2f})</span>'
         total_html = f'{total_hms} | ${m_tot:.2f}'
-        balance_html = (
-            f'<div style="display:flex; flex-direction:column; gap:4px;">'
-            f'  <div>Balance: <span style="color:{balance_color};">{balance_str}</span></div>'
-            f'  <div>Esta semana: <span style="color:{deuda_color};">{deuda_str}</span></div>'
-            f'</div>'
-        )
+        balance_html = f'<div>Balance: <span style="color:{balance_color};">{balance_str}</span></div>'
         objetivo_html = f'<div>{objetivo_hms} | ${pago_objetivo:.2f}</div>'
     else:
         # Caso Iván: Solo muestra dinero en el Balance con el nuevo texto
