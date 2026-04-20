@@ -651,7 +651,7 @@ def main():
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div style="font-size: 1.2rem; color: #aaa;">Hoy</div>
                     <div style="display:flex; align-items:center; gap:6px; font-size:0.9rem;">
-                        <span style="color:#aaa;">Pozo:</span>
+                        <span style="color:#aaa;">Deuda:</span>
                         <span style="color:{pozo_color};">
                             {pozo_html}
                         </span>
