@@ -32,9 +32,9 @@ query_params = st.query_params
 if "password" in query_params:
     st.session_state.authenticated = True
 
-# ---------------------------------------------------------
+# --------------------------------------------------------
 # LÓGICA DE SELECCIÓN DE USUARIO (SIN LOCKS)
-# ---------------------------------------------------------
+# --------------------------------------------------------
 def handle_user_login(selected_user):
     st.session_state.usuario_seleccionado = selected_user
     st.session_state.clear_cache_estudio = True # Limpiar caché al seleccionar usuario
