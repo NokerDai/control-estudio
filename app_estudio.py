@@ -618,7 +618,7 @@ def main():
         pozo_html = f'<strong>{pozo_horas_decimal:.2f}hs</strong> <span style="color:#666; margin-left:4px;">(${pozo_valor:.2f})</span>'
         total_html = f'{total_hms} | ${m_tot:.2f}'
         # Sin dinero, solo horas para Facundo:
-        total_bruto_html = f'<div style="font-size: 1.2rem; color: #aaa; margin-top: 5px;">Total bruto: {total_gral_hms}</div>'
+        total_bruto_html = f'<div>{total_gral_hms}</div>'
         balance_html = f'<div>Balance: <span style="color:{balance_color};">{balance_str}</span></div>'
         objetivo_html = f'<div>{objetivo_hms} | ${pago_objetivo:.2f}</div>'
     else:
