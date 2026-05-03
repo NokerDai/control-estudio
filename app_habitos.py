@@ -180,9 +180,9 @@ def run():
     # -------------------------
     pending = st.session_state.get("todays_pending_habits", [])
 
-    # Cartel en rojo con el total pendiente * 2000
+    # Cartel en rojo con el total pendiente * 3750
     faltantes = len(pending)
-    multa = faltantes * 2000
+    multa = faltantes * 3750
 
     st.markdown(
         f"""
