@@ -701,27 +701,7 @@ def main():
 
         tiempo_total_hms = segundos_a_hms(tiempo_total_seg)
         badge_html = f'<div class="status-badge status-active">🟢 Estudiando...</div>' if en_curso else ''
-        
-        # --- INICIO DE LO NUEVO ---
-        texto_trabajo_html = ""
-        if materia == "Trabajo":
-            # Usamos .get() por si la key no existe, para que no rompa la app.
-            # Cambiá "trabajo_md" por el nombre real de tu secret.
-            texto_md = st.secrets.get("trabajo_md", "")
-            if texto_md:
-                # Le damos un poco de estilo para que se despegue del título y el tiempo
-                texto_trabajo_html = f'<div style="margin-bottom: 10px; font-size: 0.95rem; color: #b0b0b0; line-height: 1.4;">{texto_md}</div>'
-        # --- FIN DE LO NUEVO ---
-
-        # Actualizamos el html_card para insertar {texto_trabajo_html}
-        html_card = f"""
-        <div class="materia-card">
-            <div class="materia-title">{materia}</div>
-            {badge_html}
-            {texto_trabajo_html}
-            <div class="materia-time">{tiempo_total_hms}</div>
-        </div>
-        """
+        html_card = f"""<div class="materia-card"><div class="materia-title">{materia}</div>{badge_html}<div class="materia-time">{tiempo_total_hms}</div></div>"""
 
         with st.container():
             st.markdown(html_card, unsafe_allow_html=True)
