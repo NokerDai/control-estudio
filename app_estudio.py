@@ -684,9 +684,11 @@ def main():
             md_content = st.secrets["facundo_md"] if USUARIO_ACTUAL == "Facundo" else st.secrets["ivan_md"]
             st.markdown(md_content)
             
-        if st.button("🔄 Actualizar", use_container_width=True):
-            cargar_datos_unificados.clear()
-            st.rerun()
+        # condiciono la aparición del botón de actualización
+        if usuario_estudiando:
+            if st.button("🔄 Actualizar", use_container_width=True):
+                cargar_datos_unificados.clear()
+                st.rerun()
     
     # --- Actualizar Placeholders de Materias y Botones ---
     mis_materias = USERS_LOCAL[USUARIO_ACTUAL]
