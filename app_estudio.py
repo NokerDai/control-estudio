@@ -690,7 +690,7 @@ def main():
                 cargar_datos_unificados.clear()
                 st.rerun()
     
-    # --- Actualizar Placeholders de Materias y Botones ---
+# --- Actualizar Placeholders de Materias y Botones ---
     mis_materias = USERS_LOCAL[USUARIO_ACTUAL]
     for materia, info in mis_materias.items():
 
@@ -710,56 +710,51 @@ def main():
 
             key_start = sanitize_key(f"start_{USUARIO_ACTUAL}_{materia}")
             key_stop = sanitize_key(f"stop_{USUARIO_ACTUAL}_{materia}")
-            key_disabled = sanitize_key(f"dis_{USUARIO_ACTUAL}_{materia}")
 
-            cols = st.columns([1,1,1])
-            with cols[0]:
+            # LÓGICA DE BOTONES ULTRA-ENFOCADA
+            if usuario_estudiando:
+                # Si estás estudiando, el ÚNICO botón que existirá en pantalla es el de detener la materia activa
                 if en_curso:
                     st.button(f"⛔ DETENER {materia[:14]}", key=key_stop, use_container_width=True,
                               on_click=stop_materia_callback, args=(USUARIO_ACTUAL, materia))
-                else:
-                    if materia_en_curso is None:
-                        st.button("▶ INICIAR", key=key_start, use_container_width=True,
-                                  on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia))
-                    else:
-                        st.button("...", disabled=True, key=key_disabled, use_container_width=True)
+                # Las demás materias muestran su tarjeta con el tiempo acumulado pero CERO botones o expanders
+            else:
+                # Comportamiento normal cuando NO estás estudiando
+                cols = st.columns([1, 1, 1])
+                with cols[0]:
+                    st.button("▶ INICIAR", key=key_start, use_container_width=True,
+                              on_click=start_materia_callback, args=(USUARIO_ACTUAL, materia))
 
-            with cols[1]:
-                with st.expander("🛠️ Corregir tiempo manualmente"):
-                    input_key = f"input_{sanitize_key(materia)}"
-                    # Usamos el tiempo actual de datos, que puede venir de cache pero es razonablemente reciente
-                    new_val = st.text_input("Tiempo (HH:MM:SS)", value=datos[USUARIO_ACTUAL]["tiempos"][materia], key=input_key)
+                with cols[1]:
+                    with st.expander("🛠️ Corregir tiempo manualmente"):
+                        input_key = f"input_{sanitize_key(materia)}"
+                        new_val = st.text_input("Tiempo (HH:MM:SS)", value=datos[USUARIO_ACTUAL]["tiempos"][materia], key=input_key)
 
-                    def save_correction_callback(materia_key):
-                        if st.session_state.get("materia_activa") is not None:
-                            st.error("⛔ No podés corregir el tiempo mientras estás estudiando.")
-                            pedir_rerun()
-                            return
+                        def save_correction_callback(materia_key):
+                            if st.session_state.get("materia_activa") is not None:
+                                st.error("⛔ No podés corregir el tiempo mientras estás estudiando.")
+                                pedir_rerun()
+                                return
 
-                        val = st.session_state.get(f"input_{sanitize_key(materia_key)}", "").strip()
-                        if ":" not in val:
-                            st.error("Formato inválido (debe ser HH:MM:SS)")
-                            pedir_rerun()
-                            return
+                            val = st.session_state.get(f"input_{sanitize_key(materia_key)}", "").strip()
+                            if ":" not in val:
+                                st.error("Formato inválido (debe ser HH:MM:SS)")
+                                pedir_rerun()
+                                return
 
-                        try:
-                            segs = hms_a_segundos(val)
-                            hhmmss = segundos_a_hms(segs)
-                            # Usamos config dinámica para saber en qué celda escribir AHORA
-                            cfg_corr = get_day_config()
-                            time_cell_for_row = cfg_corr["USERS"][USUARIO_ACTUAL][materia_key]["time"]
-                            batch_write([(time_cell_for_row, hhmmss)])
-                            st.success("Tiempo corregido correctamente.")
-                        except Exception as e:
-                            st.error(f"Error al corregir el tiempo: {e}")
-                        finally:
-                            pedir_rerun()
+                            try:
+                                segs = hms_a_segundos(val)
+                                hhmmss = segundos_a_hms(segs)
+                                cfg_corr = get_day_config()
+                                time_cell_for_row = cfg_corr["USERS"][USUARIO_ACTUAL][materia_key]["time"]
+                                batch_write([(time_cell_for_row, hhmmss)])
+                                st.success("Tiempo corregido correctamente.")
+                            except Exception as e:
+                                st.error(f"Error al guardar: {e}")
+                            finally:
+                                pedir_rerun()
 
-                    if en_curso or usuario_estudiando:
-                        st.info("⛔ No podés corregir el tiempo mientras estás estudiando.")
-                    else:
-                        if st.button("Guardar Corrección", key=f"save_{sanitize_key(materia)}", on_click=save_correction_callback, args=(materia,)):
-                            pass
+                        st.button("💾 Guardar", key=f"btn_save_{sanitize_key(materia)}", on_click=save_correction_callback, args=(materia,))
 
 if __name__ == "__main__":
     try:
