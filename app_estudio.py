@@ -224,7 +224,7 @@ def get_day_config(target_date=None):
     # Construimos los rangos dinámicamente usando time_row actual
     users_dict = {
         "Facundo": {
-            "Trabajo":         {"time": f"'{SHEET_FACUNDO}'!B{time_row2}", "est": f"'{SHEET_MARCAS}'!Z10"},
+            "Trabajo":         {"time": f"'{SHEET_FACUNDO}'!B{time_row2}", "est": f"'{SHEET_MARCAS}'!Z10", "excluir": True},
             "Cursado":         {"time": f"'{SHEET_FACUNDO}'!C{time_row2}", "est": f"'{SHEET_MARCAS}'!Z14"},
             "Estadística I":    {"time": f"'{SHEET_FACUNDO}'!D{time_row2}", "est": f"'{SHEET_MARCAS}'!Z4"},
             "Int. Contabilidad":    {"time": f"'{SHEET_FACUNDO}'!E{time_row2}", "est": f"'{SHEET_MARCAS}'!Z5"},
