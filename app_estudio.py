@@ -639,7 +639,7 @@ def main():
             hora_fin_obj = _argentina_now_global() + timedelta(minutes=minutos_restantes)
             hora_fin_html = f'<div style="color:#00e676;">Terminás a las {hora_fin_obj.strftime("%H:%M")}</div>'
         else:
-             = f'<div></div>'
+             = '<div></div>'
 
     if mostrar_dinero_detallado:
         # Caso Facundo: Muestra dinero en todos lados
