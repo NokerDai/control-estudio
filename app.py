@@ -5,7 +5,7 @@ import app_habitos
 import app_biblioteca
 import app_noticias
 
-# 1. Configuración global 
+# 1. Configuración global  
 st.set_page_config(
     page_title="Estudio", 
     page_icon="📖", 
