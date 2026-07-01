@@ -637,7 +637,7 @@ def main():
         if minutos_restantes > 0:
             # Calculamos a qué hora termina sumando los minutos que faltan a la hora actual
             hora_fin_obj = _argentina_now_global() + timedelta(minutes=minutos_restantes)
-            hora_fin_html = f'<div style="color:#888;">-> {hora_fin_obj.strftime("%H:%M")}</div>'
+            hora_fin_html = f'<div style="color:#00e676;">Terminás a las {hora_fin_obj.strftime("%H:%M")}</div>'
         else:
             hora_fin_html = f'<div></div>'
 
@@ -652,7 +652,8 @@ def main():
         pozo_html = f'<strong>{pozo_horas_decimal:.2f}hs</strong>'
         total_html = f'{total_hms}'
         # Aquí activamos el balance para Iván con tu frase personalizada
-        balance_html = '<div></div>'
+        balance_html = hora_fin_html
+        hora_fin_html = f'<div></div>'
         objetivo_html = f'<div>{objetivo_hms}</div>'
 
     # --- Actualizar Placeholder Global ---
